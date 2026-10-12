@@ -4,6 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Admin Dashboard - Al-Farha Cargo</title>
+
+    <!-- STRICT AUTHENTICATION GATEKEEPER -->
+    <script>
+        (function checkAuth() {
+            const token = localStorage.getItem('cargo_auth_token');
+            const role = localStorage.getItem('cargo_user_role');
+            
+            // If no token exists, immediately redirect to login page
+            if (!token) {
+                window.location.replace('../login.html');
+                return;
+            }
+            
+            // Optional: If this is an admin page, kick out standard employees
+            if (role !== 'super_admin' && role !== 'branch_admin') {
+                window.location.replace('../dashboard.html');
+            }
+        })();
+    </script>
+
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js for visualizations -->
