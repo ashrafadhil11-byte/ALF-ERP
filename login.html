@@ -18,9 +18,9 @@
                     },
                     colors: {
                         brand: {
-                            orange: '#F58220', // Cargo Orange
+                            orange: '#F58220', 
                             orangeHover: '#E06D10',
-                            purple: '#6A2C70', // Brand Purple
+                            purple: '#6A2C70', 
                             purpleDark: '#4A1D4E',
                             light: '#F8F9FA'
                         }
@@ -34,7 +34,6 @@
         }
     </script>
     <style>
-        /* Custom Input Autofill Styling to maintain rounded borders and background */
         input:-webkit-autofill,
         input:-webkit-autofill:hover, 
         input:-webkit-autofill:focus, 
@@ -44,7 +43,6 @@
             border-radius: 0.75rem;
         }
         
-        /* Floating abstract shapes */
         .shape-1 { top: -20%; left: -10%; transform: rotate(45deg); }
         .shape-2 { bottom: -10%; right: -20%; border-radius: 50%; }
     </style>
@@ -61,14 +59,9 @@
             <div class="absolute w-80 h-80 bg-brand-orange opacity-10 shape-2 z-0"></div>
             
             <div class="relative z-10">
-                <div class="flex items-center gap-2 mb-12">
-                    <!-- Placeholder for actual logo -->
-                    <div class="w-10 h-10 bg-brand-orange rounded-xl flex items-center justify-center shadow-lg">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                        </svg>
-                    </div>
-                    <span class="text-xl font-bold tracking-wide">Al-Farha Cargo</span>
+                <!-- Desktop Logo Replacement -->
+                <div class="mb-12">
+                    <img src="assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-14 w-auto object-contain">
                 </div>
                 
                 <div>
@@ -92,14 +85,9 @@
         <!-- Right Login Form Panel -->
         <div class="w-full md:w-7/12 p-8 sm:p-12 lg:p-16 flex flex-col justify-center bg-white relative">
             
-            <!-- Mobile Logo (Shows only on small screens) -->
-            <div class="flex items-center gap-2 mb-8 md:hidden">
-                <div class="w-8 h-8 bg-brand-orange rounded-lg flex items-center justify-center shadow-md">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                    </svg>
-                </div>
-                <span class="text-lg font-bold text-gray-800">Al-Farha Cargo</span>
+            <!-- Mobile Logo Replacement (Shows only on small screens) -->
+            <div class="mb-8 md:hidden">
+                <img src="assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-10 w-auto object-contain">
             </div>
 
             <div class="max-w-md w-full mx-auto">
@@ -231,7 +219,6 @@
                 await new Promise(resolve => setTimeout(resolve, 1500));
 
                 // On Success Redirect:
-                // Since this is a demo, we'll route to the dashboard we designed earlier
                 window.location.href = 'dashboard.html';
 
             } catch (error) {
