@@ -179,7 +179,6 @@
         const submitBtn = document.getElementById('submitBtn');
         const btnText = document.getElementById('btnText');
         const btnLoader = document.getElementById('btnLoader');
-        const btnArrow = document.getElementById('btnArrow');
         const errorMessage = document.getElementById('errorMessage');
 
         loginForm.addEventListener('submit', async (e) => {
@@ -192,20 +191,13 @@
             submitBtn.disabled = true;
             btnText.textContent = 'Authenticating...';
             btnLoader.classList.remove('hidden');
-            btnArrow.classList.add('hidden');
             errorMessage.classList.add('hidden');
 
             try {
-                // Call our secure hidden Vercel route instead of Supabase directly
                 const response = await fetch('/api/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        username: usernameVal,
-                        password: passwordVal
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: usernameVal, password: passwordVal })
                 });
 
                 const result = await response.json();
@@ -214,24 +206,29 @@
                     throw new Error(result.error || 'Authentication failed');
                 }
 
-                // Optionally, store the session token in localStorage or cookies here if needed for future requests
+                // 1. Securely store the session token and user role
                 if(result.session && result.session.access_token) {
                     localStorage.setItem('cargo_auth_token', result.session.access_token);
+                    
+                    // Extract the role from the Supabase user metadata
+                    const userRole = result.session.user.user_metadata.role || 'employee';
+                    localStorage.setItem('cargo_user_role', userRole);
+
+                    // 2. Role-Based Redirection
+                    if (userRole === 'super_admin') {
+                        window.location.href = 'admin/super-dashboard.html';
+                    } else {
+                        window.location.href = 'dashboard.html';
+                    }
                 }
 
-                // On Success Redirect:
-                window.location.href = 'dashboard.html';
-
             } catch (error) {
-                // Handle errors
                 errorMessage.classList.remove('hidden');
                 document.getElementById('errorText').textContent = error.message;
                 
-                // Reset Button State
                 submitBtn.disabled = false;
                 btnText.textContent = 'Sign In';
                 btnLoader.classList.add('hidden');
-                btnArrow.classList.remove('hidden');
             }
         });
     </script>
