@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create User - Al-Farha Cargo ERP</title>
+    <title>Create User - Al-Farha Cargo Admin</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts -->
@@ -37,7 +37,8 @@
         <div class="w-full md:w-5/12 bg-gradient-to-br from-brand-purple to-brand-purpleDark p-10 flex flex-col justify-between text-white relative overflow-hidden hidden md:flex">
             <div class="relative z-10">
                 <div class="mb-8">
-                    <img src="assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-12 w-auto object-contain">
+                    <!-- Path updated to point outside the admin folder -->
+                    <img src="../assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-12 w-auto object-contain">
                 </div>
                 <div>
                     <h1 class="text-3xl font-extrabold leading-tight mb-4">
@@ -49,8 +50,8 @@
                 </div>
             </div>
             
-            <!-- Dashboard Link -->
-            <a href="dashboard.html" class="relative z-10 flex items-center gap-2 text-sm text-purple-300 hover:text-white transition-colors mt-8">
+            <!-- Dashboard Link updated to point to root dashboard -->
+            <a href="../dashboard.html" class="relative z-10 flex items-center gap-2 text-sm text-purple-300 hover:text-white transition-colors mt-8">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 Back to Dashboard
             </a>
@@ -60,8 +61,9 @@
         <div class="w-full md:w-7/12 p-8 sm:p-12 flex flex-col justify-center bg-white relative">
             
             <div class="mb-6 md:hidden flex justify-between items-center">
-                <img src="assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-8 w-auto object-contain">
-                <a href="dashboard.html" class="text-sm text-gray-500 hover:text-brand-orange">Cancel</a>
+                <!-- Path updated -->
+                <img src="../assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-8 w-auto object-contain">
+                <a href="../dashboard.html" class="text-sm text-gray-500 hover:text-brand-orange">Cancel</a>
             </div>
 
             <div class="max-w-md w-full mx-auto">
@@ -157,6 +159,7 @@
             alertMsg.classList.add('hidden');
 
             try {
+                // The API route remains '/api/create-user' because the leading slash routes it from the root domain
                 const response = await fetch('/api/create-user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
