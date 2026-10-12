@@ -1,21 +1,37 @@
 export default async function handler(req, res) {
-    // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
     const { username, password } = req.body;
 
-    // These grab the keys securely from Vercel's Environment Variables (set in Step 3)
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-
-    // Format the username into an email for Supabase (e.g., admin -> admin@alfarhacargo.com)
-    // If they actually type an email, it leaves it alone.
-    const formattedEmail = username.includes('@') ? username : `${username.toLowerCase()}@alfarhacargo.com`;
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // The master key to bypass security rules internally
 
     try {
-        // Securely communicate with Supabase from the server, entirely hidden from the browser
+        let targetEmail = username; // Default to what they typed (in case they actually typed their email)
+
+        // 1. If they typed a username (no '@' symbol), look up their real email in the database
+        if (!username.includes('@')) {
+            const lookupRes = await fetch(`${SUPABASE_URL}/rest/v1/employees?username=eq.${username}&select=recovery_email`, {
+                method: 'GET',
+                headers: {
+                    'apikey': SUPABASE_SERVICE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
+                }
+            });
+            
+            const lookupData = await lookupRes.json();
+            
+            if (lookupData && lookupData.length > 0) {
+                targetEmail = lookupData[0].recovery_email; // Found the real email
+            } else {
+                return res.status(400).json({ error: 'Username not found.' });
+            }
+        }
+
+        // 2. Proceed with secure login using the real email
         const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
             method: 'POST',
             headers: {
@@ -23,7 +39,7 @@ export default async function handler(req, res) {
                 'apikey': SUPABASE_ANON_KEY
             },
             body: JSON.stringify({ 
-                email: formattedEmail, 
+                email: targetEmail, 
                 password: password 
             })
         });
@@ -31,10 +47,13 @@ export default async function handler(req, res) {
         const data = await response.json();
 
         if (!response.ok) {
+            // Check if it failed because the email isn't verified yet
+            if (data.error_description && data.error_description.includes("Email not confirmed")) {
+                 return res.status(403).json({ error: 'Please verify your email address before logging in.' });
+            }
             return res.status(response.status).json({ error: data.error_description || 'Invalid login credentials' });
         }
 
-        // Send success back to the frontend
         return res.status(200).json({ 
             success: true, 
             session: data.session 
