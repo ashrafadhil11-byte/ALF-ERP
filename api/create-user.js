@@ -3,13 +3,17 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { fullName, username, password, role } = req.body;
+    // Extract all the new fields from the incoming request body
+    const { 
+        fullName, dob, contactNumber, recoveryEmail, 
+        omanId, username, role, branch, password 
+    } = req.body;
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-    // Ensure the username is formatted as the backend email
-    const formattedEmail = username.includes('@') ? username : `${username.toLowerCase().replace(/\s+/g, '')}@alfarhacargo.com`;
+    // We still use username formatting for the internal Supabase auth system
+    const formattedAuthEmail = username.includes('@') ? username : `${username.toLowerCase().replace(/\s+/g, '')}@alfarhacargo.com`;
 
     try {
         const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
@@ -19,12 +23,18 @@ export default async function handler(req, res) {
                 'apikey': SUPABASE_ANON_KEY
             },
             body: JSON.stringify({
-                email: formattedEmail,
+                email: formattedAuthEmail, // System email for login
                 password: password,
                 data: {
+                    // This data gets stored in Supabase's auth.users table under 'raw_user_meta_data'
                     full_name: fullName,
+                    date_of_birth: dob,
+                    contact_number: contactNumber,
+                    recovery_email: recoveryEmail,
+                    oman_civil_id: omanId,
                     username: username,
-                    role: role
+                    role: role,
+                    branch: branch
                 }
             })
         });
