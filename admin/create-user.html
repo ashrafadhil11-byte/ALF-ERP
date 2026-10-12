@@ -29,15 +29,14 @@
         }
     </script>
 </head>
-<body class="bg-[#FBF8F1] min-h-screen flex items-center justify-center p-6 antialiased selection:bg-brand-orange selection:text-white">
+<body class="bg-[#FBF8F1] min-h-screen flex items-center justify-center p-4 md:p-6 antialiased selection:bg-brand-orange selection:text-white">
 
-    <div class="max-w-4xl w-full bg-white rounded-[2.5rem] shadow-soft overflow-hidden flex flex-col md:flex-row relative z-10">
+    <div class="max-w-5xl w-full bg-white rounded-[2.5rem] shadow-soft overflow-hidden flex flex-col md:flex-row relative z-10">
         
         <!-- Left Branding Panel -->
-        <div class="w-full md:w-5/12 bg-gradient-to-br from-brand-purple to-brand-purpleDark p-10 flex flex-col justify-between text-white relative overflow-hidden hidden md:flex">
+        <div class="w-full md:w-4/12 bg-gradient-to-br from-brand-purple to-brand-purpleDark p-10 flex flex-col justify-between text-white relative overflow-hidden hidden md:flex">
             <div class="relative z-10">
                 <div class="mb-8">
-                    <!-- Path updated to point outside the admin folder -->
                     <img src="../assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-12 w-auto object-contain">
                 </div>
                 <div>
@@ -45,77 +44,123 @@
                         Add New <br><span class="text-brand-orange">Team Member</span>
                     </h1>
                     <p class="text-purple-200 text-sm leading-relaxed">
-                        Create secure access credentials for employees to access the Al-Farha Cargo ERP system.
+                        Create secure access credentials and set up organizational roles for the Al-Farha Cargo ERP system.
                     </p>
                 </div>
             </div>
             
-            <!-- Dashboard Link updated to point to root dashboard -->
-            <a href="../dashboard.html" class="relative z-10 flex items-center gap-2 text-sm text-purple-300 hover:text-white transition-colors mt-8">
+            <a href="../dashboard.html" class="relative z-10 flex items-center gap-2 text-sm text-purple-300 hover:text-white transition-colors mt-8 w-max">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 Back to Dashboard
             </a>
         </div>
 
         <!-- Right Form Panel -->
-        <div class="w-full md:w-7/12 p-8 sm:p-12 flex flex-col justify-center bg-white relative">
+        <div class="w-full md:w-8/12 p-6 sm:p-10 lg:p-12 flex flex-col justify-center bg-white relative">
             
             <div class="mb-6 md:hidden flex justify-between items-center">
-                <!-- Path updated -->
                 <img src="../assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-8 w-auto object-contain">
                 <a href="../dashboard.html" class="text-sm text-gray-500 hover:text-brand-orange">Cancel</a>
             </div>
 
-            <div class="max-w-md w-full mx-auto">
-                <h2 class="text-2xl font-bold text-gray-900 mb-1">Create Account</h2>
-                <p class="text-gray-500 text-sm mb-8">Set up a new user for the logistics portal.</p>
+            <div class="w-full mx-auto">
+                <h2 class="text-2xl font-bold text-gray-900 mb-1">Employee Registration</h2>
+                <p class="text-gray-500 text-sm mb-8">Enter the user's personal and organizational details below.</p>
 
-                <form id="createUserForm" class="space-y-5">
+                <form id="createUserForm" class="space-y-6">
                     
-                    <!-- Alert Messages -->
                     <div id="alertMsg" class="hidden text-sm p-4 rounded-xl border flex items-center gap-2 mb-4"></div>
 
-                    <!-- Full Name -->
-                    <div class="space-y-1.5">
-                        <label class="text-xs font-semibold text-gray-700 ml-1">Full Name</label>
-                        <input type="text" id="fullName" required placeholder="e.g. John Doe" 
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
-                    </div>
-
-                    <!-- Grid for Username and Role -->
-                    <div class="grid grid-cols-2 gap-4">
+                    <!-- 2-Column Grid Layout -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        
+                        <!-- Full Name -->
                         <div class="space-y-1.5">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">Username</label>
-                            <input type="text" id="username" required placeholder="e.g. jdoe" 
+                            <label class="text-xs font-semibold text-gray-700 ml-1">Full Name</label>
+                            <input type="text" id="fullName" required placeholder="e.g. Muhammed Adhil" 
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
                         </div>
+
+                        <!-- Date of Birth (Creative Addition) -->
                         <div class="space-y-1.5">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">Account Role</label>
-                            <select id="role" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200 appearance-none">
-                                <option value="agent">Cargo Agent</option>
-                                <option value="manager">Manager</option>
+                            <label class="text-xs font-semibold text-gray-700 ml-1 flex justify-between items-center">
+                                Date of Birth 
+                                <span class="text-brand-orange text-[10px] font-bold bg-orange-50 px-2 py-0.5 rounded-full">🎉 For team celebrations</span>
+                            </label>
+                            <input type="date" id="dob" required 
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
+                        </div>
+
+                        <!-- Contact Number -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-semibold text-gray-700 ml-1">Contact Number</label>
+                            <input type="tel" id="contactNumber" required placeholder="+968 9XXXXXXX" 
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
+                        </div>
+
+                        <!-- Recovery Email -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-semibold text-gray-700 ml-1">Recovery Email</label>
+                            <input type="email" id="recoveryEmail" required placeholder="user@personal.com" 
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
+                        </div>
+
+                        <!-- Oman Civil ID -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-semibold text-gray-700 ml-1">Oman Civil ID</label>
+                            <input type="text" id="omanId" required placeholder="e.g. 12345678" pattern="\d+" title="Please enter numeric ID only"
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
+                        </div>
+
+                        <!-- Username -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-semibold text-gray-700 ml-1">System Username</label>
+                            <input type="text" id="username" required placeholder="e.g. madhil" 
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
+                        </div>
+
+                        <!-- User Role -->
+                        <div class="space-y-1.5">
+                            <label class="text-xs font-semibold text-gray-700 ml-1">User Role</label>
+                            <select id="role" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200 appearance-none cursor-pointer">
+                                <option value="" disabled selected>Select a role...</option>
+                                <option value="super_admin">Super Admin</option>
+                                <option value="branch_admin">Branch Admin</option>
+                                <option value="employee">Employee</option>
                                 <option value="driver">Driver</option>
-                                <option value="admin">Administrator</option>
                             </select>
                         </div>
-                    </div>
 
-                    <!-- Password -->
-                    <div class="space-y-1.5">
-                        <label class="text-xs font-semibold text-gray-700 ml-1">Temporary Password</label>
-                        <input type="password" id="password" required placeholder="••••••••" minlength="6"
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
+                        <!-- Branch Allocation -->
+                        <div class="space-y-1.5 transition-opacity duration-300" id="branchContainer">
+                            <label class="text-xs font-semibold text-gray-700 ml-1">Branch Allocation</label>
+                            <select id="branch" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200 appearance-none cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
+                                <option value="" disabled selected>Select branch...</option>
+                                <option value="salalah">Salalah HQ</option>
+                                <option value="muscat">Muscat Branch</option>
+                                <option value="sohar">Sohar Branch</option>
+                            </select>
+                        </div>
+
+                        <!-- Temporary Password (Spans both columns) -->
+                        <div class="space-y-1.5 md:col-span-2">
+                            <label class="text-xs font-semibold text-gray-700 ml-1">Temporary Password</label>
+                            <input type="password" id="password" required placeholder="Set a secure initial password" minlength="8"
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
+                        </div>
                     </div>
 
                     <!-- Submit Button -->
                     <button type="submit" id="submitBtn" 
-                        class="w-full bg-brand-orange hover:bg-brand-orangeHover text-white font-semibold py-3.5 px-4 rounded-xl shadow-glow transition-all duration-300 flex justify-center items-center gap-2 group transform active:scale-[0.98] mt-4">
-                        <span id="btnText">Create User</span>
+                        class="w-full md:w-auto md:min-w-[200px] md:float-right bg-brand-orange hover:bg-brand-orangeHover text-white font-semibold py-3.5 px-6 rounded-xl shadow-glow transition-all duration-300 flex justify-center items-center gap-2 group transform active:scale-[0.98] mt-6">
+                        <span id="btnText">Register Employee</span>
                         <svg id="btnLoader" class="w-5 h-5 animate-spin hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     </button>
+                    <!-- Clearfix for floated button -->
+                    <div class="clear-both"></div>
                 </form>
 
             </div>
@@ -128,7 +173,26 @@
         const btnText = document.getElementById('btnText');
         const btnLoader = document.getElementById('btnLoader');
         const alertMsg = document.getElementById('alertMsg');
+        
+        // Role & Branch UI Logic
+        const roleSelect = document.getElementById('role');
+        const branchContainer = document.getElementById('branchContainer');
+        const branchSelect = document.getElementById('branch');
 
+        roleSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'super_admin') {
+                branchSelect.disabled = true;
+                branchSelect.value = ""; // Clear selection
+                branchSelect.removeAttribute('required');
+                branchContainer.classList.add('opacity-40', 'pointer-events-none');
+            } else {
+                branchSelect.disabled = false;
+                branchSelect.setAttribute('required', 'required');
+                branchContainer.classList.remove('opacity-40', 'pointer-events-none');
+            }
+        });
+
+        // Alert Helper Function
         function showAlert(type, message) {
             alertMsg.className = `text-sm p-4 rounded-xl border flex items-center gap-2 mb-4 ${
                 type === 'success' 
@@ -147,39 +211,48 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const fullName = document.getElementById('fullName').value;
-            const username = document.getElementById('username').value;
-            const role = document.getElementById('role').value;
-            const password = document.getElementById('password').value;
+            // Gather all data
+            const payload = {
+                fullName: document.getElementById('fullName').value,
+                dob: document.getElementById('dob').value,
+                contactNumber: document.getElementById('contactNumber').value,
+                recoveryEmail: document.getElementById('recoveryEmail').value,
+                omanId: document.getElementById('omanId').value,
+                username: document.getElementById('username').value,
+                role: document.getElementById('role').value,
+                branch: document.getElementById('branch').value || 'Global',
+                password: document.getElementById('password').value
+            };
 
             // Loading state
             submitBtn.disabled = true;
-            btnText.textContent = 'Creating...';
+            btnText.textContent = 'Processing...';
             btnLoader.classList.remove('hidden');
             alertMsg.classList.add('hidden');
 
             try {
-                // The API route remains '/api/create-user' because the leading slash routes it from the root domain
                 const response = await fetch('/api/create-user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fullName, username, role, password })
+                    body: JSON.stringify(payload)
                 });
 
                 const result = await response.json();
 
-                if (!response.ok) {
-                    throw new Error(result.error || 'Failed to create user');
-                }
+                if (!response.ok) throw new Error(result.error || 'Failed to create user');
 
-                showAlert('success', `User <b>${username}</b> created successfully!`);
+                showAlert('success', `Employee profile for <b>${payload.fullName}</b> created successfully!`);
                 form.reset();
+                
+                // Reset branch state
+                branchSelect.disabled = false;
+                branchContainer.classList.remove('opacity-40', 'pointer-events-none');
 
             } catch (error) {
                 showAlert('error', error.message);
             } finally {
                 submitBtn.disabled = false;
-                btnText.textContent = 'Create User';
+                btnText.textContent = 'Register Employee';
                 btnLoader.classList.add('hidden');
             }
         });
