@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('topbar-container');
     if (!container) return;
 
-    // Extract Full Name & Role from localStorage or JWT
     let fullName = localStorage.getItem('cargo_user_name') || 'Muhammed Adhil';
     let roleLabel = 'Super Admin';
     try {
@@ -24,33 +23,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const encodedName = encodeURIComponent(fullName);
 
+    function getGreetingText() {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good Morning,';
+        if (hour < 17) return 'Good Afternoon,';
+        return 'Good Evening,';
+    }
+
     container.innerHTML = `
-    <header class="flex justify-between items-center w-full mb-7 px-1">
+    <header class="flex flex-col sm:flex-row sm:items-center justify-between w-full mb-6 px-1 gap-4">
         
-        <!-- Left: Beautifully Aligned Super Admin Portal Badge -->
-        <div class="flex items-center gap-3">
-            <div class="inline-flex items-center gap-2.5 bg-[#F8F8FA] border border-gray-200/70 pl-2 pr-4 py-1.5 rounded-full shadow-sm">
-                <span class="w-7 h-7 rounded-full bg-[#111827] text-white flex items-center justify-center text-[10px] font-extrabold tracking-tight">
-                    AF
-                </span>
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-extrabold text-gray-900 tracking-tight">Super Admin Portal</span>
-                    <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
-                </div>
-            </div>
-            <span id="cloudSyncStatus" class="text-[10px] font-bold text-gray-400 hidden sm:inline-block px-2.5 py-1 rounded-full bg-gray-50 border border-gray-100">
-                Cloud Synced
-            </span>
+        <!-- Top-Left: Personalized Greeting & Full Name -->
+        <div class="text-left">
+            <p class="text-sm lg:text-base font-semibold text-gray-400 tracking-tight leading-snug" id="topbarGreeting">
+                ${getGreetingText()}
+            </p>
+            <h1 class="text-2xl lg:text-[32px] font-extrabold text-gray-900 tracking-tight leading-tight mt-0.5" id="topbarUserFullName">
+                ${fullName}
+            </h1>
         </div>
         
-        <!-- Right: Animated Collapsible Search + Quick Add + Clickable Profile -->
-        <div class="flex items-center gap-3 lg:gap-4">
+        <!-- Top-Right: Animated Collapsible Search + Quick Add + Clickable Profile -->
+        <div class="flex items-center gap-3 lg:gap-3.5 self-start sm:self-center">
             
             <!-- Animated Collapsible Search Bar -->
             <div id="collapsibleSearchWrapper" 
                  class="relative flex items-center bg-[#F8F8FA] border border-gray-200/70 rounded-full h-11 w-11 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] shadow-sm">
                 
-                <!-- Search Trigger Icon -->
                 <button type="button" onclick="expandTopSearch()" 
                         title="Search ERP (Ctrl+K)"
                         class="w-11 h-11 flex-shrink-0 flex items-center justify-center text-gray-600 hover:text-gray-900 focus:outline-none">
@@ -59,14 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     </svg>
                 </button>
 
-                <!-- Expanding Input -->
                 <input id="topSearchInput" 
                        type="text" 
                        oninput="handleGlobalSearchInput(this.value)"
                        placeholder="Search AWB, Branch, Staff..." 
                        class="bg-transparent border-none focus:outline-none focus:ring-0 text-xs font-medium text-gray-800 w-full pr-16 opacity-0 pointer-events-none transition-opacity duration-300 placeholder-gray-400">
 
-                <!-- Close / ESC Pill inside Expanded Search -->
                 <button type="button" id="topSearchClearBtn" onclick="collapseTopSearch(event)" 
                         class="hidden absolute right-2.5 px-2 py-0.5 rounded-full bg-gray-200/70 hover:bg-gray-300 text-[9px] font-extrabold text-gray-600 uppercase tracking-wider transition-colors">
                     ESC
@@ -81,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </svg>
             </a>
 
-            <!-- Clickable Profile Pill (Opens Profile Component) -->
+            <!-- Clickable Profile Pill -->
             <button type="button" onclick="openProfileModal()" 
                     class="group flex items-center gap-3 bg-white hover:bg-[#F8F8FA] p-1.5 pr-4 rounded-full border border-gray-200/80 shadow-sm hover:shadow transition-all cursor-pointer text-left">
                 <div class="relative">
@@ -121,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Expand Animated Search Bar
 window.expandTopSearch = function() {
     const wrapper = document.getElementById('collapsibleSearchWrapper');
     const input = document.getElementById('topSearchInput');
@@ -139,7 +135,6 @@ window.expandTopSearch = function() {
     setTimeout(() => input.focus(), 120);
 };
 
-// Collapse Animated Search Bar
 window.collapseTopSearch = function(e) {
     if (e) e.stopPropagation();
     const wrapper = document.getElementById('collapsibleSearchWrapper');
@@ -162,7 +157,6 @@ window.collapseTopSearch = function(e) {
     if (icon) icon.classList.remove('text-coral-500', 'scale-110');
 };
 
-// Live filter Latest Bookings widget if user types in top search
 window.handleGlobalSearchInput = function(query) {
     if (typeof window.searchLatestBookings === 'function') {
         window.searchLatestBookings(query);
