@@ -29,9 +29,10 @@
         };
     </script>
 
-    <!-- Modular Layout Components -->
+    <!-- Modular Layout & Profile Components -->
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
 
     <!-- Modular Adaptive Widgets -->
     <script src="widgets/global-shipments.js" defer></script>
@@ -108,30 +109,90 @@
     <!-- Main Outer Container -->
     <main class="flex-1 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-6 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
         
-        <!-- Topbar (Contains Top Greeting, Super Admin Portal Badge, Live Clock & Customize Controls) -->
+        <!-- ======================================================= -->
+        <!-- LAYER 1: TOPBAR (Portal Badge, Animated Search, Profile)-->
+        <!-- ======================================================= -->
         <div id="topbar-container"></div>
-
-        <!-- Customize Mode Instruction Banner (Hidden unless Customize is clicked) -->
-        <div id="customize-mode-banner" class="hidden items-center justify-between bg-[#111827] text-white px-5 py-3 rounded-2xl mb-5 shadow-md">
-            <div class="flex items-center gap-3">
-                <span class="w-2.5 h-2.5 rounded-full bg-coral-500 animate-ping"></span>
-                <p class="text-xs font-semibold">
-                    <span class="font-extrabold text-coral-400">Customize Mode Active:</span> Drag cards to reorder, click <span class="underline">2×2 / 2×3</span> pills or drag the bottom-right corner handle to resize. Changes sync to your account automatically.
-                </p>
-            </div>
-            <button onclick="resetDefaultWidgets()" class="text-[11px] font-bold text-gray-300 hover:text-white underline flex-shrink-0 ml-4">
-                Reset Default Grid
-            </button>
-        </div>
 
         <!-- Scrollable Dashboard Body -->
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6 min-h-full">
-                <!-- Smartphone Resizable & Draggable Bento Grid -->
+            
+            <!-- ========================================================================= -->
+            <!-- LAYER 2: GREETING (LEFT) & WIDGET CUSTOMIZATION + DATE/TIME (RIGHT)       -->
+            <!-- ========================================================================= -->
+            <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-7 mb-6 border-b border-gray-100 gap-6">
+                
+                <!-- Left: Personalized User Greeting -->
+                <div class="text-left">
+                    <p class="text-base lg:text-lg font-semibold text-gray-400 tracking-tight leading-snug" id="greetingText">
+                        Good Evening,
+                    </p>
+                    <h1 class="text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight leading-tight mt-0.5" id="userFullName">
+                        Muhammed Adhil
+                    </h1>
+                </div>
+
+                <!-- Right: Widget Controls + Today's Date & Live Time -->
+                <div class="flex flex-wrap items-center gap-3 self-start xl:self-center">
+                    
+                    <!-- Add / Remove Widgets Modal Trigger -->
+                    <button onclick="openWidgetModal()" class="bg-white hover:bg-gray-50 text-gray-800 px-4 py-3 rounded-full border border-gray-200/80 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
+                        <svg class="w-4 h-4 text-coral-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                        <span>Widgets</span>
+                        <span id="active-widget-count" class="bg-[#F8F8FA] text-gray-600 px-2 py-0.5 rounded-full text-[10px] border border-gray-100">8/8</span>
+                    </button>
+
+                    <!-- Customize Mode Trigger -->
+                    <button id="editLayoutBtn" onclick="toggleEditLayoutMode()" class="bg-[#F8F8FA] hover:bg-gray-100 text-gray-800 px-4 py-3 rounded-full border border-gray-200/60 text-xs font-bold flex items-center gap-2 transition-all">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        <span>Customize</span>
+                    </button>
+
+                    <!-- Date & Live Time Pill -->
+                    <div class="flex items-center gap-5 bg-[#F8F8FA] px-5 py-2.5 rounded-[2rem] border border-gray-100">
+                        <div class="text-right pr-5 border-r border-gray-200/80">
+                            <p class="text-lg lg:text-xl font-extrabold text-gray-900 tracking-tight tabular-nums leading-none" id="currentTime">
+                                --:-- --
+                            </p>
+                            <p class="text-[10px] font-bold text-coral-500 uppercase tracking-widest mt-1">
+                                Local Time
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-full bg-white border border-gray-200/80 flex items-center justify-center shadow-sm">
+                                <span class="text-base font-extrabold text-gray-900 tracking-tight leading-none" id="currentDay">--</span>
+                            </div>
+                            <div class="text-left pr-1">
+                                <p class="text-xs font-bold text-gray-900 leading-tight" id="currentDayName">---</p>
+                                <p class="text-xs font-medium text-gray-400 leading-tight mt-0.5" id="currentMonthYear">---</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Customize Mode Instruction Banner (Hidden unless Customize is clicked) -->
+            <div id="customize-mode-banner" class="hidden items-center justify-between bg-[#111827] text-white px-5 py-3 rounded-2xl mb-5 shadow-md">
+                <div class="flex items-center gap-3">
+                    <span class="w-2.5 h-2.5 rounded-full bg-coral-500 animate-ping"></span>
+                    <p class="text-xs font-semibold">
+                        <span class="font-extrabold text-coral-400">Customize Mode Active:</span> Drag cards to reorder, click <span class="underline">2×2 / 2×3</span> pills or drag the bottom-right corner handle to resize. Changes sync to your account automatically.
+                    </p>
+                </div>
+                <button onclick="resetDefaultWidgets()" class="text-[11px] font-bold text-gray-300 hover:text-white underline flex-shrink-0 ml-4">
+                    Reset Default Grid
+                </button>
+            </div>
+
+            <!-- SMARTPHONE RESIZABLE & DRAGGABLE BENTO GRID -->
+            <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
                 <div id="widgets-grid" class="smart-widget-grid">
                     <!-- Widgets injected dynamically by widgets/widget-manager.js -->
                 </div>
             </section>
+            
         </div>
     </main>
 
@@ -162,5 +223,48 @@
         </div>
     </div>
 
+    <!-- Layer 2 Greeting, User Name & Live Clock Script -->
+    <script>
+        (function populateUserName() {
+            let fullName = localStorage.getItem('cargo_user_name') || 'Muhammed Adhil';
+            try {
+                const token = localStorage.getItem('cargo_auth_token');
+                if (token) {
+                    const base64Url = token.split('.')[1];
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const payload = JSON.parse(window.atob(base64));
+                    if (payload?.user_metadata?.full_name) {
+                        fullName = payload.user_metadata.full_name;
+                        localStorage.setItem('cargo_user_name', fullName);
+                    }
+                }
+            } catch (e) {}
+            const el = document.getElementById('userFullName');
+            if (el) el.textContent = fullName;
+        })();
+
+        function updateDateTimeAndGreeting() {
+            const now = new Date();
+            const hour = now.getHours();
+            
+            let greeting = 'Good Evening,';
+            if (hour < 12) greeting = 'Good Morning,';
+            else if (hour < 17) greeting = 'Good Afternoon,';
+            
+            document.getElementById('greetingText').textContent = greeting;
+            document.getElementById('currentDay').textContent = String(now.getDate()).padStart(2, '0');
+            document.getElementById('currentDayName').textContent = now.toLocaleDateString('en-US', { weekday: 'long' });
+            document.getElementById('currentMonthYear').textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true 
+            });
+        }
+
+        updateDateTimeAndGreeting();
+        setInterval(updateDateTimeAndGreeting, 1000);
+    </script>
 </body>
 </html>
