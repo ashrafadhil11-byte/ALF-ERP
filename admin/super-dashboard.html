@@ -19,12 +19,24 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
+    <!-- Initialize Global Widget Registry Before Any Widget Loads -->
+    <script>
+        window.CargoWidgetRegistry = [];
+        window.registerCargoWidget = function(widgetConfig) {
+            const existingIndex = window.CargoWidgetRegistry.findIndex(w => w.id === widgetConfig.id);
+            if (existingIndex > -1) {
+                window.CargoWidgetRegistry[existingIndex] = widgetConfig;
+            } else {
+                window.CargoWidgetRegistry.push(widgetConfig);
+            }
+        };
+    </script>
+
     <!-- Modular Layout Components -->
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
 
-    <!-- Modular Widget Engine & Individual Widget Files -->
-    <script src="widgets/widget-manager.js" defer></script>
+    <!-- Individual Widget Files (Loaded BEFORE widget-manager.js) -->
     <script src="widgets/global-shipments.js" defer></script>
     <script src="widgets/global-financials.js" defer></script>
     <script src="widgets/sla-staff-status.js" defer></script>
@@ -32,8 +44,10 @@
     <script src="widgets/branch-financials.js" defer></script>
     <script src="widgets/branch-pipeline.js" defer></script>
     <script src="widgets/branch-efficiency.js" defer></script>
-    <!-- NEW: Latest Bookings Widget -->
     <script src="widgets/latest-bookings.js" defer></script>
+
+    <!-- Widget Manager Engine (Loaded LAST so all widgets are registered) -->
+    <script src="widgets/widget-manager.js" defer></script>
 
     <script>
         tailwind.config = {
@@ -95,7 +109,7 @@
                     <button onclick="openWidgetModal()" class="bg-white hover:bg-gray-50 text-gray-800 px-4 py-3 rounded-full border border-gray-200/80 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
                         <svg class="w-4 h-4 text-coral-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
                         <span>Widgets</span>
-                        <span id="active-widget-count" class="bg-[#F8F8FA] text-gray-600 px-2 py-0.5 rounded-full text-[10px] border border-gray-100">7/7</span>
+                        <span id="active-widget-count" class="bg-[#F8F8FA] text-gray-600 px-2 py-0.5 rounded-full text-[10px] border border-gray-100">8/8</span>
                     </button>
 
                     <!-- Inline Edit Mode Trigger -->
@@ -132,7 +146,7 @@
             <!-- DYNAMIC WIDGETS CANVAS -->
             <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
                 <div id="widgets-grid" class="grid grid-cols-12 gap-5">
-                    <!-- Widgets are injected dynamically by widgets/widget-manager.js -->
+                    <!-- Widgets are injected dynamically -->
                 </div>
             </section>
             
@@ -166,8 +180,9 @@
         </div>
     </div>
 
-    <!-- User Greeting & Live Clock Script -->
+    <!-- User Greeting, Live Clock & Auto-Sync New Widgets Script -->
     <script>
+        // 1. Populate Logged-In User Full Name
         (function populateUserName() {
             let fullName = localStorage.getItem('cargo_user_name') || 'Muhammed Adhil';
             try {
@@ -185,6 +200,7 @@
             document.getElementById('userFullName').textContent = fullName;
         })();
 
+        // 2. Live Date, Time & Greeting
         function updateDateTimeAndGreeting() {
             const now = new Date();
             const hour = now.getHours();
@@ -207,6 +223,36 @@
 
         updateDateTimeAndGreeting();
         setInterval(updateDateTimeAndGreeting, 1000);
+
+        // 3. Ensure Newly Added Widgets Automatically Appear Even if Old localStorage Exists
+        window.addEventListener('DOMContentLoaded', () => {
+            const STORAGE_KEY = 'alfarha_super_dashboard_widgets_v1';
+            const REMOVED_KEY = 'alfarha_super_dashboard_removed_v1';
+
+            const savedRaw = localStorage.getItem(STORAGE_KEY);
+            const removedRaw = localStorage.getItem(REMOVED_KEY);
+            const explicitlyRemoved = removedRaw ? JSON.parse(removedRaw) : [];
+
+            if (savedRaw && window.CargoWidgetRegistry) {
+                try {
+                    const savedIds = JSON.parse(savedRaw);
+                    let updated = false;
+                    window.CargoWidgetRegistry.forEach(w => {
+                        if (!savedIds.includes(w.id) && !explicitlyRemoved.includes(w.id)) {
+                            savedIds.push(w.id);
+                            updated = true;
+                        }
+                    });
+                    if (updated) {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedIds));
+                    }
+                } catch (e) {}
+            }
+
+            if (typeof window.renderDashboardWidgets === 'function') {
+                window.renderDashboardWidgets();
+            }
+        });
     </script>
 </body>
 </html>
