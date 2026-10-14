@@ -19,9 +19,19 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- External Modular Components -->
+    <!-- Modular Layout Components -->
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
+
+    <!-- Modular Widget Engine & Individual Widget Files -->
+    <script src="widgets/widget-manager.js" defer></script>
+    <script src="widgets/global-shipments.js" defer></script>
+    <script src="widgets/global-financials.js" defer></script>
+    <script src="widgets/sla-staff-status.js" defer></script>
+    <script src="widgets/cargo-velocity.js" defer></script>
+    <script src="widgets/branch-financials.js" defer></script>
+    <script src="widgets/branch-pipeline.js" defer></script>
+    <script src="widgets/branch-efficiency.js" defer></script>
 
     <script>
         tailwind.config = {
@@ -37,8 +47,7 @@
                             400: '#F08A76',
                             500: '#E86D58', 
                             600: '#D55C48' 
-                        },
-                        canvas: '#F6F6F8'
+                        }
                     }
                 }
             }
@@ -64,8 +73,8 @@
         <!-- Scrollable Dashboard Body -->
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
             
-            <!-- GREETING (LEFT) & DATE/TIME (RIGHT) -->
-            <section class="flex flex-col md:flex-row md:items-center justify-between pb-8 mb-6 border-b border-gray-100 gap-6">
+            <!-- GREETING (LEFT) & DATE/TIME + WIDGET CONTROLS (RIGHT) -->
+            <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-8 mb-6 border-b border-gray-100 gap-6">
                 
                 <!-- Left: Personalized User Greeting -->
                 <div class="text-left">
@@ -77,483 +86,86 @@
                     </h1>
                 </div>
 
-                <!-- Right: Beautifully Aligned Today's Date & Live Time -->
-                <div class="flex items-center gap-5 self-start md:self-center bg-[#F8F8FA] px-5 py-3 rounded-[2rem] border border-gray-100">
-                    <!-- Live Time Block -->
-                    <div class="text-right pr-5 border-r border-gray-200/80">
-                        <p class="text-xl lg:text-2xl font-extrabold text-gray-900 tracking-tight tabular-nums leading-none" id="currentTime">
-                            --:-- --
-                        </p>
-                        <p class="text-[10px] font-bold text-coral-500 uppercase tracking-widest mt-1.5">
-                            Local Time
-                        </p>
+                <!-- Right: Widget Controls + Today's Date & Live Time -->
+                <div class="flex flex-wrap items-center gap-3 self-start xl:self-center">
+                    
+                    <!-- Add / Remove Widgets Modal Trigger -->
+                    <button onclick="openWidgetModal()" class="bg-white hover:bg-gray-50 text-gray-800 px-4 py-3 rounded-full border border-gray-200/80 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
+                        <svg class="w-4 h-4 text-coral-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                        <span>Widgets</span>
+                        <span id="active-widget-count" class="bg-[#F8F8FA] text-gray-600 px-2 py-0.5 rounded-full text-[10px] border border-gray-100">7/7</span>
+                    </button>
+
+                    <!-- Inline Edit Mode Trigger -->
+                    <button id="editLayoutBtn" onclick="toggleEditLayoutMode()" class="bg-[#F8F8FA] hover:bg-gray-100 text-gray-700 px-4 py-3 rounded-full border border-gray-100 text-xs font-bold flex items-center gap-2 transition-all">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        Customize
+                    </button>
+
+                    <!-- Date & Live Time Pill -->
+                    <div class="flex items-center gap-5 bg-[#F8F8FA] px-5 py-2.5 rounded-[2rem] border border-gray-100">
+                        <div class="text-right pr-5 border-r border-gray-200/80">
+                            <p class="text-lg lg:text-xl font-extrabold text-gray-900 tracking-tight tabular-nums leading-none" id="currentTime">
+                                --:-- --
+                            </p>
+                            <p class="text-[10px] font-bold text-coral-500 uppercase tracking-widest mt-1">
+                                Local Time
+                            </p>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-full bg-white border border-gray-200/80 flex items-center justify-center shadow-sm">
+                                <span class="text-base font-extrabold text-gray-900 tracking-tight leading-none" id="currentDay">--</span>
+                            </div>
+                            <div class="text-left pr-1">
+                                <p class="text-xs font-bold text-gray-900 leading-tight" id="currentDayName">---</p>
+                                <p class="text-xs font-medium text-gray-400 leading-tight mt-0.5" id="currentMonthYear">---</p>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Date Circle & Month/Year Block -->
-                    <div class="flex items-center gap-3.5">
-                        <div class="w-12 h-12 rounded-full bg-white border border-gray-200/80 flex items-center justify-center shadow-sm">
-                            <span class="text-lg font-extrabold text-gray-900 tracking-tight leading-none" id="currentDay">--</span>
-                        </div>
-                        <div class="text-left pr-1">
-                            <p class="text-xs font-bold text-gray-900 leading-tight" id="currentDayName">---</p>
-                            <p class="text-xs font-medium text-gray-400 leading-tight mt-0.5" id="currentMonthYear">---</p>
-                        </div>
-                    </div>
                 </div>
-
             </section>
 
-            <!-- SOFT-UI BENTO CANVAS -->
+            <!-- DYNAMIC WIDGETS CANVAS -->
             <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
-                <div class="grid grid-cols-12 gap-5">
-                    
-                    <!-- ========================================================= -->
-                    <!-- ROW 1: SHIPMENTS, FINANCIALS, SLA/STAFF, VELOCITY (12 COL)-->
-                    <!-- ========================================================= -->
-
-                    <!-- 1. GLOBAL SHIPMENTS OVERVIEW (4 Cols) - Pure Daily vs Monthly Comparison -->
-                    <div class="col-span-12 xl:col-span-4 bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between">
-                        <div class="flex justify-between items-center mb-5">
-                            <div class="flex items-center gap-2">
-                                <span class="font-extrabold text-gray-900 tracking-wider text-xs uppercase">Global Shipments</span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                            </div>
-                            <span class="text-[11px] font-semibold text-gray-600 bg-[#F8F8FA] px-3 py-1.5 rounded-full border border-gray-100">
-                                All Branches (SLH • MCT • SHR)
-                            </span>
-                        </div>
-
-                        <!-- Total Active Volume -->
-                        <div class="mb-5">
-                            <p class="text-xs text-gray-400 font-medium mb-1">Total Consolidated & Active Bookings</p>
-                            <div class="flex items-baseline gap-3">
-                                <p class="text-3xl font-extrabold text-gray-900 tracking-tight">1,842 <span class="text-sm font-semibold text-gray-400">AWBs</span></p>
-                                <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">+16.4% vs last mo</span>
-                            </div>
-                        </div>
-
-                        <!-- Daily Overview vs Monthly Overview Comparison Pills -->
-                        <div id="shipmentComparisonBox" class="grid grid-cols-2 gap-3 mb-6 transition-all duration-300">
-                            <!-- Daily Overview Pill Box -->
-                            <div class="bg-[#111827] text-white rounded-2xl p-3.5 flex flex-col justify-between">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Daily Overview</span>
-                                    <span class="text-[10px] font-bold text-emerald-400">+12%</span>
-                                </div>
-                                <p class="text-xl font-extrabold leading-none">74 <span class="text-[11px] font-normal text-gray-300">Bookings</span></p>
-                                <p class="text-[10px] text-gray-400 mt-1.5">Today • 920 kg</p>
-                            </div>
-
-                            <!-- Monthly Overview Pill Box -->
-                            <div class="bg-[#F8F8FA] text-gray-900 rounded-2xl p-3.5 border border-gray-100 flex flex-col justify-between">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Monthly Overview</span>
-                                    <span class="text-[10px] font-bold text-coral-500">+16.4%</span>
-                                </div>
-                                <p class="text-xl font-extrabold leading-none">1,842 <span class="text-[11px] font-normal text-gray-500">Bookings</span></p>
-                                <p class="text-[10px] text-gray-400 mt-1.5">Oct • 22.4 Tons</p>
-                            </div>
-                        </div>
-
-                        <!-- Card Footer: Daily Avg vs Monthly Target -->
-                        <div class="flex justify-between items-end border-t border-gray-100 pt-4">
-                            <div>
-                                <p class="text-[11px] text-gray-400 font-medium mb-0.5">Daily Average (This Month)</p>
-                                <p class="text-base font-extrabold text-gray-900">61.4 <span class="text-xs font-semibold text-gray-400">Shipments / day</span></p>
-                            </div>
-                            <a href="#" class="flex items-center gap-1.5 text-coral-500 text-[11px] font-bold hover:underline">
-                                <span class="w-5 h-5 rounded-full bg-coral-50 flex items-center justify-center">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                                </span>
-                                Full Breakdown
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- 2. FINANCIAL OVERVIEW: DAILY VS MONTHLY (3 Cols Stacked) -->
-                    <div class="col-span-12 md:col-span-6 xl:col-span-3 flex flex-col gap-5">
-                        <!-- Top Card: Total Revenue -->
-                        <div class="bg-white rounded-[2rem] p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex-1 flex flex-col justify-between">
-                            <div class="flex justify-between items-center mb-3">
-                                <div class="w-8 h-8 rounded-full border border-gray-100 flex justify-center items-center text-gray-900 font-bold text-xs">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                </div>
-                                <span class="text-[10px] font-bold text-gray-600 bg-[#F8F8FA] px-3 py-1 rounded-full border border-gray-100">
-                                    Daily vs Monthly
-                                </span>
-                            </div>
-                            <div>
-                                <p class="text-xs text-gray-400 font-medium mb-1">Total Global Revenue</p>
-                                <div class="flex items-baseline justify-between">
-                                    <p class="text-xl font-extrabold text-gray-900"><span class="text-coral-500 font-semibold text-sm mr-0.5">OMR</span>24,850.00</p>
-                                    <span class="text-[10px] font-semibold text-gray-400">Monthly</span>
-                                </div>
-                                <div class="mt-2 pt-2 border-t border-gray-50 flex justify-between items-center text-xs">
-                                    <span class="text-gray-400 font-medium">Today's Revenue:</span>
-                                    <span class="font-bold text-gray-900">OMR 1,140.50 <span class="text-emerald-600 text-[10px]">(+9.4%)</span></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Bottom Card: Freight, Customs & Last-Mile Cost -->
-                        <div class="bg-white rounded-[2rem] p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex-1 flex flex-col justify-between">
-                            <div class="flex justify-between items-center mb-3">
-                                <div class="w-8 h-8 rounded-full border border-gray-100 flex justify-center items-center text-gray-900">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"></path></svg>
-                                </div>
-                                <span class="text-[10px] font-bold text-gray-600 bg-[#F8F8FA] px-3 py-1 rounded-full border border-gray-100">
-                                    Freight & Clearance
-                                </span>
-                            </div>
-                            <div class="flex justify-between items-end">
-                                <div>
-                                    <p class="text-xs text-gray-400 font-medium mb-1">Monthly Operational Cost</p>
-                                    <p class="text-xl font-extrabold text-gray-900"><span class="text-coral-500 font-semibold text-sm mr-0.5">OMR</span>8,145.20</p>
-                                    <p class="text-[11px] text-gray-400 mt-1">Today's Cost: <span class="font-bold text-gray-700">OMR 312.00</span></p>
-                                </div>
-                                <span class="flex items-center gap-1 text-[10px] font-bold text-coral-500 bg-coral-50 px-2.5 py-1.5 rounded-xl leading-tight">
-                                    67.2%<br>Margin
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3. AVG BRANCH PERFORMANCE GAUGE & EMPLOYEE STATUS (2 Cols) -->
-                    <div class="col-span-12 md:col-span-6 xl:col-span-2 flex flex-col gap-5">
-                        <!-- Top Circle Card + Dark Gauge -->
-                        <div class="bg-white rounded-[2rem] p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex-1 flex flex-col items-center justify-between">
-                            <div class="text-center">
-                                <div class="w-8 h-8 rounded-full bg-[#F8F8FA] flex items-center justify-center mx-auto mb-1.5">
-                                    <svg class="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                </div>
-                                <p class="text-[11px] font-bold text-gray-900">Avg. Branch SLA</p>
-                            </div>
-
-                            <!-- Dark Circular Gauge -->
-                            <div class="relative w-28 h-28 my-1 flex items-center justify-center bg-[#111827] rounded-full shadow-md">
-                                <svg class="w-24 h-24 transform -rotate-90">
-                                    <circle cx="48" cy="48" r="40" stroke="#262F3F" stroke-width="7" fill="none" />
-                                    <circle cx="48" cy="48" r="40" stroke="#E86D58" stroke-width="7" fill="none" stroke-dasharray="251" stroke-dashoffset="40" stroke-linecap="round" />
-                                </svg>
-                                <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span class="text-white text-xl font-extrabold leading-none">94%</span>
-                                    <span class="text-gray-400 text-[9px] mt-1 font-medium">On-Time Rate</span>
-                                </div>
-                            </div>
-                            <p class="text-[10px] text-gray-400 font-medium">Daily: 96% • Monthly: 94%</p>
-                        </div>
-
-                        <!-- Bottom Card: Employee & Driver Status Matrix -->
-                        <div class="bg-white rounded-[2rem] p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80">
-                            <div class="flex justify-between items-center mb-2">
-                                <div class="w-7 h-7 rounded-full border border-gray-100 flex justify-center items-center">
-                                    <svg class="w-3.5 h-3.5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                </div>
-                                <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Active Shift</span>
-                            </div>
-                            <p class="text-lg font-extrabold text-gray-900 leading-none mb-1">42 Active Staff</p>
-                            <p class="text-[10px] font-medium text-gray-400 mb-3">28 Branch Staff • 14 Drivers</p>
-                            <!-- 30-Dot Matrix -->
-                            <div class="grid grid-cols-10 gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-coral-500" title="Branch Staff"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-coral-500"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800" title="Driver In Transit"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-800"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-200" title="Off Shift"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-200"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-200"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-200"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-200"></span>
-                                <span class="w-2 h-2 rounded-full bg-gray-200"></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 4. DAILY VS MONTHLY BOOKING VELOCITY & VOLUME (3 Cols) -->
-                    <div class="col-span-12 xl:col-span-3 flex flex-col gap-5">
-                        <!-- Top Split Mini Cards -->
-                        <div class="grid grid-cols-2 gap-4 flex-1">
-                            <!-- Left Mini Card: Consolidation Cycle -->
-                            <div class="bg-white rounded-[2rem] p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between">
-                                <div class="w-7 h-7 rounded-full border border-gray-100 flex justify-center items-center">
-                                    <svg class="w-3.5 h-3.5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                                </div>
-                                <div>
-                                    <p class="text-base font-extrabold text-gray-900 leading-tight">14 Lots</p>
-                                    <p class="text-[10px] text-gray-400 font-medium">3 Dispatched Today</p>
-                                </div>
-                                <div class="flex items-center justify-between text-[10px] font-bold pt-2 border-t border-gray-50">
-                                    <span class="text-gray-400">Break-Bulk</span>
-                                    <span class="text-coral-500">4 Active</span>
-                                </div>
-                            </div>
-
-                            <!-- Right Mini Card: Month vs Month Comparison Stem -->
-                            <div class="bg-white rounded-[2rem] p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between relative overflow-hidden">
-                                <div class="w-7 h-7 rounded-lg bg-[#F8F8FA] flex justify-center items-center">
-                                    <svg class="w-3.5 h-3.5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                                </div>
-                                <div class="flex items-end justify-around h-20 pt-2">
-                                    <div class="flex flex-col items-center">
-                                        <span class="text-[9px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full mb-1">Sep</span>
-                                        <div class="w-0.5 h-8 bg-gray-300"></div>
-                                    </div>
-                                    <div class="flex flex-col items-center">
-                                        <span class="text-[9px] font-bold text-white bg-coral-500 px-2 py-0.5 rounded-full mb-1 shadow-sm">Oct</span>
-                                        <div class="w-0.5 h-12 bg-coral-500"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Bottom Sparkline Card: Daily & Monthly Tonnage -->
-                        <div class="bg-white rounded-[2rem] p-5 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between">
-                            <div class="flex justify-between items-center mb-2">
-                                <div class="w-7 h-7 rounded-full bg-[#F8F8FA] flex justify-center items-center">
-                                    <svg class="w-3.5 h-3.5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                                </div>
-                                <p class="text-lg font-extrabold text-gray-900"><span class="text-coral-500 text-xs font-semibold mr-1">KG</span>22,480.50</p>
-                            </div>
-
-                            <!-- Smooth Wave Sparkline -->
-                            <div class="h-12 w-full my-1">
-                                <svg viewBox="0 0 200 45" class="w-full h-full stroke-coral-500 fill-none" stroke-width="2" stroke-linecap="round">
-                                    <path d="M0 35 Q 15 20, 30 28 T 60 18 T 90 25 T 120 10 T 150 22 T 180 8 T 200 18"></path>
-                                </svg>
-                            </div>
-
-                            <div class="flex justify-between items-end">
-                                <div>
-                                    <p class="text-sm font-extrabold text-gray-900 leading-tight">Cargo Volume</p>
-                                    <p class="text-[10px] font-medium text-gray-400">Daily Avg: 749 kg • Monthly: 22.4T</p>
-                                </div>
-                                <span class="text-[11px] font-bold text-coral-500 bg-coral-50 px-2.5 py-1 rounded-full">+ 14.3%</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- ========================================================= -->
-                    <!-- ROW 2: BRANCH FINANCIALS, PIPELINE & PERFORMANCE (12 COL) -->
-                    <!-- ========================================================= -->
-
-                    <!-- 5. BRANCH FINANCIAL COMPARISON (3 Cols - Concentric Circles) -->
-                    <div class="col-span-12 lg:col-span-4 xl:col-span-3 bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between">
-                        <div class="flex justify-between items-center mb-4">
-                            <span class="font-bold text-gray-900 text-sm">Branch Financials</span>
-                            <button onclick="toggleBranchPeriod()" id="branchPeriodBtn" class="flex items-center gap-1.5 text-[11px] font-bold text-gray-700 bg-[#F8F8FA] hover:bg-gray-100 px-3 py-1.5 rounded-full border border-gray-100 transition-colors">
-                                <span id="branchPeriodLabel">Monthly</span>
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                            </button>
-                        </div>
-                        
-                        <div class="relative w-full h-52 flex justify-center items-end mt-2">
-                            <div class="absolute bottom-0 w-48 h-48 bg-coral-50 rounded-full flex flex-col items-center justify-start pt-3 border border-coral-100/60">
-                                <span class="text-[9px] font-bold text-gray-400 uppercase">Salalah HQ</span>
-                                <span class="text-xs font-extrabold text-gray-900" id="circleSlh">OMR 11.4K</span>
-                            </div>
-                            <div class="absolute bottom-0 w-36 h-36 bg-coral-100/80 rounded-full flex flex-col items-center justify-start pt-2.5 border border-coral-200/50">
-                                <span class="text-[8px] font-bold text-gray-500 uppercase">Muscat</span>
-                                <span class="text-xs font-extrabold text-gray-900" id="circleMct">OMR 8.2K</span>
-                            </div>
-                            <div class="absolute bottom-0 w-24 h-24 bg-coral-300/70 rounded-full flex flex-col items-center justify-start pt-2">
-                                <span class="text-[8px] font-bold text-gray-700 uppercase">Sohar</span>
-                                <span class="text-[11px] font-extrabold text-gray-900" id="circleShr">OMR 3.6K</span>
-                            </div>
-                            <div class="absolute bottom-0 w-12 h-12 bg-coral-500 rounded-full flex flex-col items-center justify-center shadow-md">
-                                <span class="text-[7px] font-semibold text-white/80 uppercase">Today</span>
-                                <span class="text-[10px] font-extrabold text-white" id="circleToday">1.1K</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 6. BRANCH PERFORMANCE & CARGO PIPELINE MANAGER (6 Cols) -->
-                    <div class="col-span-12 lg:col-span-8 xl:col-span-6 bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between">
-                        <div>
-                            <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
-                                <span class="font-bold text-gray-900 text-sm">Branch Performance & Consolidation Pipeline</span>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[11px] font-bold text-gray-600 bg-[#F8F8FA] px-3 py-1 rounded-full border border-gray-100">Daily vs Monthly KPI</span>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-wrap items-center justify-between gap-2 mb-5 pb-3 border-b border-gray-100">
-                                <div class="flex items-center text-gray-400 text-xs">
-                                    <svg class="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                    <span>Filter branch metrics...</span>
-                                </div>
-                                <div class="flex flex-wrap gap-1.5">
-                                    <span class="text-[11px] font-bold text-gray-900 bg-[#F8F8FA] px-3 py-1 rounded-full border border-gray-200/60 flex items-center gap-1.5">
-                                        Salalah HQ <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
-                                    </span>
-                                    <span class="text-[11px] font-semibold text-gray-600 bg-[#F8F8FA] px-3 py-1 rounded-full border border-gray-100">
-                                        Muscat (92%)
-                                    </span>
-                                    <span class="text-[11px] font-semibold text-gray-600 bg-[#F8F8FA] px-3 py-1 rounded-full border border-gray-100">
-                                        Sohar (89%)
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 3 Inner Sub-Cards -->
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <!-- Sub-Card 1: Daily vs Monthly Avg Bookings per Branch -->
-                            <div class="bg-[#F8F8FA] rounded-2xl p-4 flex flex-col justify-between">
-                                <div>
-                                    <p class="text-[10px] font-semibold text-gray-400 uppercase">Avg Branch Output</p>
-                                    <p class="text-xl font-extrabold text-gray-900 mt-0.5"><span class="text-coral-500 text-sm">#</span>61.4 <span class="text-[10px] font-semibold text-gray-400">AWB/day</span></p>
-                                </div>
-
-                                <div class="flex items-end justify-between h-16 my-3 px-1">
-                                    <div class="w-1 bg-coral-300 rounded-full h-8" title="Salalah Daily"></div>
-                                    <div class="w-1 bg-coral-500 rounded-full h-14" title="Salalah Monthly Avg"></div>
-                                    <div class="w-1 bg-gray-300 rounded-full h-6"></div>
-                                    <div class="w-1 bg-coral-300 rounded-full h-10" title="Muscat Daily"></div>
-                                    <div class="w-1 bg-coral-500 rounded-full h-12" title="Muscat Monthly Avg"></div>
-                                    <div class="w-1 bg-gray-300 rounded-full h-7"></div>
-                                    <div class="w-1 bg-coral-300 rounded-full h-9" title="Sohar Daily"></div>
-                                    <div class="w-1 bg-gray-800 rounded-full h-11" title="Sohar Monthly Avg"></div>
-                                    <div class="w-1 bg-coral-500 rounded-full h-15"></div>
-                                </div>
-
-                                <div class="flex justify-between items-center text-[10px] text-gray-500 font-semibold">
-                                    <span>Daily: 74</span>
-                                    <span class="text-coral-500 font-bold">Mo: 1,842</span>
-                                </div>
-                            </div>
-
-                            <!-- Sub-Card 2: Consolidation & Break-Bulk Stages -->
-                            <div class="bg-[#F8F8FA] rounded-2xl p-4 flex flex-col justify-between">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="font-bold text-gray-900 text-xs">Cargo Stages</span>
-                                    <span class="text-[10px] font-bold text-coral-500">Active</span>
-                                </div>
-                                <div class="relative pl-3 space-y-3 my-auto">
-                                    <div class="absolute left-[11px] top-2 bottom-2 w-[1.5px] bg-coral-200"></div>
-                                    <div class="flex items-center justify-between relative z-10">
-                                        <div class="flex items-center gap-2.5">
-                                            <span class="w-4 h-4 rounded-full bg-coral-500 text-white flex items-center justify-center text-[8px] font-bold">1</span>
-                                            <span class="text-[11px] font-bold text-gray-900">Consolidated</span>
-                                        </div>
-                                        <span class="text-[10px] font-extrabold text-gray-700">640</span>
-                                    </div>
-                                    <div class="flex items-center justify-between relative z-10">
-                                        <div class="flex items-center gap-2.5">
-                                            <span class="w-4 h-4 rounded-full bg-coral-500 text-white flex items-center justify-center text-[8px] font-bold">2</span>
-                                            <span class="text-[11px] font-semibold text-gray-600">Cleared & Bulk</span>
-                                        </div>
-                                        <span class="text-[10px] font-extrabold text-gray-700">412</span>
-                                    </div>
-                                    <div class="flex items-center justify-between relative z-10">
-                                        <div class="flex items-center gap-2.5">
-                                            <span class="w-4 h-4 rounded-full bg-coral-500 text-white flex items-center justify-center text-[8px] font-bold">3</span>
-                                            <span class="text-[11px] font-semibold text-gray-600">Out for Delivery</span>
-                                        </div>
-                                        <span class="text-[10px] font-extrabold text-emerald-600">790</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Sub-Card 3: Customs & Manifest Verification -->
-                            <div class="bg-[#F8F8FA] rounded-2xl p-4 flex flex-col justify-between items-start">
-                                <div class="text-coral-500">
-                                    <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                                </div>
-                                <div class="my-2">
-                                    <h4 class="text-xs font-bold text-gray-900 leading-tight mb-1">Manifest Clearance</h4>
-                                    <p class="text-[10px] text-gray-400 leading-relaxed">3 Consolidated lots awaiting destination break-bulk release.</p>
-                                </div>
-                                <button class="bg-coral-500 hover:bg-coral-600 text-white text-[11px] font-bold py-2.5 px-4 rounded-full w-full transition-colors shadow-sm">
-                                    Approve Lots (3)
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 7. AVERAGE PERFORMANCE OF EACH BRANCH (3 Cols - Bottom Right) -->
-                    <div class="col-span-12 xl:col-span-3 bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between">
-                        <div class="flex justify-between items-center">
-                            <div class="flex gap-1 items-center">
-                                <span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-                                <span class="w-3.5 h-1.5 rounded-full bg-gray-900"></span>
-                            </div>
-                            <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">93.4% Global Avg</span>
-                        </div>
-
-                        <div class="my-3">
-                            <p class="text-[11px] text-gray-400 font-medium mb-1">Branch Efficiency Score</p>
-                            <h4 class="text-base font-extrabold text-gray-900 leading-snug">Average Performance by Branch</h4>
-                        </div>
-
-                        <div class="space-y-2.5 mb-4">
-                            <div>
-                                <div class="flex justify-between text-xs font-bold mb-1">
-                                    <span class="text-gray-800">Salalah HQ</span>
-                                    <span class="text-gray-900">96% <span class="text-[10px] text-gray-400 font-medium">(34/day)</span></span>
-                                </div>
-                                <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div class="bg-coral-500 h-full rounded-full" style="width: 96%"></div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-xs font-bold mb-1">
-                                    <span class="text-gray-800">Muscat Branch</span>
-                                    <span class="text-gray-900">92% <span class="text-[10px] text-gray-400 font-medium">(26/day)</span></span>
-                                </div>
-                                <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div class="bg-gray-900 h-full rounded-full" style="width: 92%"></div>
-                                </div>
-                            </div>
-                            <div>
-                                <div class="flex justify-between text-xs font-bold mb-1">
-                                    <span class="text-gray-800">Sohar Branch</span>
-                                    <span class="text-gray-900">89% <span class="text-[10px] text-gray-400 font-medium">(14/day)</span></span>
-                                </div>
-                                <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div class="bg-coral-300 h-full rounded-full" style="width: 89%"></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-between items-center pt-2 border-t border-gray-50">
-                            <span class="text-[10px] font-semibold text-gray-400">Daily Health Check</span>
-                            <div class="flex gap-1.5">
-                                <span class="w-7 h-7 rounded-full bg-[#F8F8FA] border border-gray-100 flex items-center justify-center text-xs font-bold text-gray-700" title="Salalah HQ">S</span>
-                                <span class="w-7 h-7 rounded-full bg-[#F8F8FA] border border-gray-100 flex items-center justify-center text-xs font-bold text-gray-700" title="Muscat">M</span>
-                                <span class="w-7 h-7 rounded-full bg-coral-500 text-white flex items-center justify-center text-xs font-bold shadow-sm" title="All Optimal">✓</span>
-                            </div>
-                        </div>
-                    </div>
-
+                <div id="widgets-grid" class="grid grid-cols-12 gap-5">
+                    <!-- Widgets are injected dynamically by widgets/widget-manager.js -->
                 </div>
             </section>
             
         </div>
     </main>
 
-    <!-- Dynamic User Name, Greeting, Date & Live Clock Script -->
+    <!-- ADD / REMOVE WIDGETS MODAL -->
+    <div id="widget-modal" class="hidden fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm items-center justify-center p-4">
+        <div class="bg-white rounded-[2.5rem] max-w-xl w-full p-6 lg:p-8 shadow-2xl border border-gray-100 flex flex-col max-h-[85vh]">
+            <div class="flex justify-between items-center pb-4 border-b border-gray-100">
+                <div>
+                    <h3 class="text-lg font-extrabold text-gray-900">Manage Dashboard Widgets</h3>
+                    <p class="text-xs text-gray-400 mt-0.5">Add or remove modules from your Super Admin view.</p>
+                </div>
+                <button onclick="closeWidgetModal()" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Dynamic Catalog List -->
+            <div id="widget-catalog-list" class="flex-1 overflow-y-auto space-y-3 my-5 pr-1 custom-scrollbar"></div>
+
+            <div class="flex justify-between items-center pt-4 border-t border-gray-100">
+                <button onclick="resetDefaultWidgets()" class="text-xs font-bold text-gray-500 hover:text-gray-900 underline">
+                    Reset to Default Layout
+                </button>
+                <button onclick="closeWidgetModal()" class="bg-[#111827] hover:bg-gray-800 text-white text-xs font-bold px-6 py-3 rounded-full transition-colors">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Greeting & Live Clock Script -->
     <script>
-        // 1. Set Dynamic Full Name from localStorage or Supabase JWT Token
         (function populateUserName() {
             let fullName = localStorage.getItem('cargo_user_name') || 'Muhammed Adhil';
             try {
@@ -571,7 +183,6 @@
             document.getElementById('userFullName').textContent = fullName;
         })();
 
-        // 2. Live Date, Time & Greeting Updater
         function updateDateTimeAndGreeting() {
             const now = new Date();
             const hour = now.getHours();
@@ -594,17 +205,6 @@
 
         updateDateTimeAndGreeting();
         setInterval(updateDateTimeAndGreeting, 1000);
-
-        // 3. Interactive Branch Financials Switcher (Monthly vs Daily in Concentric Circles)
-        let isMonthlyBranchView = true;
-        function toggleBranchPeriod() {
-            isMonthlyBranchView = !isMonthlyBranchView;
-            document.getElementById('branchPeriodLabel').textContent = isMonthlyBranchView ? 'Monthly' : 'Daily Today';
-            document.getElementById('circleSlh').textContent = isMonthlyBranchView ? 'OMR 11.4K' : 'OMR 540';
-            document.getElementById('circleMct').textContent = isMonthlyBranchView ? 'OMR 8.2K' : 'OMR 390';
-            document.getElementById('circleShr').textContent = isMonthlyBranchView ? 'OMR 3.6K' : 'OMR 210';
-            document.getElementById('circleToday').textContent = isMonthlyBranchView ? '1.1K' : 'Today';
-        }
     </script>
 </body>
 </html>
