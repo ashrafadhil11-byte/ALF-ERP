@@ -2,28 +2,56 @@
 window.CargoWidgetRegistry = window.CargoWidgetRegistry || [];
 
 window.registerCargoWidget = function(widgetConfig) {
-    window.CargoWidgetRegistry.push(widgetConfig);
+    const existingIndex = window.CargoWidgetRegistry.findIndex(w => w.id === widgetConfig.id);
+    if (existingIndex > -1) {
+        window.CargoWidgetRegistry[existingIndex] = widgetConfig;
+    } else {
+        window.CargoWidgetRegistry.push(widgetConfig);
+    }
 };
 
 const STORAGE_KEY = 'alfarha_super_dashboard_widgets_v1';
+const REMOVED_KEY = 'alfarha_super_dashboard_removed_v1';
 let isEditMode = false;
 
-// Get active widget IDs from localStorage (or return all by default)
+function getExplicitlyRemovedIds() {
+    try {
+        return JSON.parse(localStorage.getItem(REMOVED_KEY) || '[]');
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveExplicitlyRemovedIds(ids) {
+    localStorage.setItem(REMOVED_KEY, JSON.stringify(ids));
+}
+
+// Get active widget IDs and auto-include any newly created widget files
 function getActiveWidgetIds() {
+    const allRegisteredIds = window.CargoWidgetRegistry.map(w => w.id);
+    const removedIds = getExplicitlyRemovedIds();
     const saved = localStorage.getItem(STORAGE_KEY);
+
     if (saved) {
         try {
-            return JSON.parse(saved);
+            let activeIds = JSON.parse(saved);
+            // Automatically add any newly registered widget that wasn't explicitly removed
+            allRegisteredIds.forEach(id => {
+                if (!activeIds.includes(id) && !removedIds.includes(id)) {
+                    activeIds.push(id);
+                }
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(activeIds));
+            return activeIds;
         } catch (e) {}
     }
-    return window.CargoWidgetRegistry.map(w => w.id);
+    return allRegisteredIds;
 }
 
 function saveActiveWidgetIds(ids) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
 }
 
-// Render active widgets into the 12-column Bento Grid
 window.renderDashboardWidgets = function() {
     const grid = document.getElementById('widgets-grid');
     if (!grid) return;
@@ -46,14 +74,11 @@ window.renderDashboardWidgets = function() {
     } else {
         grid.innerHTML = activeWidgets.map(widget => `
             <div class="${widget.colSpan} relative group transition-all duration-200 ${isEditMode ? 'ring-2 ring-coral-400 ring-offset-2 ring-offset-[#F8F8FA] rounded-[2rem]' : ''}" data-widget-id="${widget.id}">
-                
-                <!-- Quick Remove Button (Visible in Edit Mode or on Hover) -->
                 <button onclick="removeWidget('${widget.id}')" 
                     title="Remove ${widget.title}"
                     class="${isEditMode ? 'flex' : 'hidden group-hover:flex'} absolute -top-2.5 -right-2.5 z-30 w-7 h-7 rounded-full bg-gray-900 hover:bg-coral-500 text-white items-center justify-center shadow-md transition-all">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
-
                 ${widget.render()}
             </div>
         `).join('');
@@ -63,26 +88,36 @@ window.renderDashboardWidgets = function() {
     updateActiveCountBadge();
 };
 
-// Add or Remove a Widget
 window.toggleWidget = function(widgetId) {
     let activeIds = getActiveWidgetIds();
+    let removedIds = getExplicitlyRemovedIds();
+
     if (activeIds.includes(widgetId)) {
         activeIds = activeIds.filter(id => id !== widgetId);
+        if (!removedIds.includes(widgetId)) removedIds.push(widgetId);
     } else {
         activeIds.push(widgetId);
+        removedIds = removedIds.filter(id => id !== widgetId);
     }
+
+    saveExplicitlyRemovedIds(removedIds);
     saveActiveWidgetIds(activeIds);
     window.renderDashboardWidgets();
 };
 
 window.removeWidget = function(widgetId) {
     let activeIds = getActiveWidgetIds().filter(id => id !== widgetId);
+    let removedIds = getExplicitlyRemovedIds();
+    if (!removedIds.includes(widgetId)) removedIds.push(widgetId);
+
+    saveExplicitlyRemovedIds(removedIds);
     saveActiveWidgetIds(activeIds);
     window.renderDashboardWidgets();
 };
 
 window.resetDefaultWidgets = function() {
     const allIds = window.CargoWidgetRegistry.map(w => w.id);
+    saveExplicitlyRemovedIds([]);
     saveActiveWidgetIds(allIds);
     window.renderDashboardWidgets();
 };
@@ -98,7 +133,6 @@ window.toggleEditLayoutMode = function() {
     window.renderDashboardWidgets();
 };
 
-// Open/Close Widget Picker Modal
 window.openWidgetModal = function() {
     const modal = document.getElementById('widget-modal');
     if (modal) {
@@ -124,7 +158,6 @@ function updateActiveCountBadge() {
     }
 }
 
-// Render the list of available widgets inside the Customize Modal
 function renderWidgetCatalogModal() {
     const listContainer = document.getElementById('widget-catalog-list');
     if (!listContainer) return;
