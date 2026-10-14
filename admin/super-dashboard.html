@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Admin Dashboard - Al-Farha Cargo</title>
+    <title>Super Admin Portal - Al-Farha Cargo</title>
     
     <!-- STRICT AUTHENTICATION GATEKEEPER -->
     <script>
@@ -19,16 +19,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Initialize Global Widget Registry Before Any Widget Loads -->
+    <!-- Initialize Global Widget Registry First -->
     <script>
         window.CargoWidgetRegistry = [];
         window.registerCargoWidget = function(widgetConfig) {
-            const existingIndex = window.CargoWidgetRegistry.findIndex(w => w.id === widgetConfig.id);
-            if (existingIndex > -1) {
-                window.CargoWidgetRegistry[existingIndex] = widgetConfig;
-            } else {
-                window.CargoWidgetRegistry.push(widgetConfig);
-            }
+            const idx = window.CargoWidgetRegistry.findIndex(w => w.id === widgetConfig.id);
+            if (idx > -1) window.CargoWidgetRegistry[idx] = widgetConfig;
+            else window.CargoWidgetRegistry.push(widgetConfig);
         };
     </script>
 
@@ -36,7 +33,7 @@
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
 
-    <!-- Individual Widget Files (Loaded BEFORE widget-manager.js) -->
+    <!-- Modular Adaptive Widgets -->
     <script src="widgets/global-shipments.js" defer></script>
     <script src="widgets/global-financials.js" defer></script>
     <script src="widgets/sla-staff-status.js" defer></script>
@@ -46,7 +43,7 @@
     <script src="widgets/branch-efficiency.js" defer></script>
     <script src="widgets/latest-bookings.js" defer></script>
 
-    <!-- Widget Manager Engine (Loaded LAST so all widgets are registered) -->
+    <!-- Smartphone Grid & Cloud Sync Engine -->
     <script src="widgets/widget-manager.js" defer></script>
 
     <script>
@@ -73,6 +70,34 @@
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+
+        /* SMARTPHONE-STYLE 4-COLUMN DENSE BENTO GRID */
+        .smart-widget-grid {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            grid-auto-rows: 185px;
+            grid-auto-flow: dense;
+            gap: 1.25rem;
+        }
+        @media (min-width: 768px) {
+            .smart-widget-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .widget-cell {
+                grid-column: span min(var(--w-cols, 1), 2);
+                grid-row: span var(--w-rows, 2);
+            }
+        }
+        @media (min-width: 1280px) {
+            .smart-widget-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+            .widget-cell {
+                grid-column: span var(--w-cols, 1);
+                grid-row: span var(--w-rows, 2);
+            }
+        }
     </style>
 </head>
 <body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900 selection:bg-coral-500 selection:text-white">
@@ -83,73 +108,30 @@
     <!-- Main Outer Container -->
     <main class="flex-1 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-6 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
         
-        <!-- Modular Topbar -->
+        <!-- Topbar (Contains Top Greeting, Super Admin Portal Badge, Live Clock & Customize Controls) -->
         <div id="topbar-container"></div>
+
+        <!-- Customize Mode Instruction Banner (Hidden unless Customize is clicked) -->
+        <div id="customize-mode-banner" class="hidden items-center justify-between bg-[#111827] text-white px-5 py-3 rounded-2xl mb-5 shadow-md">
+            <div class="flex items-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-full bg-coral-500 animate-ping"></span>
+                <p class="text-xs font-semibold">
+                    <span class="font-extrabold text-coral-400">Customize Mode Active:</span> Drag cards to reorder, click <span class="underline">2×2 / 2×3</span> pills or drag the bottom-right corner handle to resize. Changes sync to your account automatically.
+                </p>
+            </div>
+            <button onclick="resetDefaultWidgets()" class="text-[11px] font-bold text-gray-300 hover:text-white underline flex-shrink-0 ml-4">
+                Reset Default Grid
+            </button>
+        </div>
 
         <!-- Scrollable Dashboard Body -->
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            
-            <!-- GREETING (LEFT) & DATE/TIME + WIDGET CONTROLS (RIGHT) -->
-            <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-8 mb-6 border-b border-gray-100 gap-6">
-                
-                <!-- Left: Personalized User Greeting -->
-                <div class="text-left">
-                    <p class="text-lg lg:text-xl font-medium text-gray-400 tracking-tight leading-snug" id="greetingText">
-                        Good Afternoon,
-                    </p>
-                    <h1 class="text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight leading-tight mt-0.5" id="userFullName">
-                        Muhammed Adhil
-                    </h1>
-                </div>
-
-                <!-- Right: Widget Controls + Today's Date & Live Time -->
-                <div class="flex flex-wrap items-center gap-3 self-start xl:self-center">
-                    
-                    <!-- Add / Remove Widgets Modal Trigger -->
-                    <button onclick="openWidgetModal()" class="bg-white hover:bg-gray-50 text-gray-800 px-4 py-3 rounded-full border border-gray-200/80 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
-                        <svg class="w-4 h-4 text-coral-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
-                        <span>Widgets</span>
-                        <span id="active-widget-count" class="bg-[#F8F8FA] text-gray-600 px-2 py-0.5 rounded-full text-[10px] border border-gray-100">8/8</span>
-                    </button>
-
-                    <!-- Inline Edit Mode Trigger -->
-                    <button id="editLayoutBtn" onclick="toggleEditLayoutMode()" class="bg-[#F8F8FA] hover:bg-gray-100 text-gray-700 px-4 py-3 rounded-full border border-gray-100 text-xs font-bold flex items-center gap-2 transition-all">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                        Customize
-                    </button>
-
-                    <!-- Date & Live Time Pill -->
-                    <div class="flex items-center gap-5 bg-[#F8F8FA] px-5 py-2.5 rounded-[2rem] border border-gray-100">
-                        <div class="text-right pr-5 border-r border-gray-200/80">
-                            <p class="text-lg lg:text-xl font-extrabold text-gray-900 tracking-tight tabular-nums leading-none" id="currentTime">
-                                --:-- --
-                            </p>
-                            <p class="text-[10px] font-bold text-coral-500 uppercase tracking-widest mt-1">
-                                Local Time
-                            </p>
-                        </div>
-
-                        <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-full bg-white border border-gray-200/80 flex items-center justify-center shadow-sm">
-                                <span class="text-base font-extrabold text-gray-900 tracking-tight leading-none" id="currentDay">--</span>
-                            </div>
-                            <div class="text-left pr-1">
-                                <p class="text-xs font-bold text-gray-900 leading-tight" id="currentDayName">---</p>
-                                <p class="text-xs font-medium text-gray-400 leading-tight mt-0.5" id="currentMonthYear">---</p>
-                            </div>
-                        </div>
-                    </div>
-
+            <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6 min-h-full">
+                <!-- Smartphone Resizable & Draggable Bento Grid -->
+                <div id="widgets-grid" class="smart-widget-grid">
+                    <!-- Widgets injected dynamically by widgets/widget-manager.js -->
                 </div>
             </section>
-
-            <!-- DYNAMIC WIDGETS CANVAS -->
-            <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
-                <div id="widgets-grid" class="grid grid-cols-12 gap-5">
-                    <!-- Widgets are injected dynamically -->
-                </div>
-            </section>
-            
         </div>
     </main>
 
@@ -159,7 +141,7 @@
             <div class="flex justify-between items-center pb-4 border-b border-gray-100">
                 <div>
                     <h3 class="text-lg font-extrabold text-gray-900">Manage Dashboard Widgets</h3>
-                    <p class="text-xs text-gray-400 mt-0.5">Add or remove modules from your Super Admin view.</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Add or remove modules from your Super Admin Portal.</p>
                 </div>
                 <button onclick="closeWidgetModal()" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -180,79 +162,5 @@
         </div>
     </div>
 
-    <!-- User Greeting, Live Clock & Auto-Sync New Widgets Script -->
-    <script>
-        // 1. Populate Logged-In User Full Name
-        (function populateUserName() {
-            let fullName = localStorage.getItem('cargo_user_name') || 'Muhammed Adhil';
-            try {
-                const token = localStorage.getItem('cargo_auth_token');
-                if (token) {
-                    const base64Url = token.split('.')[1];
-                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                    const payload = JSON.parse(window.atob(base64));
-                    if (payload?.user_metadata?.full_name) {
-                        fullName = payload.user_metadata.full_name;
-                        localStorage.setItem('cargo_user_name', fullName);
-                    }
-                }
-            } catch (e) {}
-            document.getElementById('userFullName').textContent = fullName;
-        })();
-
-        // 2. Live Date, Time & Greeting
-        function updateDateTimeAndGreeting() {
-            const now = new Date();
-            const hour = now.getHours();
-            
-            let greeting = 'Good Evening,';
-            if (hour < 12) greeting = 'Good Morning,';
-            else if (hour < 17) greeting = 'Good Afternoon,';
-            
-            document.getElementById('greetingText').textContent = greeting;
-            document.getElementById('currentDay').textContent = String(now.getDate()).padStart(2, '0');
-            document.getElementById('currentDayName').textContent = now.toLocaleDateString('en-US', { weekday: 'long' });
-            document.getElementById('currentMonthYear').textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-            document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: true 
-            });
-        }
-
-        updateDateTimeAndGreeting();
-        setInterval(updateDateTimeAndGreeting, 1000);
-
-        // 3. Ensure Newly Added Widgets Automatically Appear Even if Old localStorage Exists
-        window.addEventListener('DOMContentLoaded', () => {
-            const STORAGE_KEY = 'alfarha_super_dashboard_widgets_v1';
-            const REMOVED_KEY = 'alfarha_super_dashboard_removed_v1';
-
-            const savedRaw = localStorage.getItem(STORAGE_KEY);
-            const removedRaw = localStorage.getItem(REMOVED_KEY);
-            const explicitlyRemoved = removedRaw ? JSON.parse(removedRaw) : [];
-
-            if (savedRaw && window.CargoWidgetRegistry) {
-                try {
-                    const savedIds = JSON.parse(savedRaw);
-                    let updated = false;
-                    window.CargoWidgetRegistry.forEach(w => {
-                        if (!savedIds.includes(w.id) && !explicitlyRemoved.includes(w.id)) {
-                            savedIds.push(w.id);
-                            updated = true;
-                        }
-                    });
-                    if (updated) {
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(savedIds));
-                    }
-                } catch (e) {}
-            }
-
-            if (typeof window.renderDashboardWidgets === 'function') {
-                window.renderDashboardWidgets();
-            }
-        });
-    </script>
 </body>
 </html>
