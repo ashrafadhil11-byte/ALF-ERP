@@ -1,6 +1,5 @@
 // File: admin/components/profile-modal.js
 document.addEventListener('DOMContentLoaded', () => {
-    // Inject the Profile Drawer Container into the DOM automatically
     const modalHost = document.createElement('div');
     modalHost.id = 'profile-component-host';
     document.body.appendChild(modalHost);
@@ -49,108 +48,118 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
 
-            <!-- Tab Switcher: Overview vs Security (Change Password) -->
+            <!-- Animated Sliding Pill Tab Switcher -->
             <div class="px-6 mt-5">
-                <div class="grid grid-cols-2 bg-[#F8F8FA] p-1 rounded-2xl border border-gray-100">
-                    <button id="profTabDetailsBtn" onclick="switchProfileTab('details')" 
-                            class="py-2 rounded-xl text-xs font-extrabold transition-all bg-white text-gray-900 shadow-sm">
+                <div class="relative grid grid-cols-2 bg-[#F8F8FA] p-1 rounded-2xl border border-gray-100 overflow-hidden">
+                    <!-- Gliding White Pill Background -->
+                    <div id="profTabSlider" 
+                         class="absolute top-1 bottom-1 left-1 w-[calc(50%-0.25rem)] bg-white rounded-xl shadow-sm transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] pointer-events-none"></div>
+
+                    <button type="button" id="profTabDetailsBtn" onclick="switchProfileTab('details')" 
+                            class="relative z-10 py-2.5 rounded-xl text-xs font-extrabold transition-colors duration-300 text-gray-900">
                         User & Branch Info
                     </button>
-                    <button id="profTabSecurityBtn" onclick="switchProfileTab('security')" 
-                            class="py-2 rounded-xl text-xs font-bold transition-all text-gray-500 hover:text-gray-900">
+                    <button type="button" id="profTabSecurityBtn" onclick="switchProfileTab('security')" 
+                            class="relative z-10 py-2.5 rounded-xl text-xs font-bold transition-colors duration-300 text-gray-500 hover:text-gray-900">
                         Change Password
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Scrollable Body Content -->
-        <div class="flex-1 overflow-y-auto px-6 py-5 custom-scrollbar">
-            
-            <!-- TAB 1: USER & BRANCH DETAILS -->
-            <div id="profTabDetailsContent" class="space-y-3">
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100">
-                        <p class="text-[10px] font-bold text-gray-400 uppercase">System Username</p>
-                        <p id="profModalUsername" class="text-xs font-extrabold text-gray-900 mt-1">@adhil</p>
-                    </div>
-                    <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100">
-                        <p class="text-[10px] font-bold text-gray-400 uppercase">Assigned Branch</p>
-                        <p id="profModalBranch" class="text-xs font-extrabold text-gray-900 mt-1">Global (All Branches)</p>
-                    </div>
-                </div>
-
-                <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100 flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-gray-400 uppercase">Recovery & Verification Email</p>
-                        <p id="profModalEmail" class="text-xs font-extrabold text-gray-900 mt-1">Loading...</p>
-                    </div>
-                    <span class="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                    </span>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100">
-                        <p class="text-[10px] font-bold text-gray-400 uppercase">Contact Number</p>
-                        <p id="profModalPhone" class="text-xs font-extrabold text-gray-900 mt-1">Loading...</p>
-                    </div>
-                    <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100">
-                        <p class="text-[10px] font-bold text-gray-400 uppercase">Oman Civil ID</p>
-                        <p id="profModalOmanId" class="text-xs font-extrabold text-gray-900 mt-1">Loading...</p>
-                    </div>
-                </div>
-
-                <div class="bg-[#FFF5F3] p-3.5 rounded-2xl border border-coral-100 flex items-center justify-between">
-                    <div>
-                        <p class="text-[10px] font-bold text-coral-600 uppercase">Date of Birth</p>
-                        <p id="profModalDob" class="text-xs font-extrabold text-gray-900 mt-1">Loading...</p>
-                    </div>
-                    <span class="text-[10px] font-bold bg-white text-coral-600 px-3 py-1 rounded-full border border-coral-100 shadow-sm">
-                        🎉 Birthday Sync Active
-                    </span>
-                </div>
-            </div>
-
-            <!-- TAB 2: CHANGE / RESET PASSWORD -->
-            <div id="profTabSecurityContent" class="hidden">
-                <form id="changePasswordForm" class="space-y-4">
-                    <div class="bg-[#F8F8FA] p-4 rounded-2xl border border-gray-100">
-                        <h4 class="text-xs font-extrabold text-gray-900">Update Account Password</h4>
-                        <p class="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
-                            Enter a new password below. Your session will remain active across this device.
-                        </p>
-                    </div>
-
-                    <div id="passwordAlertBox" class="hidden p-3.5 rounded-2xl text-xs font-bold border"></div>
-
-                    <div class="space-y-1.5">
-                        <label class="text-[11px] font-bold text-gray-700 ml-1">New Password</label>
-                        <div class="relative">
-                            <input type="password" id="newPasswordInput" required minlength="6" placeholder="Minimum 6 characters"
-                                   class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200 rounded-2xl text-xs font-semibold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
-                            <button type="button" onclick="togglePasswordVisibility('newPasswordInput')" 
-                                    class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-700">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                            </button>
+        <!-- Smooth Horizontal Sliding Viewport -->
+        <div class="flex-1 overflow-x-hidden overflow-y-auto custom-scrollbar my-4">
+            <div id="profTabsTrack" class="flex w-[200%] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
+                
+                <!-- PANE 1: USER & BRANCH DETAILS (50% Width of Track) -->
+                <div id="profTabDetailsPane" class="w-1/2 px-6 space-y-3 transition-opacity duration-300 opacity-100">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase">System Username</p>
+                            <p id="profModalUsername" class="text-xs font-extrabold text-gray-900 mt-1">@adhil</p>
+                        </div>
+                        <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase">Assigned Branch</p>
+                            <p id="profModalBranch" class="text-xs font-extrabold text-gray-900 mt-1">Global (All Branches)</p>
                         </div>
                     </div>
 
-                    <div class="space-y-1.5">
-                        <label class="text-[11px] font-bold text-gray-700 ml-1">Confirm New Password</label>
-                        <div class="relative">
-                            <input type="password" id="confirmPasswordInput" required minlength="6" placeholder="Re-enter new password"
-                                   class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200 rounded-2xl text-xs font-semibold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
+                    <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100 flex items-center justify-between">
+                        <div class="min-w-0 pr-2">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase">Recovery & Verification Email</p>
+                            <p id="profModalEmail" class="text-xs font-extrabold text-gray-900 mt-1 truncate">Loading...</p>
+                        </div>
+                        <span class="w-8 h-8 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase">Contact Number</p>
+                            <p id="profModalPhone" class="text-xs font-extrabold text-gray-900 mt-1">Loading...</p>
+                        </div>
+                        <div class="bg-[#F8F8FA] p-3.5 rounded-2xl border border-gray-100">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase">Oman Civil ID</p>
+                            <p id="profModalOmanId" class="text-xs font-extrabold text-gray-900 mt-1">Loading...</p>
                         </div>
                     </div>
 
-                    <button type="submit" id="savePasswordBtn" 
-                            class="w-full bg-coral-500 hover:bg-coral-600 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-[0_8px_20px_-6px_rgba(232,109,88,0.5)] transition-all flex items-center justify-center gap-2">
-                        <span id="savePasswordBtnText">Update Password</span>
-                    </button>
-                </form>
-            </div>
+                    <div class="bg-[#FFF5F3] p-3.5 rounded-2xl border border-coral-100 flex items-center justify-between">
+                        <div>
+                            <p class="text-[10px] font-bold text-coral-600 uppercase">Date of Birth</p>
+                            <p id="profModalDob" class="text-xs font-extrabold text-gray-900 mt-1">Loading...</p>
+                        </div>
+                        <span class="text-[10px] font-bold bg-white text-coral-600 px-3 py-1 rounded-full border border-coral-100 shadow-sm">
+                            🎉 Birthday Sync Active
+                        </span>
+                    </div>
+                </div>
 
+                <!-- PANE 2: CHANGE / RESET PASSWORD (50% Width of Track) -->
+                <div id="profTabSecurityPane" class="w-1/2 px-6 transition-opacity duration-300 opacity-40">
+                    <form id="changePasswordForm" class="space-y-4">
+                        <div class="bg-[#F8F8FA] p-4 rounded-2xl border border-gray-100">
+                            <h4 class="text-xs font-extrabold text-gray-900">Update Account Password</h4>
+                            <p class="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
+                                Enter a new password below. Your session will remain active across this device.
+                            </p>
+                        </div>
+
+                        <div id="passwordAlertBox" class="hidden p-3.5 rounded-2xl text-xs font-bold border"></div>
+
+                        <div class="space-y-1.5">
+                            <label class="text-[11px] font-bold text-gray-700 ml-1">New Password</label>
+                            <div class="relative">
+                                <input type="password" id="newPasswordInput" required minlength="6" placeholder="Minimum 6 characters"
+                                       class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200 rounded-2xl text-xs font-semibold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
+                                <button type="button" onclick="togglePasswordVisibility('newPasswordInput')" 
+                                        class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-700">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1.5">
+                            <label class="text-[11px] font-bold text-gray-700 ml-1">Confirm New Password</label>
+                            <div class="relative">
+                                <input type="password" id="confirmPasswordInput" required minlength="6" placeholder="Re-enter new password"
+                                       class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200 rounded-2xl text-xs font-semibold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
+                                <button type="button" onclick="togglePasswordVisibility('confirmPasswordInput')" 
+                                        class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-700">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <button type="submit" id="savePasswordBtn" 
+                                class="w-full bg-coral-500 hover:bg-coral-600 text-white font-extrabold text-xs py-3.5 rounded-2xl shadow-[0_8px_20px_-6px_rgba(232,109,88,0.5)] transition-all flex items-center justify-center gap-2">
+                            <span id="savePasswordBtnText">Update Password</span>
+                        </button>
+                    </form>
+                </div>
+
+            </div>
         </div>
 
         <!-- Drawer Footer -->
@@ -170,7 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     </aside>
     `;
 
-    // Handle Password Update Submission
+    // Password Update Form Handler
     const pwdForm = document.getElementById('changePasswordForm');
     if (pwdForm) {
         pwdForm.addEventListener('submit', async (e) => {
@@ -219,129 +228,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Format Role String
 function formatRoleTitle(role) {
     if (!role) return 'Employee';
     return role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-// Format Branch String
 function formatBranchTitle(branch, role) {
     if (role === 'super_admin' || !branch || branch.toLowerCase() === 'global') {
-        return 'Global (All Branches)';
-    }
-    return branch.charAt(0).toUpperCase() + branch.slice(1) + ' Branch';
-}
-
-// Populate User Profile Data from JWT immediately, then refresh from `/api/profile`
-async function loadUserProfileDetails() {
-    const token = localStorage.getItem('cargo_auth_token');
-    if (!token) return;
-
-    // 1. Instant fill from JWT user_metadata
-    try {
-        const base64Url = token.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const payload = JSON.parse(window.atob(base64));
-        const meta = payload.user_metadata || {};
-
-        applyProfileToDOM({
-            full_name: meta.full_name || localStorage.getItem('cargo_user_name') || 'Muhammed Adhil',
-            username: meta.username || 'admin',
-            role: meta.role || 'super_admin',
-            branch: meta.branch || 'Global',
-            recovery_email: meta.recovery_email || payload.email || 'Not Set',
-            contact_number: meta.contact_number || 'Not Set',
-            oman_civil_id: meta.oman_civil_id || 'Not Set',
-            date_of_birth: meta.date_of_birth || 'Not Set'
-        });
-    } catch (e) {}
-
-    // 2. Authoritative fetch from Supabase `employees` table
-    try {
-        const res = await fetch('/api/profile', {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-            const { profile } = await res.json();
-            if (profile) applyProfileToDOM(profile);
-        }
-    } catch (e) {}
-}
-
-function applyProfileToDOM(p) {
-    const encoded = encodeURIComponent(p.full_name || 'User');
-    const avatarEl = document.getElementById('profModalAvatar');
-    if (avatarEl) avatarEl.src = `https://ui-avatars.com/api/?name=${encoded}&background=E86D58&color=fff&bold=true`;
-
-    const setTxt = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = val;
-    };
-
-    setTxt('profModalFullName', p.full_name);
-    setTxt('profModalRoleBadge', formatRoleTitle(p.role));
-    setTxt('profModalBranchBadge', formatBranchTitle(p.branch, p.role));
-    setTxt('profModalUsername', `@${p.username || 'admin'}`);
-    setTxt('profModalBranch', formatBranchTitle(p.branch, p.role));
-    setTxt('profModalEmail', p.recovery_email || 'Not Set');
-    setTxt('profModalPhone', p.contact_number || 'Not Set');
-    setTxt('profModalOmanId', p.oman_civil_id || 'Not Set');
-    setTxt('profModalDob', p.date_of_birth || 'Not Set');
-}
-
-// Open Profile Drawer
-window.openProfileModal = function() {
-    const backdrop = document.getElementById('profileDrawerBackdrop');
-    const panel = document.getElementById('profileDrawerPanel');
-    if (!backdrop || !panel) return;
-
-    loadUserProfileDetails();
-
-    backdrop.classList.remove('hidden');
-    requestAnimationFrame(() => {
-        backdrop.classList.remove('opacity-0');
-        panel.classList.remove('translate-x-[110%]');
-    });
-};
-
-// Close Profile Drawer
-window.closeProfileModal = function() {
-    const backdrop = document.getElementById('profileDrawerBackdrop');
-    const panel = document.getElementById('profileDrawerPanel');
-    if (!backdrop || !panel) return;
-
-    backdrop.classList.add('opacity-0');
-    panel.classList.add('translate-x-[110%]');
-    setTimeout(() => {
-        backdrop.classList.add('hidden');
-    }, 300);
-};
-
-// Switch Between Profile Info & Password Reset Tabs
-window.switchProfileTab = function(tab) {
-    const detailsBtn = document.getElementById('profTabDetailsBtn');
-    const securityBtn = document.getElementById('profTabSecurityBtn');
-    const detailsContent = document.getElementById('profTabDetailsContent');
-    const securityContent = document.getElementById('profTabSecurityContent');
-
-    if (tab === 'details') {
-        detailsBtn.className = 'py-2 rounded-xl text-xs font-extrabold transition-all bg-white text-gray-900 shadow-sm';
-        securityBtn.className = 'py-2 rounded-xl text-xs font-bold transition-all text-gray-500 hover:text-gray-900';
-        detailsContent.classList.remove('hidden');
-        securityContent.classList.add('hidden');
-    } else {
-        securityBtn.className = 'py-2 rounded-xl text-xs font-extrabold transition-all bg-white text-gray-900 shadow-sm';
-        detailsBtn.className = 'py-2 rounded-xl text-xs font-bold transition-all text-gray-500 hover:text-gray-900';
-        securityContent.classList.remove('hidden');
-        detailsContent.classList.add('hidden');
-    }
-};
-
-// Show/Hide Password Input Helper
-window.togglePasswordVisibility = function(inputId) {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-    input.type = input.type === 'password' ? 'text' : 'password';
-};
+        return 'Global (
