@@ -4,450 +4,352 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Admin Dashboard - Al-Farha Cargo</title>
-
+    
     <!-- STRICT AUTHENTICATION GATEKEEPER -->
     <script>
         (function checkAuth() {
             const token = localStorage.getItem('cargo_auth_token');
             const role = localStorage.getItem('cargo_user_role');
-            
-            // If no token exists, immediately redirect to login page
-            if (!token) {
-                window.location.replace('../login.html');
-                return;
-            }
-            
-            // Optional: If this is an admin page, kick out standard employees
-            if (role !== 'super_admin' && role !== 'branch_admin') {
-                window.location.replace('../dashboard.html');
-            }
+            if (!token) window.location.replace('../login.html');
+            if (role !== 'super_admin' && role !== 'branch_admin') window.location.replace('../dashboard.html');
         })();
     </script>
 
-    
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS & Fonts -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js for visualizations -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
+    <!-- Import External JS UI Components -->
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'], },
                     colors: {
-                        brand: {
-                            orange: '#F58220', orangeHover: '#E06D10',
-                            purple: '#6A2C70', purpleDark: '#4A1D4E',
-                        }
-                    },
-                    boxShadow: {
-                        'soft': '0 10px 40px -10px rgba(0,0,0,0.05)',
-                        'inner-soft': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.03)'
+                        coral: { 500: '#E86D58', 600: '#D55C48' }, // Accent color from reference
+                        brand: { orange: '#F58220', purple: '#6A2C70' }
                     }
                 }
             }
         }
     </script>
     <style>
-        /* Custom Scrollbar for a polished look */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
+        /* Custom smooth scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
     </style>
 </head>
-<body class="bg-[#FBF8F1] h-screen overflow-hidden flex antialiased text-gray-800 selection:bg-brand-orange selection:text-white">
+<body class="bg-[#F3F4F6] min-h-screen p-4 lg:p-5 flex gap-5 antialiased text-gray-800">
 
-    <!-- Sidebar Navigation -->
-    <aside class="w-64 bg-white h-full shadow-soft flex flex-col justify-between hidden lg:flex z-20 relative">
-        <div class="p-8">
-            <div class="mb-10">
-                <img src="../assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo" class="h-10 w-auto object-contain">
-            </div>
-            
-            <nav class="space-y-2">
-                <a href="#" class="flex items-center gap-3 px-4 py-3 bg-brand-orange text-white rounded-2xl font-semibold shadow-md transition-all">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                    Overview
-                </a>
-                <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-500 hover:text-brand-purple hover:bg-gray-50 rounded-2xl font-medium transition-all">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                    Branches
-                </a>
-                <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-500 hover:text-brand-purple hover:bg-gray-50 rounded-2xl font-medium transition-all">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                    Shipments
-                </a>
-                <a href="create-user.html" class="flex items-center gap-3 px-4 py-3 text-gray-500 hover:text-brand-purple hover:bg-gray-50 rounded-2xl font-medium transition-all">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                    Staff & Users
-                </a>
-                <a href="#" class="flex items-center gap-3 px-4 py-3 text-gray-500 hover:text-brand-purple hover:bg-gray-50 rounded-2xl font-medium transition-all">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Financials
-                </a>
-            </nav>
-        </div>
+    <!-- Sidebar Injected Here -->
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <!-- Main Content Wrapper -->
+    <main class="flex-1 bg-white rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] p-6 lg:p-10 flex flex-col relative z-10 overflow-hidden border border-gray-100">
         
-        <div class="p-8">
-            <div class="bg-gray-50 rounded-3xl p-4 text-center border border-gray-100">
-                <div class="w-10 h-10 bg-brand-purple/10 text-brand-purple rounded-full flex items-center justify-center mx-auto mb-2">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                </div>
-                <h4 class="text-sm font-semibold text-gray-800">System Settings</h4>
-                <p class="text-xs text-gray-500 mt-1 mb-3">Manage global ERP configurations</p>
-                <button class="w-full bg-white border border-gray-200 text-gray-700 text-xs font-semibold py-2 rounded-xl hover:text-brand-orange hover:border-brand-orange transition-colors">Open Settings</button>
-            </div>
-        </div>
-    </aside>
+        <!-- Topbar Injected Here -->
+        <div id="topbar-container"></div>
 
-    <!-- Main Content Area -->
-    <main class="flex-1 h-full overflow-y-auto p-4 md:p-8 lg:p-10 relative">
-        
-        <!-- Top Header -->
-        <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
-            <div>
-                <p class="text-sm font-semibold text-brand-orange mb-1 uppercase tracking-wider" id="currentDate">October 12, 2026</p>
-                <h1 class="text-3xl font-extrabold text-gray-900">Global Overview</h1>
-                <p class="text-gray-500 text-sm mt-1">SuperAdmin Access • Viewing all branches</p>
-            </div>
+        <!-- Scrollable Dashboard Body -->
+        <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
             
-            <div class="flex items-center gap-4 w-full md:w-auto">
-                <!-- Search Bar -->
-                <div class="relative w-full md:w-64">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <!-- Beautiful Greeting Space -->
+            <div class="flex flex-col xl:flex-row xl:items-center justify-between mb-10 gap-6">
+                <!-- Date & Tasks Button -->
+                <div class="flex items-center gap-4 lg:gap-6">
+                    <div class="w-16 h-16 rounded-full border border-gray-100 flex flex-col items-center justify-center bg-white shadow-[0_4px_15px_-5px_rgba(0,0,0,0.05)]">
+                        <span class="text-[22px] font-extrabold text-gray-900 leading-none" id="currentDay">19</span>
                     </div>
-                    <input type="text" placeholder="Search AWB, Staff..." class="w-full pl-10 pr-4 py-2.5 bg-white border-none shadow-soft rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-orange transition-all">
-                </div>
-                
-                <!-- Notifications -->
-                <button class="w-11 h-11 bg-white rounded-2xl shadow-soft flex items-center justify-center text-gray-500 hover:text-brand-orange relative flex-shrink-0">
-                    <span class="absolute top-2.5 right-3 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                </button>
-                
-                <!-- Profile -->
-                <div class="flex items-center gap-3 pl-2 border-l border-gray-200">
-                    <img src="https://ui-avatars.com/api/?name=Muhammed+Adhil&background=F58220&color=fff&bold=true" alt="Admin" class="w-10 h-10 rounded-xl shadow-sm">
-                </div>
-            </div>
-        </header>
-
-        <!-- Global KPI Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <!-- Global Revenue -->
-            <div class="bg-white p-6 rounded-[2rem] shadow-soft relative overflow-hidden group">
-                <div class="absolute -right-6 -top-6 w-24 h-24 bg-brand-orange/5 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                <div class="flex justify-between items-start mb-4 relative z-10">
-                    <div class="w-12 h-12 bg-orange-50 text-brand-orange rounded-2xl flex items-center justify-center">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <div class="flex flex-col">
+                        <p class="text-sm font-semibold text-gray-500 leading-tight" id="currentDayName">Tue,</p>
+                        <p class="text-sm font-semibold text-gray-900 leading-tight" id="currentMonth">December</p>
                     </div>
-                    <span class="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full">+14.2%</span>
-                </div>
-                <h3 class="text-gray-500 text-sm font-medium relative z-10">Global Revenue (OMR)</h3>
-                <p class="text-3xl font-extrabold text-gray-900 mt-1 relative z-10">48,294.00</p>
-            </div>
-
-            <!-- Active Shipments -->
-            <div class="bg-white p-6 rounded-[2rem] shadow-soft relative overflow-hidden group">
-                <div class="absolute -right-6 -top-6 w-24 h-24 bg-brand-purple/5 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                <div class="flex justify-between items-start mb-4 relative z-10">
-                    <div class="w-12 h-12 bg-purple-50 text-brand-purple rounded-2xl flex items-center justify-center">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
-                    </div>
-                    <span class="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">In Transit</span>
-                </div>
-                <h3 class="text-gray-500 text-sm font-medium relative z-10">Active Global Shipments</h3>
-                <p class="text-3xl font-extrabold text-gray-900 mt-1 relative z-10">1,248</p>
-            </div>
-
-            <!-- Total Tonnage -->
-            <div class="bg-white p-6 rounded-[2rem] shadow-soft relative overflow-hidden group">
-                <div class="absolute -right-6 -top-6 w-24 h-24 bg-blue-50 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                <div class="flex justify-between items-start mb-4 relative z-10">
-                    <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
-                    </div>
-                    <span class="bg-gray-100 text-gray-700 text-xs font-bold px-2.5 py-1 rounded-full">Monthly</span>
-                </div>
-                <h3 class="text-gray-500 text-sm font-medium relative z-10">Total Volume Processed</h3>
-                <div class="flex items-baseline gap-1 mt-1 relative z-10">
-                    <p class="text-3xl font-extrabold text-gray-900">84.5</p>
-                    <span class="text-gray-500 font-medium">Tons</span>
-                </div>
-            </div>
-
-            <!-- Staff Online -->
-            <div class="bg-gradient-to-br from-brand-purple to-brand-purpleDark p-6 rounded-[2rem] shadow-soft relative overflow-hidden group text-white">
-                <div class="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
-                <div class="flex justify-between items-start mb-4 relative z-10">
-                    <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                    </div>
-                    <span class="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-sm">All Branches</span>
-                </div>
-                <h3 class="text-purple-200 text-sm font-medium relative z-10">Active Staff & Drivers</h3>
-                <div class="flex items-center gap-2 mt-1 relative z-10">
-                    <span class="w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse"></span>
-                    <p class="text-3xl font-extrabold">42</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Charts Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <!-- Shipment Volume Trend -->
-            <div class="bg-white p-6 rounded-[2.5rem] shadow-soft lg:col-span-2 flex flex-col">
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 class="text-lg font-bold text-gray-900">Shipment Volume Trends</h2>
-                        <p class="text-xs text-gray-500">Monthly aggregate across all operating branches</p>
-                    </div>
-                    <select class="bg-gray-50 border-none text-xs font-semibold py-1.5 px-3 rounded-xl focus:ring-0 cursor-pointer">
-                        <option>Last 6 Months</option>
-                        <option>This Year</option>
-                    </select>
-                </div>
-                <div class="relative flex-1 w-full h-64">
-                    <canvas id="volumeChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Revenue by Branch -->
-            <div class="bg-white p-6 rounded-[2.5rem] shadow-soft flex flex-col">
-                <div class="mb-4">
-                    <h2 class="text-lg font-bold text-gray-900">Branch Performance</h2>
-                    <p class="text-xs text-gray-500">Revenue distribution by location</p>
-                </div>
-                <div class="relative flex-1 w-full flex items-center justify-center">
-                    <canvas id="branchChart" class="max-h-[200px]"></canvas>
-                    <!-- Center Metric -->
-                    <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
-                        <span class="text-xs text-gray-500 font-medium">Top Earner</span>
-                        <span class="text-lg font-bold text-gray-900">Salalah HQ</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bottom Grid: Branches & Audit Log -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
-            
-            <!-- Branch Status List -->
-            <div class="bg-white rounded-[2.5rem] shadow-soft overflow-hidden flex flex-col">
-                <div class="p-6 border-b border-gray-50 flex justify-between items-center">
-                    <h2 class="text-lg font-bold text-gray-900">Branch Operational Status</h2>
-                    <button class="text-brand-orange text-sm font-semibold hover:underline">View Map</button>
-                </div>
-                <div class="p-2">
-                    <!-- Salalah -->
-                    <div class="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
-                        <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 bg-orange-100 text-brand-orange rounded-xl flex items-center justify-center font-bold text-sm">SLH</div>
-                            <div>
-                                <h4 class="text-sm font-bold text-gray-900">Salalah Headquarters</h4>
-                                <p class="text-xs text-gray-500">Manager: Ahmed Al-Balushi</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Optimal
-                            </span>
-                        </div>
-                    </div>
-                    <!-- Muscat -->
-                    <div class="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
-                        <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 bg-purple-100 text-brand-purple rounded-xl flex items-center justify-center font-bold text-sm">MCT</div>
-                            <div>
-                                <h4 class="text-sm font-bold text-gray-900">Muscat Branch</h4>
-                                <p class="text-xs text-gray-500">Manager: Tariq Said</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
-                                <span class="w-1.5 h-1.5 rounded-full bg-yellow-500"></span> High Volume
-                            </span>
-                        </div>
-                    </div>
-                    <!-- Sohar -->
-                    <div class="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors">
-                        <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-bold text-sm">SHR</div>
-                            <div>
-                                <h4 class="text-sm font-bold text-gray-900">Sohar Logistics Hub</h4>
-                                <p class="text-xs text-gray-500">Manager: Khalid Oman</p>
-                            </div>
-                        </div>
-                        <div class="text-right">
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                                <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Optimal
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Global Audit Log -->
-            <div class="bg-white rounded-[2.5rem] shadow-soft overflow-hidden flex flex-col">
-                <div class="p-6 border-b border-gray-50 flex justify-between items-center">
-                    <h2 class="text-lg font-bold text-gray-900">Recent Global Activities</h2>
-                    <button class="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-brand-orange bg-gray-50 rounded-full">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                    <button class="ml-2 lg:ml-4 bg-coral-500 text-white px-6 py-3.5 rounded-full font-bold text-sm flex items-center gap-2 hover:bg-coral-600 transition-colors shadow-[0_8px_20px_-6px_rgba(232,109,88,0.5)]">
+                        Show my Tasks
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </button>
+                    <button class="w-12 h-12 bg-white rounded-full border border-gray-100 shadow-sm flex items-center justify-center text-gray-400 hover:text-gray-900 relative transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        <span class="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
                     </button>
                 </div>
-                <div class="p-6 relative">
-                    <!-- Timeline Line -->
-                    <div class="absolute left-[39px] top-6 bottom-6 w-0.5 bg-gray-100 z-0"></div>
-                    
-                    <div class="space-y-6 relative z-10">
-                        <!-- Activity Item -->
-                        <div class="flex gap-4">
-                            <div class="w-8 h-8 rounded-full bg-green-100 border-4 border-white flex items-center justify-center flex-shrink-0 text-green-600 shadow-sm mt-0.5">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                            </div>
+                
+                <!-- Welcome Text -->
+                <div class="flex flex-col xl:flex-row xl:items-center gap-4 lg:gap-6">
+                    <div class="text-left xl:text-right flex items-center flex-wrap gap-2">
+                        <h2 class="text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight">Hey, Need help? <span class="inline-block origin-bottom-right hover:rotate-12 transition-transform cursor-pointer">👋</span></h2>
+                        <p class="text-3xl lg:text-4xl font-light text-gray-300 tracking-tight hidden lg:block">|</p>
+                        <p class="text-3xl lg:text-4xl font-light text-gray-400 tracking-tight">Just ask me anything!</p>
+                    </div>
+                    <button class="w-14 h-14 bg-gray-50 border border-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors shadow-sm lg:ml-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Soft UI Widget Grid -->
+            <div class="grid grid-cols-12 gap-5">
+                
+                <!-- Main Account / Fleet Card -->
+                <div class="col-span-12 lg:col-span-4 bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-6">
+                        <span class="font-extrabold text-gray-900 tracking-wider text-sm">FLEET</span>
+                        <button class="flex items-center gap-2 text-[11px] font-bold text-gray-600 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                            Active Units <svg class="w-3 h-3"><path d="M19 9l-7 7-7-7"></path></svg>
+                        </button>
+                    </div>
+                    <div class="mb-6">
+                        <p class="text-xs text-gray-400 font-medium mb-1">Linked to main dispatch</p>
+                        <p class="text-xl font-bold text-gray-900">**** 2719</p>
+                    </div>
+                    <div class="flex gap-3 mb-6">
+                        <button class="bg-gray-900 text-white text-xs font-bold px-6 py-2.5 rounded-full">Dispatch</button>
+                        <button class="bg-gray-50 text-gray-600 text-xs font-bold px-6 py-2.5 rounded-full border border-gray-100">Track</button>
+                    </div>
+                    <div class="flex justify-between items-end border-t border-gray-50 pt-4 mt-2">
+                        <div>
+                            <p class="text-xs text-gray-400 font-medium mb-0.5">Avg Cost / Mile</p>
+                            <p class="text-lg font-bold text-gray-900">$2.50</p>
+                        </div>
+                        <button class="flex items-center gap-1.5 text-coral-500 text-[11px] font-bold bg-red-50 px-3 py-1.5 rounded-full">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                            Edit Fleet Limit
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Financial Mini Cards -->
+                <div class="col-span-12 lg:col-span-3 flex flex-col gap-5">
+                    <div class="bg-white border border-gray-100 rounded-[2rem] p-5 shadow-sm flex-1 flex flex-col justify-between">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="w-8 h-8 rounded-full border border-gray-100 flex justify-center items-center"><svg class="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg></div>
+                            <button class="flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">Weekly <svg class="w-3 h-3"><path d="M19 9l-7 7-7-7"></path></svg></button>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-400 font-medium mb-1">Total Revenue</p>
+                            <p class="text-xl font-bold text-gray-900">$23,194.80</p>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-gray-100 rounded-[2rem] p-5 shadow-sm flex-1 flex flex-col justify-between">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="w-8 h-8 rounded-full border border-gray-100 flex justify-center items-center"><svg class="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path></svg></div>
+                            <button class="flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">Weekly <svg class="w-3 h-3"><path d="M19 9l-7 7-7-7"></path></svg></button>
+                        </div>
+                        <div class="flex justify-between items-end">
                             <div>
-                                <p class="text-sm text-gray-800"><span class="font-bold">Salalah HQ</span> successfully dispatched manifest <span class="font-bold text-brand-orange">#MAN-992</span></p>
-                                <p class="text-xs text-gray-400 mt-0.5">10 minutes ago</p>
+                                <p class="text-xs text-gray-400 font-medium mb-1">Logistics Cost</p>
+                                <p class="text-xl font-bold text-gray-900">$8,145.20</p>
+                            </div>
+                            <span class="text-[10px] font-bold text-coral-500 bg-red-50 px-2 py-1 rounded-md text-right leading-tight">View<br>chart mode</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Utilization & Time Tracker -->
+                <div class="col-span-12 lg:col-span-2 flex flex-col gap-5">
+                    <!-- Donut Progress -->
+                    <div class="bg-white border border-gray-100 rounded-[2rem] p-5 shadow-sm flex-1 flex flex-col items-center justify-center relative">
+                        <div class="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center mb-3 border border-gray-100">
+                             <svg class="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                        </div>
+                        <p class="text-[10px] font-bold text-gray-900 mb-2">Fleet Locked</p>
+                        <div class="relative w-20 h-20">
+                            <svg class="w-full h-full transform -rotate-90">
+                                <circle cx="40" cy="40" r="34" stroke="#f3f4f6" stroke-width="6" fill="none" />
+                                <circle cx="40" cy="40" r="34" stroke="#111827" stroke-width="6" fill="none" stroke-dasharray="213" stroke-dashoffset="60" />
+                                <circle cx="40" cy="40" r="34" stroke="#E86D58" stroke-width="6" fill="none" stroke-dasharray="213" stroke-dashoffset="160" class="origin-center transform rotate-[130deg]" />
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900 rounded-full m-[5px] shadow-inner">
+                                <span class="text-white text-lg font-bold leading-none">86%</span>
+                                <span class="text-gray-400 text-[8px] mt-0.5">Active</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Time Active -->
+                    <div class="bg-white border border-gray-100 rounded-[2rem] p-5 shadow-sm">
+                        <div class="w-8 h-8 rounded-full border border-gray-100 flex justify-center items-center mb-3"><svg class="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                        <p class="text-lg font-bold text-gray-900 leading-none mb-1">13 Days</p>
+                        <p class="text-[10px] font-medium text-gray-400 mb-3">109 hours, 23 minutes</p>
+                        <!-- Decorative Dot Grid -->
+                        <div class="grid grid-cols-10 gap-1 opacity-80">
+                            <!-- Orange Dots -->
+                            <div class="w-1.5 h-1.5 rounded-full bg-coral-500"></div><div class="w-1.5 h-1.5 rounded-full bg-coral-500"></div><div class="w-1.5 h-1.5 rounded-full bg-coral-500"></div><div class="w-1.5 h-1.5 rounded-full bg-coral-500"></div><div class="w-1.5 h-1.5 rounded-full bg-coral-500"></div><div class="w-1.5 h-1.5 rounded-full bg-coral-500"></div><div class="w-1.5 h-1.5 rounded-full bg-coral-500"></div><div class="w-1.5 h-1.5 rounded-full bg-coral-500"></div>
+                            <!-- Gray Dots -->
+                            <div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Volume Tracker -->
+                <div class="col-span-12 lg:col-span-3 bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col justify-between">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="w-8 h-8 rounded-md bg-gray-50 border border-gray-100 flex justify-center items-center"><svg class="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg></div>
+                        
+                        <!-- Mini Bar Visual -->
+                        <div class="flex items-end gap-1.5 h-12">
+                            <div class="flex flex-col items-center"><div class="w-1 bg-gray-200 h-6 rounded-full mb-1"></div><span class="text-[8px] font-bold text-gray-400">2022</span></div>
+                            <div class="flex flex-col items-center"><div class="w-1 bg-coral-500 h-10 rounded-full mb-1"></div><span class="text-[8px] font-bold text-gray-900 bg-red-50 px-1.5 rounded-full">2023</span></div>
+                            <div class="flex flex-col items-center"><div class="w-0.5 bg-gray-200 h-12"></div></div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-6 h-6 rounded-full bg-gray-50 border border-gray-100 flex justify-center items-center"><svg class="w-3 h-3 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg></div>
+                        <h3 class="text-xl font-bold text-gray-900 ml-auto leading-none">16,073.49</h3>
+                    </div>
+                    
+                    <div class="relative h-12 w-full mt-2">
+                        <!-- Custom Decorative Sparkline -->
+                        <svg viewBox="0 0 100 30" class="w-full h-full stroke-coral-500 fill-none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M0 25 Q 10 15, 20 20 T 40 10 T 60 15 T 80 5 T 100 10"></path>
+                        </svg>
+                    </div>
+
+                    <div class="flex justify-between items-end mt-2">
+                        <div>
+                            <p class="text-sm font-bold text-gray-900 leading-none mb-1">Total Volume</p>
+                            <p class="text-[10px] font-medium text-gray-400">Extended & Limited Tonnage</p>
+                        </div>
+                        <span class="text-[11px] font-bold text-coral-500 bg-red-50 px-2.5 py-1 rounded-full">+ 9.3%</span>
+                    </div>
+                </div>
+
+                <!-- Bottom Row Grid -->
+                <!-- Concentric Circle Chart -->
+                <div class="col-span-12 lg:col-span-3 bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-gray-900 text-sm">Annual Volumes</span>
+                        <button class="flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">2023 <svg class="w-3 h-3"><path d="M19 9l-7 7-7-7"></path></svg></button>
+                    </div>
+                    
+                    <div class="relative w-full h-44 flex justify-center items-end overflow-visible mt-2">
+                        <div class="absolute bottom-0 w-44 h-44 bg-red-50 rounded-full flex items-start justify-center pt-3 border border-red-100"><span class="text-[11px] font-bold text-coral-600">$14K</span></div>
+                        <div class="absolute bottom-0 w-32 h-32 bg-red-100 rounded-full flex items-start justify-center pt-3 border border-red-200"><span class="text-[11px] font-bold text-coral-700">$9.3K</span></div>
+                        <div class="absolute bottom-0 w-20 h-20 bg-red-200 rounded-full flex items-start justify-center pt-3"><span class="text-[11px] font-bold text-coral-800">$6.8K</span></div>
+                        <div class="absolute bottom-0 w-10 h-10 bg-coral-500 rounded-full flex items-center justify-center z-10 shadow-lg translate-y-2"><span class="text-[9px] font-bold text-white">$4K</span></div>
+                    </div>
+                </div>
+
+                <!-- Operations Center -->
+                <div class="col-span-12 lg:col-span-6 bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col lg:flex-row gap-6">
+                    
+                    <!-- Activity Bar Chart -->
+                    <div class="flex-1 border-r border-gray-50 pr-6 flex flex-col justify-between">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="font-bold text-gray-900 text-sm">Daily Dispatch</span>
+                            <div class="flex items-center gap-2">
+                                <button class="w-6 h-6 flex items-center justify-center text-gray-900"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg></button>
+                                <button class="w-6 h-6 flex items-center justify-center text-gray-900"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg></button>
+                                <button class="flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-50 px-2 py-1 rounded-md border border-gray-100"><svg class="w-3 h-3"><path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg> Filters</button>
                             </div>
                         </div>
                         
-                        <!-- Activity Item -->
-                        <div class="flex gap-4">
-                            <div class="w-8 h-8 rounded-full bg-blue-100 border-4 border-white flex items-center justify-center flex-shrink-0 text-blue-600 shadow-sm mt-0.5">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+                        <div class="flex items-center justify-between mb-4 bg-gray-50 rounded-full px-2 py-1 border border-gray-100">
+                            <div class="flex items-center text-gray-400 pl-2">
+                                <svg class="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                <span class="text-[10px] font-medium">Search branches...</span>
                             </div>
-                            <div>
-                                <p class="text-sm text-gray-800"><span class="font-bold">Super Admin</span> created a new driver account for <span class="font-bold">Muscat Branch</span></p>
-                                <p class="text-xs text-gray-400 mt-0.5">1 hour ago</p>
+                            <div class="flex gap-1">
+                                <span class="text-[10px] font-bold text-gray-900 bg-white px-2.5 py-1 rounded-full shadow-sm border border-gray-100 flex items-center gap-1">HQ <div class="w-1.5 h-1.5 rounded-full bg-red-500"></div></span>
+                                <span class="text-[10px] font-bold text-gray-500 bg-transparent px-2.5 py-1 rounded-full flex items-center gap-1">Fleet x</span>
+                                <span class="text-[10px] font-bold text-gray-500 bg-transparent px-2.5 py-1 rounded-full flex items-center gap-1">Drivers x</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-end justify-center gap-2 h-20 mb-2">
+                            <div class="flex flex-col justify-end"><h3 class="text-xl font-bold text-gray-900 leading-none mr-2">$43.20 <span class="text-[10px] text-gray-400">USD</span></h3></div>
+                            <!-- Bar shapes matching visual -->
+                            <div class="w-1.5 bg-red-200 rounded-full h-8"></div>
+                            <div class="w-1.5 bg-coral-500 rounded-full h-14"></div>
+                            <div class="w-1.5 bg-gray-200 rounded-full h-6"></div>
+                            <div class="w-1.5 bg-red-200 rounded-full h-10"></div>
+                            <div class="w-1.5 bg-coral-500 rounded-full h-12"></div>
+                            <div class="w-1.5 bg-gray-200 rounded-full h-4"></div>
+                            <div class="w-1.5 bg-red-200 rounded-full h-7"></div>
+                            <div class="w-1.5 bg-coral-500 rounded-full h-16"></div>
+                        </div>
+                        <div class="flex justify-center gap-1 mt-auto">
+                            <div class="w-2 h-1 rounded-full bg-gray-200"></div>
+                            <div class="w-4 h-1 rounded-full bg-coral-500"></div>
+                            <div class="w-2 h-1 rounded-full bg-gray-200"></div>
+                        </div>
+                    </div>
+
+                    <!-- Right side lists -->
+                    <div class="flex-1 flex gap-4">
+                        <div class="flex-1 border-r border-gray-50 pr-4">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="font-bold text-gray-900 text-sm">Operations</span>
+                                <svg class="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+                            </div>
+                            <div class="relative pl-4 space-y-4">
+                                <div class="absolute left-[7px] top-2 bottom-2 w-[1px] bg-red-200 z-0"></div>
+                                <div class="flex items-center gap-3 relative z-10">
+                                    <div class="w-4 h-4 rounded-full bg-coral-500 flex items-center justify-center text-white"><svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"></path><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"></path></svg></div>
+                                    <span class="text-[11px] font-bold text-gray-900">Fleet tracking</span>
+                                </div>
+                                <div class="flex items-center gap-3 relative z-10">
+                                    <div class="w-4 h-4 rounded-full bg-coral-500 flex items-center justify-center text-white"><svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"></path><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"></path></svg></div>
+                                    <span class="text-[11px] font-bold text-gray-500">Warehousing</span>
+                                </div>
+                                <div class="flex items-center gap-3 relative z-10">
+                                    <div class="w-4 h-4 rounded-full bg-coral-500 flex items-center justify-center text-white"><svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"></path></svg></div>
+                                    <span class="text-[11px] font-bold text-gray-500">HR management</span>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Activity Item -->
-                        <div class="flex gap-4">
-                            <div class="w-8 h-8 rounded-full bg-yellow-100 border-4 border-white flex items-center justify-center flex-shrink-0 text-yellow-600 shadow-sm mt-0.5">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <!-- Verification Box -->
+                        <div class="flex-1 flex flex-col items-center text-center justify-center px-2">
+                            <div class="text-coral-500 mb-2">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                             </div>
-                            <div>
-                                <p class="text-sm text-gray-800">Shipment <span class="font-bold text-brand-purple">#AWB-4401</span> flagged for clearance delay in Sohar.</p>
-                                <p class="text-xs text-gray-400 mt-0.5">3 hours ago</p>
-                            </div>
+                            <h4 class="text-xs font-bold text-gray-900 leading-tight mb-1">Customs<br>Clearance</h4>
+                            <p class="text-[9px] text-gray-400 font-medium leading-tight mb-3">Enable rapid clearing verification.</p>
+                            <button class="bg-coral-500 text-white text-[11px] font-bold px-6 py-2 rounded-full w-full hover:bg-coral-600 transition-colors shadow-sm">Enable</button>
                         </div>
                     </div>
                 </div>
-            </div>
 
+                <!-- Review Rating -->
+                <div class="col-span-12 lg:col-span-3 bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex flex-col justify-between relative">
+                    <button class="absolute top-4 right-4 w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 hover:text-gray-900 border border-gray-100">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    
+                    <!-- Decorative Dots -->
+                    <div class="flex gap-1 mt-4">
+                        <div class="w-1.5 h-1.5 rounded-full bg-gray-900"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-300"></div><div class="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
+                    </div>
+                    
+                    <div class="mt-4 mb-4">
+                        <p class="text-[10px] text-gray-400 font-medium mb-1">Fleet Feedback</p>
+                        <h4 class="text-sm font-bold text-gray-900 leading-tight">How is your driver management going?</h4>
+                    </div>
+                    
+                    <div class="flex justify-between items-center mt-auto px-2">
+                        <div class="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-900 hover:text-gray-900 cursor-pointer transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                        <div class="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-900 hover:text-gray-900 cursor-pointer transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg></div>
+                        <div class="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-900 hover:text-gray-900 cursor-pointer transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                        <div class="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:border-gray-900 hover:text-gray-900 cursor-pointer transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></div>
+                    </div>
+                </div>
+            </div>
+            
         </div>
     </main>
 
-    <!-- Chart Setup Scripts -->
+    <!-- Simple Script to set exact Date in the UI dynamically -->
     <script>
-        // Set dynamic date in header
-        const dateElement = document.getElementById('currentDate');
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        dateElement.textContent = new Date().toLocaleDateString('en-US', options);
-
-        // Chart defaults for clean look
-        Chart.defaults.font.family = '"Plus Jakarta Sans", sans-serif';
-        Chart.defaults.color = '#9CA3AF';
-        Chart.defaults.scale.grid.color = '#F3F4F6';
-
-        // 1. Shipment Volume Line Chart
-        const ctxVolume = document.getElementById('volumeChart').getContext('2d');
-        
-        // Gradient for line chart
-        const gradientOrange = ctxVolume.createLinearGradient(0, 0, 0, 400);
-        gradientOrange.addColorStop(0, 'rgba(245, 130, 32, 0.4)');
-        gradientOrange.addColorStop(1, 'rgba(245, 130, 32, 0.0)');
-
-        new Chart(ctxVolume, {
-            type: 'line',
-            data: {
-                labels: ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
-                datasets: [{
-                    label: 'Total Shipments',
-                    data: [3200, 3800, 3500, 4100, 4800, 5200],
-                    borderColor: '#F58220',
-                    backgroundColor: gradientOrange,
-                    borderWidth: 3,
-                    pointBackgroundColor: '#FFFFFF',
-                    pointBorderColor: '#F58220',
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    fill: true,
-                    tension: 0.4 // Smooth curves
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: '#1F2937',
-                        padding: 12,
-                        titleFont: { size: 13, weight: 'bold' },
-                        bodyFont: { size: 13 },
-                        displayColors: false,
-                        cornerRadius: 8,
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        border: { display: false },
-                        ticks: { padding: 10, maxTicksLimit: 5 }
-                    },
-                    x: {
-                        border: { display: false },
-                        grid: { display: false }
-                    }
-                }
-            }
-        });
-
-        // 2. Branch Revenue Doughnut Chart
-        const ctxBranch = document.getElementById('branchChart').getContext('2d');
-        new Chart(ctxBranch, {
-            type: 'doughnut',
-            data: {
-                labels: ['Salalah HQ', 'Muscat', 'Sohar'],
-                datasets: [{
-                    data: [55, 30, 15], // Percentages
-                    backgroundColor: [
-                        '#F58220', // Brand Orange
-                        '#6A2C70', // Brand Purple
-                        '#E5E7EB'  // Gray
-                    ],
-                    borderWidth: 0,
-                    hoverOffset: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '75%', // Makes it thin and sleek
-                plugins: {
-                    legend: { display: false }, // Custom legend handled in HTML if needed
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return ' ' + context.label + ': ' + context.raw + '%';
-                            }
-                        },
-                        backgroundColor: '#1F2937',
-                        padding: 10,
-                        cornerRadius: 8,
-                        displayColors: true
-                    }
-                }
-            }
-        });
+        const date = new Date();
+        document.getElementById('currentDay').textContent = date.getDate();
+        document.getElementById('currentDayName').textContent = date.toLocaleDateString('en-US', { weekday: 'short' }) + ',';
+        document.getElementById('currentMonth').textContent = date.toLocaleDateString('en-US', { month: 'long' });
     </script>
 </body>
 </html>
