@@ -2,28 +2,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('topbar-container');
     if (!container) return;
 
+    // Extract Full Name from localStorage or Supabase JWT Token
+    let fullName = localStorage.getItem('cargo_user_name') || 'Muhammed Adhil';
+    try {
+        const token = localStorage.getItem('cargo_auth_token');
+        if (token) {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(window.atob(base64));
+            if (payload?.user_metadata?.full_name) {
+                fullName = payload.user_metadata.full_name;
+            }
+        }
+    } catch (e) {
+        // Fallback to default if token parsing fails
+    }
+
+    const encodedName = encodeURIComponent(fullName);
+
     container.innerHTML = `
     <header class="flex justify-between items-center w-full mb-8 px-1">
-        <div class="flex items-center gap-3.5">
-            <button class="w-11 h-11 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h10"></path></svg>
-            </button>
-            <div class="w-11 h-11 bg-[#111827] text-white rounded-full flex justify-center items-center font-extrabold text-sm shadow-sm tracking-tight">AF</div>
+        <!-- Clean Left Title (Removed button before Executive ERP) -->
+        <div class="flex items-center">
             <div>
-                <h2 class="text-base font-bold text-gray-900 leading-tight">Executive ERP</h2>
+                <h2 class="text-lg font-extrabold text-gray-900 leading-tight tracking-tight">Executive ERP</h2>
                 <p class="text-xs text-gray-400 font-medium">Super Admin Control</p>
             </div>
         </div>
         
+        <!-- Right Actions & User Profile -->
         <div class="flex items-center gap-4 lg:gap-5">
             <a href="create-user.html" title="Add Team Member" class="w-10 h-10 bg-gray-50 rounded-full border border-gray-100 flex items-center justify-center text-gray-700 hover:bg-gray-900 hover:text-white transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
             </a>
 
             <div class="flex items-center gap-3 bg-white p-1 pr-4 rounded-full border border-gray-100 shadow-sm">
-                <img src="https://ui-avatars.com/api/?name=Muhammed+Adhil&background=E86D58&color=fff&bold=true" alt="Profile" class="w-9 h-9 rounded-full">
+                <img src="https://ui-avatars.com/api/?name=${encodedName}&background=E86D58&color=fff&bold=true" alt="Profile" class="w-9 h-9 rounded-full">
                 <div class="hidden md:block text-left">
-                    <p class="text-xs font-bold text-gray-900 leading-none">Muhammed Adhil</p>
+                    <p class="text-xs font-bold text-gray-900 leading-none">${fullName}</p>
                     <p class="text-[10px] font-medium text-gray-400 mt-1">Super Admin</p>
                 </div>
             </div>
