@@ -109,27 +109,40 @@
     <!-- Main Outer Container -->
     <main class="flex-1 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-6 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
         
-        <!-- ======================================================= -->
-        <!-- LAYER 1: TOPBAR (Portal Badge, Animated Search, Profile)-->
-        <!-- ======================================================= -->
+        <!-- =============================================================== -->
+        <!-- LAYER 1: TOPBAR (Top-Left Greeting + Search & Profile on Right) -->
+        <!-- =============================================================== -->
         <div id="topbar-container"></div>
 
         <!-- Scrollable Dashboard Body -->
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
             
-            <!-- ========================================================================= -->
-            <!-- LAYER 2: GREETING (LEFT) & WIDGET CUSTOMIZATION + DATE/TIME (RIGHT)       -->
-            <!-- ========================================================================= -->
-            <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-7 mb-6 border-b border-gray-100 gap-6">
+            <!-- ================================================================================= -->
+            <!-- LAYER 2: SUPER ADMIN PORTAL IDENTITY (LEFT) & WIDGETS + DATE/TIME (RIGHT)        -->
+            <!-- ================================================================================= -->
+            <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-5">
                 
-                <!-- Left: Personalized User Greeting -->
-                <div class="text-left">
-                    <p class="text-base lg:text-lg font-semibold text-gray-400 tracking-tight leading-snug" id="greetingText">
-                        Good Evening,
-                    </p>
-                    <h1 class="text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight leading-tight mt-0.5" id="userFullName">
-                        Muhammed Adhil
-                    </h1>
+                <!-- Left: Beautifully Aligned Super Admin Portal Workspace Bar -->
+                <div class="flex flex-wrap items-center gap-3.5">
+                    <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
+                        <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center font-extrabold text-xs tracking-tight shadow-sm">
+                            AF
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-extrabold text-gray-900 tracking-tight">Super Admin Portal</span>
+                                <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
+                            </div>
+                            <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">
+                                All Branches • Salalah HQ • Muscat • Sohar
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Cloud Sync Status Pill -->
+                    <span id="cloudSyncStatus" class="text-[10px] font-bold text-emerald-600 bg-emerald-50/80 px-3 py-1.5 rounded-full border border-emerald-100">
+                        Cloud Synced
+                    </span>
                 </div>
 
                 <!-- Right: Widget Controls + Today's Date & Live Time -->
@@ -223,26 +236,8 @@
         </div>
     </div>
 
-    <!-- Layer 2 Greeting, User Name & Live Clock Script -->
+    <!-- Live Date, Time & Greeting Updater Script -->
     <script>
-        (function populateUserName() {
-            let fullName = localStorage.getItem('cargo_user_name') || 'Muhammed Adhil';
-            try {
-                const token = localStorage.getItem('cargo_auth_token');
-                if (token) {
-                    const base64Url = token.split('.')[1];
-                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                    const payload = JSON.parse(window.atob(base64));
-                    if (payload?.user_metadata?.full_name) {
-                        fullName = payload.user_metadata.full_name;
-                        localStorage.setItem('cargo_user_name', fullName);
-                    }
-                }
-            } catch (e) {}
-            const el = document.getElementById('userFullName');
-            if (el) el.textContent = fullName;
-        })();
-
         function updateDateTimeAndGreeting() {
             const now = new Date();
             const hour = now.getHours();
@@ -251,7 +246,9 @@
             if (hour < 12) greeting = 'Good Morning,';
             else if (hour < 17) greeting = 'Good Afternoon,';
             
-            document.getElementById('greetingText').textContent = greeting;
+            const greetingEl = document.getElementById('topbarGreeting');
+            if (greetingEl) greetingEl.textContent = greeting;
+
             document.getElementById('currentDay').textContent = String(now.getDate()).padStart(2, '0');
             document.getElementById('currentDayName').textContent = now.toLocaleDateString('en-US', { weekday: 'long' });
             document.getElementById('currentMonthYear').textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
