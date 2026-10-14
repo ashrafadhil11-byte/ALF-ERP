@@ -7,12 +7,12 @@ export default async function handler(req, res) {
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // The master key to bypass security rules internally
+    const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     try {
-        let targetEmail = username; // Default to what they typed (in case they actually typed their email)
+        let targetEmail = username; 
 
-        // 1. If they typed a username (no '@' symbol), look up their real email in the database
+        // 1. Look up the real email from the username
         if (!username.includes('@')) {
             const lookupRes = await fetch(`${SUPABASE_URL}/rest/v1/employees?username=eq.${username}&select=recovery_email`, {
                 method: 'GET',
@@ -25,13 +25,13 @@ export default async function handler(req, res) {
             const lookupData = await lookupRes.json();
             
             if (lookupData && lookupData.length > 0) {
-                targetEmail = lookupData[0].recovery_email; // Found the real email
+                targetEmail = lookupData[0].recovery_email;
             } else {
                 return res.status(400).json({ error: 'Username not found.' });
             }
         }
 
-        // 2. Proceed with secure login using the real email
+        // 2. Request the secure token from Supabase
         const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
             method: 'POST',
             headers: {
@@ -47,16 +47,17 @@ export default async function handler(req, res) {
         const data = await response.json();
 
         if (!response.ok) {
-            // Check if it failed because the email isn't verified yet
             if (data.error_description && data.error_description.includes("Email not confirmed")) {
                  return res.status(403).json({ error: 'Please verify your email address before logging in.' });
             }
             return res.status(response.status).json({ error: data.error_description || 'Invalid login credentials' });
         }
 
+        // 3. THE FIX: Pass the token and user directly from the raw Supabase response back to the frontend
         return res.status(200).json({ 
             success: true, 
-            session: data.session 
+            access_token: data.access_token,
+            user: data.user 
         });
 
     } catch (error) {
