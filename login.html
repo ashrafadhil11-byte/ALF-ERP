@@ -97,12 +97,11 @@
                         <span id="errorText">Invalid credentials.</span>
                     </div>
 
-                    <!-- Username Field (Changed from Email) -->
+                    <!-- Username Field -->
                     <div class="space-y-2">
                         <label for="username" class="text-sm font-semibold text-gray-700 ml-1">Username</label>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                                <!-- User Icon -->
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                             </div>
                             <input type="text" id="username" required placeholder="e.g. admin" autocomplete="username"
@@ -129,15 +128,6 @@
                                 </svg>
                             </button>
                         </div>
-                    </div>
-
-                    <!-- Remember Me -->
-                    <div class="flex items-center">
-                        <input id="remember" type="checkbox" 
-                            class="h-4 w-4 text-brand-orange border-gray-300 rounded focus:ring-brand-orange cursor-pointer">
-                        <label for="remember" class="ml-2 block text-sm text-gray-600 cursor-pointer select-none">
-                            Keep me logged in
-                        </label>
                     </div>
 
                     <!-- Submit Button -->
@@ -174,11 +164,11 @@
             }
         });
 
-        // Form Submission to Secure Vercel API
         const loginForm = document.getElementById('loginForm');
         const submitBtn = document.getElementById('submitBtn');
         const btnText = document.getElementById('btnText');
         const btnLoader = document.getElementById('btnLoader');
+        const btnArrow = document.getElementById('btnArrow');
         const errorMessage = document.getElementById('errorMessage');
 
         loginForm.addEventListener('submit', async (e) => {
@@ -191,6 +181,7 @@
             submitBtn.disabled = true;
             btnText.textContent = 'Authenticating...';
             btnLoader.classList.remove('hidden');
+            btnArrow.classList.add('hidden');
             errorMessage.classList.add('hidden');
 
             try {
@@ -206,29 +197,38 @@
                     throw new Error(result.error || 'Authentication failed');
                 }
 
-                // 1. Securely store the session token and user role
-                if(result.session && result.session.access_token) {
-                    localStorage.setItem('cargo_auth_token', result.session.access_token);
+                // Supabase API returns payloads slightly differently depending on the structure. 
+                // This checks both the nested `session` object and the root `result` object for the token.
+                const token = (result.session && result.session.access_token) ? result.session.access_token : result.access_token;
+                const user = (result.session && result.session.user) ? result.session.user : result.user;
+
+                if (token && user) {
+                    // Securely store data
+                    localStorage.setItem('cargo_auth_token', token);
                     
-                    // Extract the role from the Supabase user metadata
-                    const userRole = result.session.user.user_metadata.role || 'employee';
+                    const userRole = user.user_metadata?.role || 'employee';
                     localStorage.setItem('cargo_user_role', userRole);
 
-                    // 2. Role-Based Redirection
+                    // Role-Based Redirection
                     if (userRole === 'super_admin') {
                         window.location.href = 'admin/super-dashboard.html';
                     } else {
                         window.location.href = 'dashboard.html';
                     }
+                } else {
+                    throw new Error('Invalid response from server. Missing security token.');
                 }
 
             } catch (error) {
+                // Display error
                 errorMessage.classList.remove('hidden');
                 document.getElementById('errorText').textContent = error.message;
                 
+                // Reset Button State
                 submitBtn.disabled = false;
                 btnText.textContent = 'Sign In';
                 btnLoader.classList.add('hidden');
+                btnArrow.classList.remove('hidden');
             }
         });
     </script>
