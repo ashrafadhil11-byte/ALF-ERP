@@ -235,4 +235,120 @@ function formatRoleTitle(role) {
 
 function formatBranchTitle(branch, role) {
     if (role === 'super_admin' || !branch || branch.toLowerCase() === 'global') {
-        return 'Global (
+        return 'Global (All Branches)';
+    }
+    return branch.charAt(0).toUpperCase() + branch.slice(1) + ' Branch';
+}
+
+async function loadUserProfileDetails() {
+    const token = localStorage.getItem('cargo_auth_token');
+    if (!token) return;
+
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(window.atob(base64));
+        const meta = payload.user_metadata || {};
+
+        applyProfileToDOM({
+            full_name: meta.full_name || localStorage.getItem('cargo_user_name') || 'Muhammed Adhil',
+            username: meta.username || 'admin',
+            role: meta.role || 'super_admin',
+            branch: meta.branch || 'Global',
+            recovery_email: meta.recovery_email || payload.email || 'Not Set',
+            contact_number: meta.contact_number || 'Not Set',
+            oman_civil_id: meta.oman_civil_id || 'Not Set',
+            date_of_birth: meta.date_of_birth || 'Not Set'
+        });
+    } catch (e) {}
+
+    try {
+        const res = await fetch('/api/profile', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+            const { profile } = await res.json();
+            if (profile) applyProfileToDOM(profile);
+        }
+    } catch (e) {}
+}
+
+function applyProfileToDOM(p) {
+    const encoded = encodeURIComponent(p.full_name || 'User');
+    const avatarEl = document.getElementById('profModalAvatar');
+    if (avatarEl) avatarEl.src = `https://ui-avatars.com/api/?name=${encoded}&background=E86D58&color=fff&bold=true`;
+
+    const setTxt = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+
+    setTxt('profModalFullName', p.full_name);
+    setTxt('profModalRoleBadge', formatRoleTitle(p.role));
+    setTxt('profModalBranchBadge', formatBranchTitle(p.branch, p.role));
+    setTxt('profModalUsername', `@${p.username || 'admin'}`);
+    setTxt('profModalBranch', formatBranchTitle(p.branch, p.role));
+    setTxt('profModalEmail', p.recovery_email || 'Not Set');
+    setTxt('profModalPhone', p.contact_number || 'Not Set');
+    setTxt('profModalOmanId', p.oman_civil_id || 'Not Set');
+    setTxt('profModalDob', p.date_of_birth || 'Not Set');
+}
+
+window.openProfileModal = function() {
+    const backdrop = document.getElementById('profileDrawerBackdrop');
+    const panel = document.getElementById('profileDrawerPanel');
+    if (!backdrop || !panel) return;
+
+    loadUserProfileDetails();
+
+    backdrop.classList.remove('hidden');
+    requestAnimationFrame(() => {
+        backdrop.classList.remove('opacity-0');
+        panel.classList.remove('translate-x-[110%]');
+    });
+};
+
+window.closeProfileModal = function() {
+    const backdrop = document.getElementById('profileDrawerBackdrop');
+    const panel = document.getElementById('profileDrawerPanel');
+    if (!backdrop || !panel) return;
+
+    backdrop.classList.add('opacity-0');
+    panel.classList.add('translate-x-[110%]');
+    setTimeout(() => {
+        backdrop.classList.add('hidden');
+    }, 300);
+};
+
+// Smoothly Glide Tab Pill & Horizontal Pane Track
+window.switchProfileTab = function(tab) {
+    const slider = document.getElementById('profTabSlider');
+    const track = document.getElementById('profTabsTrack');
+    const detailsBtn = document.getElementById('profTabDetailsBtn');
+    const securityBtn = document.getElementById('profTabSecurityBtn');
+    const detailsPane = document.getElementById('profTabDetailsPane');
+    const securityPane = document.getElementById('profTabSecurityPane');
+
+    if (tab === 'details') {
+        if (slider) slider.style.transform = 'translateX(0%)';
+        if (track) track.style.transform = 'translateX(0%)';
+        if (detailsBtn) detailsBtn.className = 'relative z-10 py-2.5 rounded-xl text-xs font-extrabold transition-colors duration-300 text-gray-900';
+        if (securityBtn) securityBtn.className = 'relative z-10 py-2.5 rounded-xl text-xs font-bold transition-colors duration-300 text-gray-500 hover:text-gray-900';
+        if (detailsPane) { detailsPane.classList.remove('opacity-40'); detailsPane.classList.add('opacity-100'); }
+        if (securityPane) { securityPane.classList.remove('opacity-100'); securityPane.classList.add('opacity-40'); }
+    } else {
+        if (slider) slider.style.transform = 'translateX(100%)';
+        if (track) track.style.transform = 'translateX(-50%)';
+        if (securityBtn) securityBtn.className = 'relative z-10 py-2.5 rounded-xl text-xs font-extrabold transition-colors duration-300 text-gray-900';
+        if (detailsBtn) detailsBtn.className = 'relative z-10 py-2.5 rounded-xl text-xs font-bold transition-colors duration-300 text-gray-500 hover:text-gray-900';
+        if (securityPane) { securityPane.classList.remove('opacity-40'); securityPane.classList.add('opacity-100'); }
+        if (detailsPane) { detailsPane.classList.remove('opacity-100'); detailsPane.classList.add('opacity-40'); }
+    }
+};
+
+window.togglePasswordVisibility = function(inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.type = input.type === 'password' ? 'text' : 'password';
+};
