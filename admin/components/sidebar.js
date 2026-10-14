@@ -5,8 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = `
     <aside class="h-[calc(100vh-2.5rem)] w-64 bg-white rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] flex flex-col justify-between p-6 sticky top-5 border border-gray-100">
         <div>
-            <!-- Logo for White Backgrounds -->
-            <div class="mb-10 mt-4 px-2">
+            <!-- Logo perfectly centered -->
+            <div class="mb-10 mt-4 px-2 flex justify-center items-center">
                 <img src="../assets/LOGO%20BG%20W.svg" alt="Al-Farha Cargo" class="h-10 w-auto object-contain">
             </div>
             
@@ -41,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 });
 
-// Secure Logout Logic
 window.handleLogout = function() {
     localStorage.removeItem('cargo_auth_token');
     localStorage.removeItem('cargo_user_role');
