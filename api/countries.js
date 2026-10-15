@@ -1,22 +1,90 @@
 // File: api/countries.js
 const REGIONAL_CITIES = {
-    OM: ['Salalah, Dhofar', 'Sanaiya (Salalah Industrial)', 'Muscat (Ruwi)', 'Seeb, Muscat', 'Sohar', 'Nizwa', 'Sur', 'Barka', 'Ibri', 'Duqm', 'Khasab'],
-    AE: ['Dubai (Deira)', 'Dubai (Al Qusais)', 'Sharjah', 'Abu Dhabi', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Al Ain'],
-    SA: ['Riyadh', 'Jeddah', 'Dammam', 'Al Khobar', 'Mecca', 'Medina', 'Jubail'],
-    QA: ['Doha', 'Al Wakrah', 'Al Khor', 'Industrial Area'],
-    KW: ['Kuwait City', 'Farwaniya', 'Hawalli', 'Ahmadi', 'Salmiya'],
-    BH: ['Manama', 'Muharraq', 'Riffa', 'Sitra'],
-    IN: ['Kozhikode, Kerala', 'Kochi, Kerala', 'Thiruvananthapuram, Kerala', 'Thrissur, Kerala', 'Kannur, Kerala', 'Mumbai, Maharashtra', 'Delhi NCR', 'Chennai, TN', 'Bengaluru, KA', 'Mangaluru, KA', 'Hyderabad, TS'],
-    PK: ['Karachi', 'Lahore', 'Islamabad', 'Sialkot', 'Faisalabad', 'Peshawar'],
-    BD: ['Dhaka', 'Chittagong', 'Sylhet', 'Khulna'],
-    LK: ['Colombo', 'Kandy', 'Galle', 'Negombo'],
-    PH: ['Manila', 'Quezon City', 'Cebu City', 'Davao City'],
-    EG: ['Cairo', 'Alexandria', 'Giza', 'Port Said'],
+    OM: ['Salalah', 'Sanaiya (Salalah Industrial)', 'Muscat', 'Seeb', 'Sohar', 'Nizwa', 'Sur', 'Barka', 'Ibri', 'Duqm', 'Khasab'],
+    SA: ['Riyadh', 'Jeddah', 'Dammam', 'Al Khobar', 'Mecca', 'Medina', 'Jubail', 'Tabuk', 'Abha'],
+    AE: ['Dubai', 'Sharjah', 'Abu Dhabi', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Al Ain'],
+    QA: ['Doha', 'Al Wakrah', 'Al Khor', 'Al Rayyan', 'Lusail'],
+    KW: ['Kuwait City', 'Farwaniya', 'Hawalli', 'Ahmadi', 'Salmiya', 'Jahra'],
+    BH: ['Manama', 'Muharraq', 'Riffa', 'Sitra', 'Isa Town'],
+    IN: ['Kozhikode', 'Kochi', 'Kannur', 'Thiruvananthapuram', 'Thrissur', 'Malappuram', 'Kasaragod', 'Mangaluru', 'Bengaluru', 'Chennai', 'Mumbai', 'Delhi'],
+    PK: ['Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'Sialkot', 'Faisalabad', 'Peshawar'],
+    BD: ['Dhaka', 'Chittagong', 'Sylhet', 'Khulna', 'Rajshahi'],
+    LK: ['Colombo', 'Kandy', 'Galle', 'Negombo', 'Jaffna'],
+    PH: ['Manila', 'Quezon City', 'Cebu City', 'Davao City', 'Makati'],
+    EG: ['Cairo', 'Alexandria', 'Giza', 'Port Said', 'Suez'],
     DE: ['Frankfurt', 'Berlin', 'Hamburg', 'Munich', 'Cologne'],
-    GB: ['London', 'Manchester', 'Birmingham', 'Glasgow'],
-    US: ['New York, NY', 'Houston, TX', 'Chicago, IL', 'Los Angeles, CA'],
-    CA: ['Toronto, ON', 'Vancouver, BC', 'Montreal, QC', 'Calgary, AB']
+    GB: ['London', 'Manchester', 'Birmingham', 'Glasgow', 'Liverpool'],
+    US: ['New York', 'Houston', 'Chicago', 'Los Angeles', 'Miami'],
+    CA: ['Toronto', 'Vancouver', 'Montreal', 'Calgary', 'Ottawa']
 };
+
+// Normalize any country object from v5 or v3.1
+function normalizeCountry(item) {
+    if (!item || typeof item !== 'object') return null;
+
+    const commonName =
+        (typeof item.name === 'string' ? item.name : item?.name?.common) ||
+        item?.common_name ||
+        item?.country ||
+        null;
+
+    if (!commonName) return null;
+
+    const officialName =
+        (typeof item?.name === 'object' ? item?.name?.official : null) ||
+        item?.official_name ||
+        commonName;
+
+    const cca2 = String(item?.cca2 || item?.alpha2Code || item?.iso2 || item?.code || '').toUpperCase();
+    const cca3 = String(item?.cca3 || item?.alpha3Code || item?.iso3 || '').toUpperCase();
+    const capital = Array.isArray(item?.capital) ? item.capital[0] : (item?.capital || '');
+    const region = item?.subregion || item?.region || '';
+
+    // Extract Dialing Code (e.g. +968, +966, +91)
+    let dialCode = '+';
+    if (item?.idd?.root) {
+        const suffixes = Array.isArray(item.idd.suffixes) ? item.idd.suffixes : [];
+        // Note: countries like US/CA have root "+1" and many area suffixes; keep "+1" clean
+        const suffix = (item.idd.root === '+1' || suffixes.length > 1) ? '' : (suffixes[0] || '');
+        dialCode = `${item.idd.root}${suffix}`;
+    } else if (Array.isArray(item?.callingCodes) && item.callingCodes[0]) {
+        dialCode = `+${String(item.callingCodes[0]).replace(/^\+/, '')}`;
+    } else if (item?.dial_code || item?.phone_code) {
+        dialCode = `+${String(item.dial_code || item.phone_code).replace(/^\+/, '')}`;
+    }
+
+    const flag =
+        item?.flags?.svg ||
+        item?.flags?.png ||
+        item?.flag_url ||
+        (cca2 ? `https://flagcdn.com/${cca2.toLowerCase()}.svg` : '');
+
+    const customCities = REGIONAL_CITIES[cca2] || [];
+    const defaultCities = [capital, region].filter(Boolean);
+    const cities = [...new Set([...customCities, ...defaultCities])];
+
+    return {
+        name: commonName,
+        officialName,
+        cca2,
+        cca3,
+        capital,
+        region,
+        dialCode,
+        flag,
+        cities
+    };
+}
+
+function extractArrayFromPayload(payload) {
+    if (!payload) return [];
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload.data)) return payload.data;
+    if (Array.isArray(payload.countries)) return payload.countries;
+    if (Array.isArray(payload.results)) return payload.results;
+    if (payload.name || payload.cca2 || payload.alpha2Code) return [payload];
+    return [];
+}
 
 export default async function handler(req, res) {
     if (req.method !== 'GET') {
@@ -26,86 +94,54 @@ export default async function handler(req, res) {
     const query = (req.query.q || '').trim();
     const API_KEY = process.env.RESTCOUNTRIES_API_KEY || 'rc_live_123b103f9d2647f3a9b0a66d5cbf42de';
 
-    try {
-        // Attempt Primary RESTCountries v5 API with Bearer Key, fallback to public v3.1 full list if needed
-        const url = query
-            ? `https://api.restcountries.com/countries/v5?q=${encodeURIComponent(query)}&pretty=1`
-            : `https://api.restcountries.com/countries/v5?pretty=1`;
+    let extractedList = [];
 
-        let rawData = null;
-
+    // 1. Primary: Call api.restcountries.com/countries/v5 with Bearer Key
+    if (query) {
         try {
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${API_KEY}`,
-                    'Accept': 'application/json'
+            const v5Res = await fetch(
+                `https://api.restcountries.com/countries/v5?q=${encodeURIComponent(query)}&pretty=1`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Accept': 'application/json'
+                    }
                 }
-            });
-            if (response.ok) {
-                rawData = await response.json();
+            );
+            if (v5Res.ok) {
+                const v5Json = await v5Res.json();
+                extractedList = extractArrayFromPayload(v5Json);
             }
-        } catch (err) {}
+        } catch (err) {
+            // Continue to fallback
+        }
+    }
 
-        // Fallback to full global dataset if v5 endpoint requires a query param on root
-        if (!rawData) {
-            const fallbackUrl = query
+    // 2. If initial load (no `q`) or v5 returned empty, fetch from restcountries.com v3.1
+    if (extractedList.length === 0) {
+        try {
+            const v3Url = query
                 ? `https://restcountries.com/v3.1/name/${encodeURIComponent(query)}?fields=name,cca2,cca3,idd,capital,region,subregion,flags`
                 : `https://restcountries.com/v3.1/all?fields=name,cca2,cca3,idd,capital,region,subregion,flags`;
-            const fbRes = await fetch(fallbackUrl);
-            if (fbRes.ok) {
-                rawData = await fbRes.json();
+
+            const v3Res = await fetch(v3Url, {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (v3Res.ok) {
+                const v3Json = await v3Res.json();
+                extractedList = extractArrayFromPayload(v3Json);
             }
+        } catch (err) {
+            // Continue to backup list
         }
-
-        const list = Array.isArray(rawData)
-            ? rawData
-            : (rawData?.data || rawData?.countries || (rawData ? [rawData] : []));
-
-        const countries = list
-            .filter(Boolean)
-            .map(item => {
-                const commonName = item?.name?.common || item?.name || 'Unknown';
-                const officialName = item?.name?.official || commonName;
-                const cca2 = (item?.cca2 || item?.alpha2Code || '').toUpperCase();
-                const cca3 = (item?.cca3 || item?.alpha3Code || '').toUpperCase();
-                const capital = Array.isArray(item?.capital) ? item.capital[0] : (item?.capital || '');
-                const region = item?.subregion || item?.region || '';
-
-                let dialCode = '+';
-                if (item?.idd?.root) {
-                    const suffix = Array.isArray(item.idd.suffixes) && item.idd.suffixes.length === 1
-                        ? item.idd.suffixes[0]
-                        : (Array.isArray(item.idd.suffixes) && item.idd.suffixes[0] ? item.idd.suffixes[0] : '');
-                    dialCode = `${item.idd.root}${suffix}`;
-                } else if (Array.isArray(item?.callingCodes) && item.callingCodes[0]) {
-                    dialCode = `+${String(item.callingCodes[0]).replace(/^\+/, '')}`;
-                }
-
-                // Build City / Location options for this country
-                const customCities = REGIONAL_CITIES[cca2] || [];
-                const defaultCities = [
-                    capital ? `${capital} (Capital)` : null,
-                    region ? `${commonName} - ${region}` : null
-                ].filter(Boolean);
-                const cities = [...new Set([...customCities, ...defaultCities])];
-
-                return {
-                    name: commonName,
-                    officialName,
-                    cca2,
-                    cca3,
-                    capital,
-                    region,
-                    dialCode,
-                    flag: item?.flags?.svg || item?.flags?.png || '',
-                    cities
-                };
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
-
-        return res.status(200).json({ countries });
-    } catch (error) {
-        return res.status(500).json({ error: 'Unable to load countries', details: error.message });
     }
+
+    const countries = extractedList
+        .map(normalizeCountry)
+        .filter(Boolean)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+    return res.status(200).json({ countries });
 }
