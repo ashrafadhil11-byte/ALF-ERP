@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Branch Network - Al-Farha Cargo Super Admin</title>
+    <title>Branch Network & AWB Architecture - Al-Farha Cargo</title>
     
     <!-- STRICT AUTHENTICATION GATEKEEPER -->
     <script>
@@ -17,7 +17,7 @@
 
     <!-- Tailwind CSS & Fonts -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
     
     <!-- Reusable Admin Components -->
     <script src="components/sidebar.js" defer></script>
@@ -28,7 +28,10 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+                    fontFamily: { 
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace']
+                    },
                     colors: {
                         coral: { 
                             50: '#FFF5F3',
@@ -45,9 +48,29 @@
         }
     </script>
     <style>
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+
+        /* Smooth micro-animations */
+        .field-card {
+            transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease;
+        }
+        .field-card:focus-within {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px -10px rgba(232, 109, 88, 0.16);
+        }
+        .awb-token {
+            transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        @keyframes pulsePop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: pulsePop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+        }
     </style>
 </head>
 <body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900 selection:bg-coral-500 selection:text-white">
@@ -67,7 +90,6 @@
             <!-- LAYER 2: Super Admin Portal Bar (Left) & Live Date/Time (Right) -->
             <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-5">
                 
-                <!-- Left: Super Admin Portal Identity Bar -->
                 <div class="flex flex-wrap items-center gap-3.5">
                     <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
                         <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center font-extrabold text-xs tracking-tight shadow-sm">
@@ -79,13 +101,13 @@
                                 <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
                             </div>
                             <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">
-                                Branch Network & AWB Prefix Configuration
+                                Branch Network • 6-Char Codes (`ALFSLL`) & Smart AWB Matrix
                             </p>
                         </div>
                     </div>
 
                     <span id="branchCountBadge" class="text-[10px] font-extrabold text-coral-600 bg-coral-50 px-3.5 py-1.5 rounded-full border border-coral-100">
-                        Loading Branches...
+                        Loading Network...
                     </span>
                 </div>
 
@@ -114,157 +136,282 @@
 
             <!-- MAIN BENTO WORKSPACE -->
             <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
-                <div class="grid grid-cols-12 gap-6">
+                <div class="grid grid-cols-12 gap-6 items-start">
                     
-                    <!-- ========================================================= -->
-                    <!-- LEFT COLUMN (5 Cols): CREATE NEW BRANCH FORM              -->
-                    <!-- ========================================================= -->
-                    <div class="col-span-12 xl:col-span-5 bg-white rounded-[2rem] p-6 lg:p-7 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80">
-                        <div class="flex items-center justify-between pb-4 mb-5 border-b border-gray-100">
+                    <!-- =================================================================== -->
+                    <!-- LEFT COLUMN (5 Cols): CREATE / EDIT BRANCH FORM & AWB SIMULATOR     -->
+                    <!-- =================================================================== -->
+                    <div id="branchFormCard" class="col-span-12 xl:col-span-5 bg-white rounded-[2rem] p-6 lg:p-7 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.03)] border border-gray-100/90 transition-all duration-300">
+                        
+                        <!-- Dynamic Form Header (Switches smoothly between Create & Edit Mode) -->
+                        <div class="flex items-center justify-between pb-5 mb-5 border-b border-gray-100">
                             <div>
                                 <div class="flex items-center gap-2">
-                                    <h2 class="text-base font-extrabold text-gray-900">Create New Branch</h2>
-                                    <span class="w-2 h-2 rounded-full bg-coral-500"></span>
+                                    <span id="formModeBadge" class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-coral-50 text-coral-600 border border-coral-100">
+                                        New Registration
+                                    </span>
+                                    <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
                                 </div>
-                                <p class="text-xs text-gray-400 mt-0.5">Configure branch location, AWB booking prefix & manager.</p>
+                                <h2 id="formHeaderTitle" class="text-lg font-extrabold text-gray-900 mt-1">Create New Branch</h2>
+                                <p id="formHeaderSubtitle" class="text-xs text-gray-400 mt-0.5">Configure 6-digit branch code, location & booking digit.</p>
                             </div>
-                            <span class="w-10 h-10 rounded-2xl bg-[#F8F8FA] border border-gray-100 flex items-center justify-center text-gray-800">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                            </span>
+
+                            <!-- Cancel Edit Button (Hidden unless editing an existing branch) -->
+                            <button type="button" id="cancelEditBtn" onclick="exitEditMode()" 
+                                    class="hidden items-center gap-1.5 px-3.5 py-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-extrabold transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                Cancel Edit
+                            </button>
                         </div>
 
-                        <!-- Alert Box -->
-                        <div id="branchAlertBox" class="hidden p-4 rounded-2xl text-xs font-bold mb-5 border"></div>
+                        <!-- Alert Notification Banner -->
+                        <div id="branchAlertBox" class="hidden p-4 rounded-2xl text-xs font-bold mb-5 border transition-all"></div>
 
-                        <form id="createBranchForm" class="space-y-4">
-                            
-                            <!-- 1. Branch Name -->
-                            <div class="space-y-1.5">
-                                <label class="text-[11px] font-bold text-gray-700 ml-1">Branch Name</label>
-                                <input type="text" id="branchName" required placeholder="e.g. Salalah Main Logistics Hub"
-                                       oninput="autoSuggestCodes()"
-                                       class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200/80 rounded-2xl text-xs font-semibold text-gray-900 placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
-                            </div>
+                        <form id="branchForm" class="space-y-5">
+                            <input type="hidden" id="editingBranchId" value="">
 
-                            <!-- 2. Branch Code & Unique Booking Code (AWB Prefix) -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                <div class="space-y-1.5">
-                                    <label class="text-[11px] font-bold text-gray-700 ml-1">Branch Code</label>
-                                    <input type="text" id="branchCode" required maxlength="6" placeholder="e.g. SLH"
-                                           oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''); updateAwbPreview();"
-                                           class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200/80 rounded-2xl text-xs font-extrabold uppercase tracking-wider text-gray-900 placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
+                            <!-- SECTION 1: IDENTITY & CODES -->
+                            <div class="bg-[#F8F8FA] p-4 rounded-[1.5rem] border border-gray-100 space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">01 • Branch Identity & Codes</span>
+                                    <span class="text-[10px] font-bold text-gray-500">Auto-Sync Active</span>
                                 </div>
 
-                                <div class="space-y-1.5">
-                                    <label class="text-[11px] font-bold text-gray-700 ml-1 flex items-center justify-between">
-                                        <span>Unique Booking Code</span>
-                                        <span class="text-[9px] font-extrabold text-coral-600 bg-coral-50 px-2 py-0.5 rounded-full">AWB Prefix</span>
-                                    </label>
-                                    <input type="text" id="bookingCode" required maxlength="10" placeholder="e.g. AFC-SLH"
-                                           oninput="this.value = this.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''); updateAwbPreview();"
-                                           class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200/80 rounded-2xl text-xs font-extrabold uppercase tracking-wider text-gray-900 placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
+                                <!-- Branch Name -->
+                                <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
+                                    <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1">Branch Name *</label>
+                                    <input type="text" id="branchName" required placeholder="e.g. Salalah Central Cargo Hub"
+                                           oninput="handleBranchNameInput()"
+                                           class="w-full bg-transparent border-none p-0 text-xs font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
                                 </div>
-                            </div>
 
-                            <!-- LIVE AWB / BOOKING ID PREVIEW BANNER -->
-                            <div class="bg-[#111827] text-white p-4 rounded-2xl flex items-center justify-between shadow-sm">
-                                <div>
-                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Live AWB / Booking ID Format</p>
-                                    <p class="text-[11px] text-gray-300 mt-0.5">Every shipment booked at this branch will carry:</p>
-                                </div>
-                                <div class="bg-white/10 border border-white/15 px-3.5 py-2 rounded-xl text-right">
-                                    <span id="liveAwbPreview" class="text-sm font-extrabold text-coral-400 tracking-wider font-mono">AFC-SLH-100001</span>
-                                </div>
-                            </div>
-
-                            <!-- 3. Country Lookup (Powered by RestCountries v5 API) & City/Location -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                <div class="space-y-1.5 relative">
-                                    <label class="text-[11px] font-bold text-gray-700 ml-1 flex items-center justify-between">
-                                        <span>Country (API Lookup)</span>
-                                        <span id="countryApiStatus" class="text-[9px] font-bold text-emerald-600">RESTCountries v5</span>
-                                    </label>
-                                    <div class="relative">
-                                        <input type="text" id="countrySearchInput" required value="Oman" placeholder="Type country (e.g. Oman, UAE, India)..."
-                                               autocomplete="off"
-                                               oninput="handleCountrySearch(this.value)"
-                                               onfocus="handleCountrySearch(this.value)"
-                                               class="w-full pl-9 pr-4 py-3 bg-[#F8F8FA] border border-gray-200/80 rounded-2xl text-xs font-semibold text-gray-900 placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
-                                        <span id="selectedCountryFlag" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm">🇴🇲</span>
+                                <!-- 6-Digit Branch Code & 1-Digit Unique Booking Code -->
+                                <div class="grid grid-cols-12 gap-3">
+                                    <!-- 6-Character Branch Code (ALFSLL, ALFSNY) -->
+                                    <div class="col-span-7 field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Branch Code (6-Char) *</label>
+                                            <span id="branchCodeCounter" class="text-[9px] font-mono font-bold text-coral-500">6/6</span>
+                                        </div>
+                                        <input type="text" id="branchCode" required maxlength="6" value="ALFSLL" placeholder="ALFSLL"
+                                               oninput="handleBranchCodeInput(this)"
+                                               class="w-full bg-transparent border-none p-0 text-sm font-mono font-extrabold uppercase tracking-widest text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
+                                        <p class="text-[9px] text-gray-400 mt-1">Examples: <b class="text-gray-600">ALFSLL</b>, <b class="text-gray-600">ALFSNY</b>, <b class="text-gray-600">ALFMCT</b></p>
                                     </div>
 
-                                    <!-- Country API Dropdown Results -->
-                                    <div id="countryDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 z-40 bg-white rounded-2xl shadow-xl border border-gray-100 max-h-48 overflow-y-auto custom-scrollbar p-1.5"></div>
-                                </div>
-
-                                <div class="space-y-1.5">
-                                    <label class="text-[11px] font-bold text-gray-700 ml-1">City / Location</label>
-                                    <input type="text" id="branchLocation" required placeholder="e.g. Salalah, Dhofar"
-                                           oninput="syncVerifiedAddress()"
-                                           class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200/80 rounded-2xl text-xs font-semibold text-gray-900 placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
-                                </div>
-                            </div>
-
-                            <!-- 4. Street / Building & Verified Full Address -->
-                            <div class="space-y-1.5">
-                                <label class="text-[11px] font-bold text-gray-700 ml-1">Street / Building / Landmark</label>
-                                <input type="text" id="streetLine" placeholder="e.g. 23rd July Street, Near Al-Salam Roundabout, Bldg 14"
-                                       oninput="syncVerifiedAddress()"
-                                       class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200/80 rounded-2xl text-xs font-semibold text-gray-900 placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
-                            </div>
-
-                            <div class="space-y-1.5">
-                                <label class="text-[11px] font-bold text-gray-700 ml-1 flex items-center justify-between">
-                                    <span>Complete Formatted Address</span>
-                                    <span id="verifiedCountryBadge" class="text-[9px] font-bold text-gray-400">Sultanate of Oman (OMN)</span>
-                                </label>
-                                <textarea id="branchAddress" rows="2" required placeholder="Full branch address..."
-                                          class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200/80 rounded-2xl text-xs font-semibold text-gray-900 placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all resize-none"></textarea>
-                            </div>
-
-                            <!-- 5. Phone Number & Assigned Manager -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                <div class="space-y-1.5">
-                                    <label class="text-[11px] font-bold text-gray-700 ml-1">Branch Phone Number</label>
-                                    <input type="tel" id="phoneNumber" required value="+968 " placeholder="+968 23XXXXXX"
-                                           class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200/80 rounded-2xl text-xs font-semibold text-gray-900 placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all">
-                                </div>
-
-                                <div class="space-y-1.5">
-                                    <label class="text-[11px] font-bold text-gray-700 ml-1">Assigned Manager (Optional)</label>
-                                    <select id="assignedManager" class="w-full px-4 py-3 bg-[#F8F8FA] border border-gray-200/80 rounded-2xl text-xs font-semibold text-gray-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-coral-500 transition-all cursor-pointer">
-                                        <option value="">-- No Manager Assigned Yet --</option>
-                                    </select>
+                                    <!-- Unique Booking Branch Code (Embedded in AWB: e.g. 2) -->
+                                    <div class="col-span-5 field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Booking Code *</label>
+                                            <span class="text-[9px] font-extrabold text-coral-600 bg-coral-50 px-1.5 py-0.5 rounded">AWB Digit</span>
+                                        </div>
+                                        <input type="text" id="bookingCode" required maxlength="2" value="2" placeholder="e.g. 2"
+                                               oninput="handleBookingCodeInput(this)"
+                                               class="w-full bg-transparent border-none p-0 text-sm font-mono font-extrabold uppercase tracking-widest text-coral-600 placeholder-gray-300 focus:outline-none focus:ring-0">
+                                        <p class="text-[9px] text-gray-400 mt-1">Branch ID in AWB (<b class="text-gray-600">1–9</b>)</p>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Submit Button -->
+                            <!-- ================================================================= -->
+                            <!-- INTERACTIVE SMART BOOKING ID / AWB ARCHITECTURE SIMULATOR         -->
+                            <!-- ================================================================= -->
+                            <div class="bg-[#111827] text-white p-5 rounded-[1.75rem] shadow-lg relative overflow-hidden">
+                                <div class="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-coral-500/15 blur-xl pointer-events-none"></div>
+
+                                <div class="flex items-center justify-between mb-3">
+                                    <div>
+                                        <span class="text-[10px] font-extrabold uppercase tracking-widest text-coral-400">Smart AWB Architecture Preview</span>
+                                        <p class="text-[11px] text-gray-400 mt-0.5">Test how this branch's booking ID adapts by destination & mode</p>
+                                    </div>
+                                    <span class="text-[10px] font-mono font-bold bg-white/10 px-2.5 py-1 rounded-full text-gray-300">
+                                        Live Format
+                                    </span>
+                                </div>
+
+                                <!-- Segmented Visual Breakdown of the AWB Number -->
+                                <div id="awbPreviewBadge" class="bg-gray-900/90 border border-gray-700/80 rounded-2xl p-3.5 mb-3.5 flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-1 sm:gap-1.5 font-mono text-base sm:text-lg font-extrabold tracking-wider">
+                                        <!-- Segment 1: Destination Country Code (1-9 or 2-letter ISO) -->
+                                        <span id="segDest" class="awb-token px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" title="Destination Country Code">3</span>
+                                        <span class="text-gray-600 text-xs">•</span>
+                                        <!-- Segment 2: Cargo Type Code (1=Air, 2=Sea, 3=Road) -->
+                                        <span id="segCargo" class="awb-token px-2 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30" title="Cargo Mode Code">1</span>
+                                        <span class="text-gray-600 text-xs">•</span>
+                                        <!-- Segment 3: Unique Branch Booking Code -->
+                                        <span id="segBranch" class="awb-token px-2.5 py-1 rounded-lg bg-coral-500 text-white shadow-sm" title="Unique Branch Booking Code">2</span>
+                                        <span class="text-gray-600 text-xs">•</span>
+                                        <!-- Segment 4: 6-Digit Sequence -->
+                                        <span id="segSeq" class="awb-token px-2 py-1 rounded-lg bg-white/10 text-white" title="Sequential Booking Number">100001</span>
+                                    </div>
+
+                                    <div class="text-right">
+                                        <span class="text-[9px] font-bold text-gray-400 uppercase block">Final AWB</span>
+                                        <span id="combinedAwbString" class="text-xs sm:text-sm font-mono font-extrabold text-white tracking-wider">312100001</span>
+                                    </div>
+                                </div>
+
+                                <!-- Interactive Simulator Controls (Destination Mode + Cargo Mode) -->
+                                <div class="grid grid-cols-2 gap-2.5 text-[10px]">
+                                    <div class="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                                        <span class="text-gray-400 font-bold uppercase block mb-1.5">1. Destination Code</span>
+                                        <select id="simDestinationSelect" onchange="updateSmartAwbSimulator()" 
+                                                class="w-full bg-gray-800 text-white font-bold text-[11px] rounded-lg px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-coral-500 cursor-pointer">
+                                            <optgroup label="Frequent Destinations (1–9)">
+                                                <option value="1">1 — India (Kerala / South)</option>
+                                                <option value="2">2 — United Arab Emirates</option>
+                                                <option value="3" selected>3 — India (All Sector)</option>
+                                                <option value="4">4 — Saudi Arabia</option>
+                                                <option value="5">5 — Pakistan</option>
+                                                <option value="6">6 — Bangladesh</option>
+                                                <option value="7">7 — Sri Lanka</option>
+                                                <option value="8">8 — Philippines</option>
+                                                <option value="9">9 — Egypt</option>
+                                            </optgroup>
+                                            <optgroup label="Unassigned (2-Letter Alpha ISO)">
+                                                <option value="DE">DE — Germany (Alpha-2)</option>
+                                                <option value="GB">GB — United Kingdom (Alpha-2)</option>
+                                                <option value="CA">CA — Canada (Alpha-2)</option>
+                                                <option value="US">US — United States (Alpha-2)</option>
+                                            </optgroup>
+                                        </select>
+                                    </div>
+
+                                    <div class="bg-white/5 rounded-xl p-2.5 border border-white/10">
+                                        <span class="text-gray-400 font-bold uppercase block mb-1.5">2. Cargo Mode Code</span>
+                                        <div class="grid grid-cols-3 gap-1">
+                                            <button type="button" onclick="setSimCargoType('1')" id="simCargoBtn1"
+                                                    class="py-1.5 rounded-lg font-extrabold text-[10px] bg-sky-500 text-white transition-all">
+                                                1 Air
+                                            </button>
+                                            <button type="button" onclick="setSimCargoType('2')" id="simCargoBtn2"
+                                                    class="py-1.5 rounded-lg font-bold text-[10px] bg-gray-800 text-gray-300 hover:bg-gray-700 transition-all">
+                                                2 Sea
+                                            </button>
+                                            <button type="button" onclick="setSimCargoType('3')" id="simCargoBtn3"
+                                                    class="py-1.5 rounded-lg font-bold text-[10px] bg-gray-800 text-gray-300 hover:bg-gray-700 transition-all">
+                                                3 Road
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SECTION 2: LOCATION, CASCADING COUNTRY/CITY & PHONE -->
+                            <div class="bg-[#F8F8FA] p-4 rounded-[1.5rem] border border-gray-100 space-y-3.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">02 • Country, City & Contact</span>
+                                    <span id="countryIsoTag" class="text-[10px] font-mono font-bold text-emerald-600">OM • +968</span>
+                                </div>
+
+                                <!-- Complete Country Dropdown + Respective City Dropdown -->
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <!-- Country Select (Populated from RESTCountries API) -->
+                                    <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
+                                        <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1">Country (REST API) *</label>
+                                        <select id="countrySelect" required onchange="handleCountryDropdownChange(this.value)"
+                                                class="w-full bg-transparent border-none p-0 text-xs font-extrabold text-gray-900 focus:outline-none focus:ring-0 cursor-pointer">
+                                            <option value="Oman">🇴🇲 Oman (+968)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- City / Location Selector + Custom Input Support -->
+                                    <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">City / Location *</label>
+                                            <button type="button" onclick="toggleCustomCityInput()" id="toggleCityModeBtn" class="text-[9px] font-extrabold text-coral-500 hover:underline">
+                                                Custom City?
+                                            </button>
+                                        </div>
+                                        <!-- Dropdown of cities for selected country -->
+                                        <select id="citySelect" onchange="handleCityDropdownChange(this.value)"
+                                                class="w-full bg-transparent border-none p-0 text-xs font-extrabold text-gray-900 focus:outline-none focus:ring-0 cursor-pointer">
+                                        </select>
+                                        <!-- Optional manual city input -->
+                                        <input type="text" id="branchLocation" required placeholder="Type city or industrial area..."
+                                               oninput="handleLocationTextChange()"
+                                               class="hidden w-full bg-transparent border-none p-0 text-xs font-extrabold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
+                                    </div>
+                                </div>
+
+                                <!-- Street / Building Input -->
+                                <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
+                                    <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1">Street / Industrial Plot / Building</label>
+                                    <input type="text" id="streetLine" placeholder="e.g. Plot 44, Sanaiya Industrial Area / 23rd July Street"
+                                           oninput="composeFullBranchAddress()"
+                                           class="w-full bg-transparent border-none p-0 text-xs font-semibold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
+                                </div>
+
+                                <!-- Auto-Composed Full Official Address -->
+                                <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Formatted Official Address *</label>
+                                        <span id="officialCountryLabel" class="text-[9px] font-bold text-gray-400">Sultanate of Oman</span>
+                                    </div>
+                                    <textarea id="branchAddress" rows="2" required placeholder="Complete branch address..."
+                                              class="w-full bg-transparent border-none p-0 text-xs font-semibold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0 resize-none"></textarea>
+                                </div>
+
+                                <!-- Phone Number (With Automatic Country Dial Code Badge) & Assigned Manager -->
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
+                                        <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Branch Phone *</label>
+                                        <div class="flex items-center gap-2">
+                                            <span id="phoneDialCodeBadge" class="px-2.5 py-1 rounded-lg bg-[#111827] text-white font-mono text-[11px] font-extrabold flex-shrink-0 select-none">
+                                                +968
+                                            </span>
+                                            <input type="tel" id="phoneLocalNumber" required placeholder="93096535"
+                                                   class="w-full bg-transparent border-none p-0 text-xs font-mono font-extrabold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
+                                        </div>
+                                    </div>
+
+                                    <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
+                                        <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Assigned Manager</label>
+                                        <select id="assignedManager" class="w-full bg-transparent border-none p-0 text-xs font-bold text-gray-900 focus:outline-none focus:ring-0 cursor-pointer">
+                                            <option value="">-- Unassigned --</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Submit / Save Action Button -->
                             <button type="submit" id="submitBranchBtn"
-                                    class="w-full bg-coral-500 hover:bg-coral-600 text-white font-extrabold text-xs py-4 rounded-2xl shadow-[0_10px_25px_-5px_rgba(232,109,88,0.5)] transition-all flex items-center justify-center gap-2 mt-2">
-                                <span id="submitBranchBtnText">Create Branch & Activate AWB Prefix</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                                    class="w-full bg-coral-500 hover:bg-coral-600 active:scale-[0.99] text-white font-extrabold text-xs py-4 rounded-2xl shadow-[0_12px_25px_-6px_rgba(232,109,88,0.55)] transition-all flex items-center justify-center gap-2">
+                                <span id="submitBranchBtnText">Create Branch & Activate AWB Code</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                             </button>
                         </form>
                     </div>
 
-                    <!-- ========================================================= -->
-                    <!-- RIGHT COLUMN (7 Cols): ACTIVE BRANCHES DIRECTORY          -->
-                    <!-- ========================================================= -->
+                    <!-- =================================================================== -->
+                    <!-- RIGHT COLUMN (7 Cols): ACTIVE & DISMISSED BRANCHES DIRECTORY        -->
+                    <!-- =================================================================== -->
                     <div class="col-span-12 xl:col-span-7 flex flex-col gap-5">
                         
-                        <!-- Directory Filter Header Card -->
-                        <div class="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <!-- Directory Filter Bar -->
+                        <div class="bg-white rounded-[2rem] p-5 lg:p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
-                                <h3 class="text-base font-extrabold text-gray-900">Operating Branches & AWB Codes</h3>
-                                <p class="text-xs text-gray-400 mt-0.5">All registered Al-Farha Cargo locations and their unique booking prefixes</p>
+                                <h3 class="text-base font-extrabold text-gray-900">Branch Network Directory</h3>
+                                <p class="text-xs text-gray-400 mt-0.5">Click <b>Edit</b> to modify details or <b>Dismiss</b> to close a branch</p>
                             </div>
-                            <div class="relative flex items-center bg-[#F8F8FA] rounded-full px-4 py-2 border border-gray-200/60 w-full sm:w-60">
-                                <svg class="w-3.5 h-3.5 text-gray-400 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                <input type="text" oninput="filterBranchCards(this.value)" placeholder="Filter branches or code..." class="bg-transparent border-none focus:outline-none text-xs text-gray-800 w-full placeholder-gray-400">
+
+                            <div class="flex flex-wrap items-center gap-2">
+                                <!-- Status Filter Pills -->
+                                <div class="flex bg-[#F8F8FA] p-1 rounded-full border border-gray-200/60">
+                                    <button type="button" onclick="setBranchStatusFilter('ALL')" id="filterTabALL" class="px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#111827] text-white transition-all">All</button>
+                                    <button type="button" onclick="setBranchStatusFilter('ACTIVE')" id="filterTabACTIVE" class="px-3 py-1 rounded-full text-[11px] font-bold text-gray-500 hover:text-gray-900 transition-all">Active</button>
+                                    <button type="button" onclick="setBranchStatusFilter('DISMISSED')" id="filterTabDISMISSED" class="px-3 py-1 rounded-full text-[11px] font-bold text-gray-500 hover:text-gray-900 transition-all">Dismissed</button>
+                                </div>
+
+                                <!-- Search Box -->
+                                <div class="relative flex items-center bg-[#F8F8FA] rounded-full px-3.5 py-2 border border-gray-200/60 w-full sm:w-52">
+                                    <svg class="w-3.5 h-3.5 text-gray-400 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                                    <input type="text" id="branchSearchBox" oninput="renderBranchCards()" placeholder="Search ALFSLL, city..." class="bg-transparent border-none focus:outline-none text-xs text-gray-800 w-full placeholder-gray-400">
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Branch Cards List -->
+                        <!-- Branch Cards Grid -->
                         <div id="branchesListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <!-- Injected dynamically via JS -->
                         </div>
@@ -277,20 +424,46 @@
         </div>
     </main>
 
-    <!-- Branch Logic, REST Countries v5 Integration & Live AWB Preview -->
+    <!-- DISMISS / CLOSE BRANCH CONFIRMATION MODAL -->
+    <div id="dismissBranchModal" class="hidden fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm items-center justify-center p-4">
+        <div class="bg-white rounded-[2.25rem] max-w-md w-full p-6 lg:p-7 shadow-2xl border border-gray-100">
+            <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+            </div>
+            <h3 id="dismissModalTitle" class="text-lg font-extrabold text-gray-900">Dismiss & Close Branch?</h3>
+            <p id="dismissModalDesc" class="text-xs text-gray-500 mt-1.5 leading-relaxed">
+                This will mark the branch as <b>Closed / Dismissed</b> and pause new AWB bookings under its code. Historical shipments remain intact.
+            </p>
+            <div class="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-gray-100">
+                <button type="button" onclick="closeDismissModal()" class="px-4 py-2.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-colors">
+                    Cancel
+                </button>
+                <button type="button" id="confirmDismissBtn" class="px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold transition-colors shadow-sm">
+                    Confirm Dismiss Branch
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complete Interactive Logic -->
     <script>
-        let selectedCountryMeta = {
+        let allCountriesData = [];
+        let selectedCountryObj = {
             name: 'Oman',
             officialName: 'Sultanate of Oman',
+            cca2: 'OM',
             cca3: 'OMN',
             dialCode: '+968',
-            region: 'Western Asia'
+            cities: ['Salalah, Dhofar', 'Sanaiya (Salalah Industrial)', 'Muscat (Ruwi)', 'Seeb, Muscat', 'Sohar', 'Nizwa', 'Sur', 'Barka', 'Duqm']
         };
 
         let allBranchesList = [];
-        let countrySearchTimer = null;
+        let branchStatusFilter = 'ALL';
+        let simCargoMode = '1';
+        let isCustomCityMode = false;
+        let pendingDismissBranch = null;
 
-        // 1. Live Clock Updater
+        // 1. Live Clock
         function updateClock() {
             const now = new Date();
             document.getElementById('currentDay').textContent = String(now.getDate()).padStart(2, '0');
@@ -303,124 +476,208 @@
         updateClock();
         setInterval(updateClock, 1000);
 
-        // 2. Auto-Suggest Branch Code & Booking Code from Branch Name
-        function autoSuggestCodes() {
-            const nameVal = document.getElementById('branchName').value.trim();
-            const branchCodeInput = document.getElementById('branchCode');
-            const bookingCodeInput = document.getElementById('bookingCode');
-
-            if (!nameVal) return;
-
-            // Generate 3-letter code from first word or initials
-            const clean = nameVal.replace(/[^a-zA-Z\s]/g, '').toUpperCase().trim();
-            const words = clean.split(/\s+/);
-            let code = words[0].substring(0, 3);
-            if (words.length >= 2 && code.length < 3) {
-                code = (words[0][0] + words[1].substring(0, 2)).toUpperCase();
-            }
-
-            if (!branchCodeInput.dataset.manualEdit) {
-                branchCodeInput.value = code;
-            }
-            if (!bookingCodeInput.dataset.manualEdit) {
-                bookingCodeInput.value = `AFC-${branchCodeInput.value || code}`;
-            }
-            updateAwbPreview();
-        }
-
-        document.getElementById('branchCode').addEventListener('keydown', function() { this.dataset.manualEdit = 'true'; });
-        document.getElementById('bookingCode').addEventListener('keydown', function() { this.dataset.manualEdit = 'true'; });
-
-        function updateAwbPreview() {
-            const bookingCode = document.getElementById('bookingCode').value.trim() || 'AFC-BRN';
-            document.getElementById('liveAwbPreview').textContent = `${bookingCode}-100001`;
-        }
-
-        // 3. REST Countries v5 Lookup & Address Formatter
-        function handleCountrySearch(query) {
-            clearTimeout(countrySearchTimer);
-            const q = (query || '').trim();
-            if (q.length < 2) {
-                document.getElementById('countryDropdown').classList.add('hidden');
-                return;
-            }
-
-            const statusEl = document.getElementById('countryApiStatus');
-            statusEl.textContent = 'Searching API...';
-
-            countrySearchTimer = setTimeout(async () => {
-                try {
-                    const res = await fetch(`/api/countries?q=${encodeURIComponent(q)}`);
-                    const data = await res.json();
-                    statusEl.textContent = 'RESTCountries v5';
-
-                    if (data.countries && data.countries.length > 0) {
-                        renderCountryDropdown(data.countries);
-                    } else {
-                        document.getElementById('countryDropdown').classList.add('hidden');
-                    }
-                } catch (e) {
-                    statusEl.textContent = 'API Ready';
+        // 2. Load Full Countries List from /api/countries
+        async function loadAllCountries() {
+            try {
+                const res = await fetch('/api/countries');
+                const data = await res.json();
+                if (data.countries && data.countries.length > 0) {
+                    allCountriesData = data.countries;
+                    populateCountryDropdown();
                 }
-            }, 250);
+            } catch (e) {
+                populateCountryDropdown();
+            }
         }
 
-        function renderCountryDropdown(countries) {
-            const dropdown = document.getElementById('countryDropdown');
-            dropdown.innerHTML = countries.slice(0, 6).map(c => `
-                <button type="button" 
-                        onclick='selectCountryFromApi(${JSON.stringify(c).replace(/'/g, "&#39;")})'
-                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#F8F8FA] text-left transition-colors">
-                    <div class="flex items-center gap-2.5 min-w-0">
-                        ${c.flag ? `<img src="${c.flag}" class="w-5 h-3.5 object-cover rounded-sm border border-gray-100">` : '<span class="text-xs">🌍</span>'}
-                        <div class="truncate">
-                            <p class="text-xs font-extrabold text-gray-900 truncate">${c.name}</p>
-                            <p class="text-[10px] text-gray-400 truncate">${c.officialName} ${c.capital ? `• Capital: ${c.capital}` : ''}</p>
-                        </div>
-                    </div>
-                    <span class="text-[10px] font-extrabold text-coral-600 bg-coral-50 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">${c.dialCode}</span>
-                </button>
+        function populateCountryDropdown() {
+            const select = document.getElementById('countrySelect');
+            if (!allCountriesData.length) {
+                allCountriesData = [selectedCountryObj];
+            }
+            select.innerHTML = allCountriesData.map(c => `
+                <option value="${c.name}" ${c.name.toLowerCase() === 'oman' ? 'selected' : ''}>
+                    ${c.name} (${c.dialCode}) — ${c.cca2}
+                </option>
             `).join('');
-            dropdown.classList.remove('hidden');
+
+            handleCountryDropdownChange(select.value || 'Oman', false);
         }
 
-        window.selectCountryFromApi = function(countryObj) {
-            selectedCountryMeta = countryObj;
-            document.getElementById('countrySearchInput').value = countryObj.name;
-            document.getElementById('verifiedCountryBadge').textContent = `${countryObj.officialName} (${countryObj.cca3 || countryObj.cca2})`;
-            document.getElementById('countryDropdown').classList.add('hidden');
-
-            // Update phone prefix if empty or just a dial code
-            const phoneInput = document.getElementById('phoneNumber');
-            if (countryObj.dialCode && (phoneInput.value.trim().length <= 5 || phoneInput.value.startsWith('+'))) {
-                const existingDigits = phoneInput.value.replace(/^\+\d+\s*/, '');
-                phoneInput.value = `${countryObj.dialCode} ${existingDigits}`;
+        // When user selects a Country from the dropdown
+        window.handleCountryDropdownChange = function(countryName, shouldSyncCode = true) {
+            const found = allCountriesData.find(c => c.name.toLowerCase() === String(countryName).toLowerCase());
+            if (found) {
+                selectedCountryObj = found;
+            } else {
+                selectedCountryObj = {
+                    name: countryName,
+                    officialName: countryName,
+                    cca2: countryName.substring(0, 2).toUpperCase(),
+                    dialCode: '+968',
+                    cities: [countryName]
+                };
             }
 
-            syncVerifiedAddress();
+            // Update Dial Code Badge & Official Country Tag
+            document.getElementById('phoneDialCodeBadge').textContent = selectedCountryObj.dialCode || '+';
+            document.getElementById('countryIsoTag').textContent = `${selectedCountryObj.cca2 || 'OM'} • ${selectedCountryObj.dialCode || '+968'}`;
+            document.getElementById('officialCountryLabel').textContent = selectedCountryObj.officialName || selectedCountryObj.name;
+
+            // Populate Respective Cities for this Country
+            const citySelect = document.getElementById('citySelect');
+            const locationInput = document.getElementById('branchLocation');
+            const cities = (selectedCountryObj.cities && selectedCountryObj.cities.length > 0)
+                ? selectedCountryObj.cities
+                : [`${selectedCountryObj.capital || selectedCountryObj.name} Central`];
+
+            citySelect.innerHTML = cities.map(city => `<option value="${city}">${city}</option>`).join('');
+
+            if (!isCustomCityMode) {
+                locationInput.value = cities[0];
+            }
+
+            if (shouldSyncCode) {
+                autoGenerateSixCharBranchCode();
+            }
+            composeFullBranchAddress();
         };
 
-        // Compose standardized address using street, city/location, and verified country details
-        function syncVerifiedAddress() {
-            const street = document.getElementById('streetLine').value.trim();
-            const city = document.getElementById('branchLocation').value.trim();
-            const countryOfficial = selectedCountryMeta.officialName || document.getElementById('countrySearchInput').value.trim();
-            const parts = [street, city, countryOfficial].filter(Boolean);
-            if (parts.length > 0) {
-                document.getElementById('branchAddress').value = parts.join(', ');
+        window.handleCityDropdownChange = function(cityVal) {
+            document.getElementById('branchLocation').value = cityVal;
+            autoGenerateSixCharBranchCode();
+            composeFullBranchAddress();
+        };
+
+        window.toggleCustomCityInput = function() {
+            isCustomCityMode = !isCustomCityMode;
+            const citySelect = document.getElementById('citySelect');
+            const locationInput = document.getElementById('branchLocation');
+            const btn = document.getElementById('toggleCityModeBtn');
+
+            if (isCustomCityMode) {
+                citySelect.classList.add('hidden');
+                locationInput.classList.remove('hidden');
+                locationInput.focus();
+                btn.textContent = 'Use City List';
+            } else {
+                citySelect.classList.remove('hidden');
+                locationInput.classList.add('hidden');
+                locationInput.value = citySelect.value;
+                btn.textContent = 'Custom City?';
+                composeFullBranchAddress();
+            }
+        };
+
+        window.handleLocationTextChange = function() {
+            autoGenerateSixCharBranchCode();
+            composeFullBranchAddress();
+        };
+
+        // 3. Smart 6-Character Branch Code Generator (e.g. Salalah -> ALFSLL, Sanaiya -> ALFSNY, Muscat -> ALFMCT)
+        const CITY_CODE_MAP = {
+            'SALALAH': 'ALFSLL',
+            'SANAIYA': 'ALFSNY',
+            'MUSCAT': 'ALFMCT',
+            'SEEB': 'ALFSEB',
+            'SOHAR': 'ALFSHR',
+            'NIZWA': 'ALFNZW',
+            'SUR': 'ALFSUR',
+            'BARKA': 'ALFBRK',
+            'DUQM': 'ALFDQM',
+            'DUBAI': 'ALFDXB',
+            'SHARJAH': 'ALFSHJ',
+            'ABU DHABI': 'ALFAUH'
+        };
+
+        function autoGenerateSixCharBranchCode() {
+            const branchCodeEl = document.getElementById('branchCode');
+            if (branchCodeEl.dataset.manualEdit === 'true') return;
+
+            const nameUpper = document.getElementById('branchName').value.toUpperCase();
+            const locUpper = document.getElementById('branchLocation').value.toUpperCase();
+            const combined = `${nameUpper} ${locUpper}`;
+
+            for (const [key, code] of Object.entries(CITY_CODE_MAP)) {
+                if (combined.includes(key)) {
+                    branchCodeEl.value = code;
+                    document.getElementById('branchCodeCounter').textContent = `${code.length}/6`;
+                    return;
+                }
+            }
+
+            // Fallback: ALF + 3 consonants/letters from location or branch name
+            const sourceWord = (locUpper || nameUpper).replace(/[^A-Z]/g, '');
+            if (sourceWord.length >= 3) {
+                const suffix = sourceWord.substring(0, 3);
+                branchCodeEl.value = `ALF${suffix}`;
+                document.getElementById('branchCodeCounter').textContent = `6/6`;
             }
         }
 
-        // Hide country dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            const dropdown = document.getElementById('countryDropdown');
-            const input = document.getElementById('countrySearchInput');
-            if (dropdown && input && !dropdown.contains(e.target) && e.target !== input) {
-                dropdown.classList.add('hidden');
-            }
-        });
+        window.handleBranchNameInput = function() {
+            autoGenerateSixCharBranchCode();
+        };
 
-        // 4. Load Existing Branches & Staff Managers from Supabase
+        window.handleBranchCodeInput = function(input) {
+            input.dataset.manualEdit = 'true';
+            input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6);
+            document.getElementById('branchCodeCounter').textContent = `${input.value.length}/6`;
+        };
+
+        window.handleBookingCodeInput = function(input) {
+            input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 2);
+            updateSmartAwbSimulator();
+        };
+
+        // 4. Smart AWB / Booking ID Simulator (312100001 / DE2100002)
+        window.setSimCargoType = function(modeCode) {
+            simCargoMode = String(modeCode);
+            ['1', '2', '3'].forEach(code => {
+                const btn = document.getElementById(`simCargoBtn${code}`);
+                if (code === simCargoMode) {
+                    btn.className = 'py-1.5 rounded-lg font-extrabold text-[10px] bg-sky-500 text-white transition-all shadow-sm';
+                } else {
+                    btn.className = 'py-1.5 rounded-lg font-bold text-[10px] bg-gray-800 text-gray-300 hover:bg-gray-700 transition-all';
+                }
+            });
+            updateSmartAwbSimulator();
+        };
+
+        window.updateSmartAwbSimulator = function() {
+            const destCode = document.getElementById('simDestinationSelect').value || '3';
+            const cargoCode = simCargoMode || '1';
+            const branchDigit = document.getElementById('bookingCode').value.trim() || '2';
+            const seqNum = destCode === 'DE' ? '100002' : '100001';
+
+            const segDest = document.getElementById('segDest');
+            const segCargo = document.getElementById('segCargo');
+            const segBranch = document.getElementById('segBranch');
+            const segSeq = document.getElementById('segSeq');
+            const combinedEl = document.getElementById('combinedAwbString');
+
+            segDest.textContent = destCode;
+            segCargo.textContent = cargoCode;
+            segBranch.textContent = branchDigit;
+            segSeq.textContent = seqNum;
+            combinedEl.textContent = `${destCode}${cargoCode}${branchDigit}${seqNum}`;
+
+            // Subtle micro-animation pop
+            combinedEl.classList.remove('animate-pop');
+            void combinedEl.offsetWidth;
+            combinedEl.classList.add('animate-pop');
+        };
+
+        // Compose Full Branch Address automatically
+        window.composeFullBranchAddress = function() {
+            const street = document.getElementById('streetLine').value.trim();
+            const city = document.getElementById('branchLocation').value.trim();
+            const officialCountry = selectedCountryObj.officialName || selectedCountryObj.name || 'Oman';
+            const parts = [street, city, officialCountry].filter(Boolean);
+            document.getElementById('branchAddress').value = parts.join(', ');
+        };
+
+        // 5. Fetch Branches & Managers from /api/branches
         async function loadBranchesAndManagers() {
             const token = localStorage.getItem('cargo_auth_token');
             try {
@@ -429,154 +686,383 @@
                 });
                 const data = await res.json();
 
-                // Populate Assigned Manager Select
                 const managerSelect = document.getElementById('assignedManager');
                 if (data.managers && Array.isArray(data.managers)) {
-                    managerSelect.innerHTML = `<option value="">-- No Manager Assigned Yet --</option>` +
+                    managerSelect.innerHTML = `<option value="">-- Unassigned --</option>` +
                         data.managers.map(m => `
                             <option value="${m.id}" data-name="${m.full_name}">
-                                ${m.full_name} (@${m.username || 'staff'} • ${(m.role || 'employee').replace('_', ' ')})
+                                ${m.full_name} (@${m.username || 'staff'})
                             </option>
                         `).join('');
                 }
 
-                // Populate Branches List (or show default fallback if table is newly created)
                 allBranchesList = (data.branches && data.branches.length > 0) ? data.branches : [
                     {
-                        branch_name: 'Salalah Headquarters',
-                        branch_code: 'SLH',
-                        booking_code: 'AFC-SLH',
+                        id: 'default-sll',
+                        branch_name: 'Salalah Central Hub',
+                        branch_code: 'ALFSLL',
+                        booking_code: '1',
                         country: 'Oman',
                         location: 'Salalah, Dhofar',
-                        address: '23rd July Street, Salalah, Sultanate of Oman',
+                        address: '23rd July Street, Salalah, Dhofar, Sultanate of Oman',
+                        phone_number: '+968 93096535',
+                        manager_name: 'Muhammed Adhil',
+                        status: 'Optimal'
+                    },
+                    {
+                        id: 'default-sny',
+                        branch_name: 'Sanaiya Industrial Cargo',
+                        branch_code: 'ALFSNY',
+                        booking_code: '2',
+                        country: 'Oman',
+                        location: 'Sanaiya (Salalah Industrial)',
+                        address: 'Plot 14, Sanaiya Industrial Area, Salalah, Sultanate of Oman',
                         phone_number: '+968 93096535',
                         manager_name: 'Muhammed Adhil',
                         status: 'Optimal'
                     }
                 ];
 
-                renderBranchCards(allBranchesList);
+                // Suggest next available numeric booking code (e.g. 3) if not in edit mode
+                if (!document.getElementById('editingBranchId').value) {
+                    const numericCodes = allBranchesList
+                        .map(b => parseInt(b.booking_code, 10))
+                        .filter(n => !isNaN(n));
+                    const nextDigit = numericCodes.length > 0 ? Math.max(...numericCodes) + 1 : 1;
+                    document.getElementById('bookingCode').value = String(nextDigit);
+                    updateSmartAwbSimulator();
+                }
+
+                renderBranchCards();
             } catch (e) {
-                renderBranchCards([]);
+                renderBranchCards();
             }
         }
 
-        function renderBranchCards(list) {
+        // 6. Render Branch Directory Cards with Edit & Dismiss/Reopen Actions
+        window.setBranchStatusFilter = function(statusMode) {
+            branchStatusFilter = statusMode;
+            ['ALL', 'ACTIVE', 'DISMISSED'].forEach(tab => {
+                const btn = document.getElementById(`filterTab${tab}`);
+                if (tab === statusMode) {
+                    btn.className = 'px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#111827] text-white transition-all';
+                } else {
+                    btn.className = 'px-3 py-1 rounded-full text-[11px] font-bold text-gray-500 hover:text-gray-900 transition-all';
+                }
+            });
+            renderBranchCards();
+        };
+
+        window.renderBranchCards = function() {
             const container = document.getElementById('branchesListContainer');
             const badge = document.getElementById('branchCountBadge');
-            if (badge) badge.textContent = `${list.length} Active ${list.length === 1 ? 'Branch' : 'Branches'}`;
+            const q = (document.getElementById('branchSearchBox')?.value || '').toLowerCase().trim();
 
-            if (!list || list.length === 0) {
+            const activeCount = allBranchesList.filter(b => (b.status || 'Optimal') !== 'Dismissed').length;
+            const dismissedCount = allBranchesList.length - activeCount;
+            if (badge) {
+                badge.textContent = `${activeCount} Active • ${dismissedCount} Dismissed`;
+            }
+
+            const filtered = allBranchesList.filter(b => {
+                const isDismissed = (b.status || '') === 'Dismissed';
+                if (branchStatusFilter === 'ACTIVE' && isDismissed) return false;
+                if (branchStatusFilter === 'DISMISSED' && !isDismissed) return false;
+
+                if (!q) return true;
+                return (
+                    (b.branch_name || '').toLowerCase().includes(q) ||
+                    (b.branch_code || '').toLowerCase().includes(q) ||
+                    String(b.booking_code || '').toLowerCase().includes(q) ||
+                    (b.location || '').toLowerCase().includes(q) ||
+                    (b.manager_name || '').toLowerCase().includes(q)
+                );
+            });
+
+            if (filtered.length === 0) {
                 container.innerHTML = `
                     <div class="col-span-2 bg-white rounded-[2rem] p-12 text-center border border-dashed border-gray-200">
-                        <p class="text-sm font-bold text-gray-900">No branches registered yet</p>
-                        <p class="text-xs text-gray-400 mt-1">Use the form on the left to create your first branch and AWB prefix.</p>
+                        <p class="text-sm font-bold text-gray-900">No matching branches found</p>
+                        <p class="text-xs text-gray-400 mt-1">Try switching the filter tab or registering a new branch on the left.</p>
                     </div>
                 `;
                 return;
             }
 
-            container.innerHTML = list.map(b => `
-                <div class="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col justify-between hover:border-gray-200 transition-all">
-                    <div>
-                        <!-- Top Row: Branch Code & Unique Booking Code Pill -->
-                        <div class="flex items-center justify-between gap-2 mb-4">
-                            <div class="flex items-center gap-2.5">
-                                <span class="w-10 h-10 rounded-2xl bg-[#111827] text-white flex items-center justify-center text-xs font-extrabold tracking-wider shadow-sm">
-                                    ${b.branch_code}
+            container.innerHTML = filtered.map(b => {
+                const isDismissed = (b.status || '') === 'Dismissed';
+                const bCodeDigit = b.booking_code || '1';
+                const sampleFrequentAwb = `31${bCodeDigit}100001`;
+                const sampleIsoAwb = `DE2${bCodeDigit}100002`;
+
+                return `
+                    <div class="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border ${isDismissed ? 'border-gray-200/70 opacity-65 bg-gray-50/50' : 'border-gray-100/80 hover:border-gray-300'} flex flex-col justify-between transition-all duration-300">
+                        <div>
+                            <!-- Top Row: 6-Char Branch Code Pill + Status Badge -->
+                            <div class="flex items-start justify-between gap-2 mb-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="px-3 py-2 rounded-2xl ${isDismissed ? 'bg-gray-300 text-gray-700' : 'bg-[#111827] text-white'} font-mono text-xs font-extrabold tracking-widest shadow-sm">
+                                        ${b.branch_code}
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-extrabold text-gray-900 leading-tight">${b.branch_name}</h4>
+                                        <p class="text-[11px] font-semibold text-gray-400 mt-0.5">${b.location} • ${b.country || 'Oman'}</p>
+                                    </div>
+                                </div>
+
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
+                                    isDismissed
+                                    ? 'bg-red-50 text-red-600 border-red-100'
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                                }">
+                                    <span class="w-1.5 h-1.5 rounded-full ${isDismissed ? 'bg-red-500' : 'bg-emerald-500'}"></span>
+                                    ${isDismissed ? 'Dismissed' : 'Active'}
                                 </span>
-                                <div>
-                                    <h4 class="text-sm font-extrabold text-gray-900 leading-tight">${b.branch_name}</h4>
-                                    <p class="text-[11px] font-semibold text-gray-400">${b.location} • ${b.country || 'Oman'}</p>
+                            </div>
+
+                            <!-- Smart AWB Code Breakdown Box -->
+                            <div class="bg-[#F8F8FA] rounded-2xl p-3.5 border border-gray-100 mb-4">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider">Unique Booking Branch Code</span>
+                                    <span class="px-2 py-0.5 rounded-md bg-coral-500 text-white font-mono text-xs font-extrabold">
+                                        Digit: ${bCodeDigit}
+                                    </span>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200/60 text-[10px]">
+                                    <div>
+                                        <span class="text-gray-400 font-semibold block">Frequent Dest (Air):</span>
+                                        <span class="font-mono font-extrabold text-gray-900">31<span class="text-coral-600 underline">${bCodeDigit}</span>100001</span>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-gray-400 font-semibold block">Alpha-2 Dest (Sea):</span>
+                                        <span class="font-mono font-extrabold text-gray-900">DE2<span class="text-coral-600 underline">${bCodeDigit}</span>100002</span>
+                                    </div>
                                 </div>
                             </div>
-                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ${b.status || 'Active'}
-                            </span>
-                        </div>
 
-                        <!-- AWB Booking Prefix Highlight Box -->
-                        <div class="bg-[#F8F8FA] rounded-2xl p-3.5 border border-gray-100 mb-4 flex items-center justify-between">
-                            <div>
-                                <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Unique Booking / AWB Code</p>
-                                <p class="text-xs font-extrabold text-gray-900 mt-0.5 font-mono">${b.booking_code}</p>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-[9px] font-bold text-gray-400 uppercase block">Sample AWB</span>
-                                <span class="text-[11px] font-extrabold text-coral-600 font-mono">${b.booking_code}-100001</span>
+                            <!-- Address -->
+                            <div class="flex items-start gap-2 text-xs text-gray-600 mb-4">
+                                <svg class="w-4 h-4 text-coral-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                <p class="text-[11px] font-medium text-gray-500 leading-relaxed">${b.address}</p>
                             </div>
                         </div>
 
-                        <!-- Verified Address -->
-                        <div class="flex items-start gap-2.5 text-xs text-gray-600 mb-4">
-                            <svg class="w-4 h-4 text-coral-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                            <p class="text-[11px] font-medium text-gray-500 leading-relaxed">${b.address}</p>
+                        <!-- Card Footer: Manager, Phone & Edit / Dismiss Controls -->
+                        <div class="pt-3.5 border-t border-gray-100 space-y-3">
+                            <div class="flex items-center justify-between text-xs">
+                                <div>
+                                    <span class="text-[9px] font-bold text-gray-400 uppercase block">Assigned Manager</span>
+                                    <span class="text-[11px] font-extrabold text-gray-900">${b.manager_name || 'Unassigned'}</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-[9px] font-bold text-gray-400 uppercase block">Branch Phone</span>
+                                    <span class="text-[11px] font-mono font-bold text-gray-700">${b.phone_number}</span>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons: Edit Branch & Dismiss/Reopen Branch -->
+                            <div class="flex items-center gap-2 pt-2 border-t border-gray-50">
+                                <button type="button" onclick='enterEditBranchMode(${JSON.stringify(b).replace(/'/g, "&#39;")})'
+                                        class="flex-1 py-2 px-3 rounded-xl bg-[#F8F8FA] hover:bg-gray-900 hover:text-white text-gray-800 text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 border border-gray-200/60">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                                    Edit Details
+                                </button>
+
+                                ${isDismissed ? `
+                                    <button type="button" onclick='toggleBranchDismissStatus(${JSON.stringify(b).replace(/'/g, "&#39;")})'
+                                            class="py-2 px-3.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white text-[11px] font-extrabold transition-all border border-emerald-100">
+                                        Reactivate
+                                    </button>
+                                ` : `
+                                    <button type="button" onclick='openDismissModal(${JSON.stringify(b).replace(/'/g, "&#39;")})'
+                                            class="py-2 px-3.5 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white text-[11px] font-extrabold transition-all border border-red-100">
+                                        Dismiss
+                                    </button>
+                                `}
+                            </div>
                         </div>
                     </div>
-
-                    <!-- Card Footer: Manager & Contact Phone -->
-                    <div class="pt-3.5 border-t border-gray-100 flex items-center justify-between text-xs">
-                        <div>
-                            <span class="text-[9px] font-bold text-gray-400 uppercase block">Assigned Manager</span>
-                            <span class="text-[11px] font-extrabold text-gray-900">${b.manager_name || 'Unassigned'}</span>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-[9px] font-bold text-gray-400 uppercase block">Branch Phone</span>
-                            <span class="text-[11px] font-bold text-gray-700">${b.phone_number}</span>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        window.filterBranchCards = function(query) {
-            const q = (query || '').toLowerCase().trim();
-            if (!q) {
-                renderBranchCards(allBranchesList);
-                return;
-            }
-            const filtered = allBranchesList.filter(b =>
-                b.branch_name.toLowerCase().includes(q) ||
-                b.branch_code.toLowerCase().includes(q) ||
-                b.booking_code.toLowerCase().includes(q) ||
-                b.location.toLowerCase().includes(q) ||
-                (b.manager_name || '').toLowerCase().includes(q)
-            );
-            renderBranchCards(filtered);
+                `;
+            }).join('');
         };
 
-        // 5. Handle Create Branch Form Submission
-        document.getElementById('createBranchForm').addEventListener('submit', async (e) => {
+        // 7. Enter & Exit Edit Branch Mode
+        window.enterEditBranchMode = function(branch) {
+            document.getElementById('editingBranchId').value = branch.id;
+            document.getElementById('formModeBadge').textContent = `Editing • ${branch.branch_code}`;
+            document.getElementById('formModeBadge').className = 'text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200';
+            document.getElementById('formHeaderTitle').textContent = `Edit ${branch.branch_name}`;
+            document.getElementById('formHeaderSubtitle').textContent = 'Update branch location, 6-char code, manager or booking code.';
+            document.getElementById('submitBranchBtnText').textContent = 'Save Branch Changes';
+
+            const cancelBtn = document.getElementById('cancelEditBtn');
+            cancelBtn.classList.remove('hidden');
+            cancelBtn.classList.add('inline-flex');
+
+            // Populate form fields
+            document.getElementById('branchName').value = branch.branch_name || '';
+            const bCodeEl = document.getElementById('branchCode');
+            bCodeEl.value = branch.branch_code || '';
+            bCodeEl.dataset.manualEdit = 'true';
+            document.getElementById('branchCodeCounter').textContent = `${bCodeEl.value.length}/6`;
+
+            document.getElementById('bookingCode').value = branch.booking_code || '';
+
+            // Match Country & City
+            const countrySelect = document.getElementById('countrySelect');
+            if (branch.country) {
+                countrySelect.value = branch.country;
+                handleCountryDropdownChange(branch.country, false);
+            }
+
+            const citySelect = document.getElementById('citySelect');
+            const locInput = document.getElementById('branchLocation');
+            const hasCityOption = Array.from(citySelect.options).some(opt => opt.value === branch.location);
+            if (hasCityOption) {
+                isCustomCityMode = false;
+                citySelect.classList.remove('hidden');
+                locInput.classList.add('hidden');
+                citySelect.value = branch.location;
+                locInput.value = branch.location;
+            } else {
+                isCustomCityMode = true;
+                citySelect.classList.add('hidden');
+                locInput.classList.remove('hidden');
+                locInput.value = branch.location || '';
+            }
+
+            document.getElementById('branchAddress').value = branch.address || '';
+
+            // Extract local phone digits after dial code
+            const rawPhone = String(branch.phone_number || '').trim();
+            const dial = selectedCountryObj.dialCode || '+968';
+            const cleanLocal = rawPhone.startsWith(dial)
+                ? rawPhone.slice(dial.length).trim()
+                : rawPhone.replace(/^\+\d+\s*/, '');
+            document.getElementById('phoneLocalNumber').value = cleanLocal;
+
+            // Assigned Manager
+            const managerSelect = document.getElementById('assignedManager');
+            managerSelect.value = branch.manager_id || '';
+
+            updateSmartAwbSimulator();
+
+            // Highlight form card and scroll into view smoothly
+            const formCard = document.getElementById('branchFormCard');
+            formCard.classList.add('ring-4', 'ring-coral-500/20');
+            formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => formCard.classList.remove('ring-4', 'ring-coral-500/20'), 1400);
+        };
+
+        window.exitEditMode = function() {
+            document.getElementById('editingBranchId').value = '';
+            document.getElementById('branchForm').reset();
+            delete document.getElementById('branchCode').dataset.manualEdit;
+
+            document.getElementById('formModeBadge').textContent = 'New Registration';
+            document.getElementById('formModeBadge').className = 'text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-coral-50 text-coral-600 border border-coral-100';
+            document.getElementById('formHeaderTitle').textContent = 'Create New Branch';
+            document.getElementById('formHeaderSubtitle').textContent = 'Configure 6-digit branch code, location & booking digit.';
+            document.getElementById('submitBranchBtnText').textContent = 'Create Branch & Activate AWB Code';
+
+            const cancelBtn = document.getElementById('cancelEditBtn');
+            cancelBtn.classList.add('hidden');
+            cancelBtn.classList.remove('inline-flex');
+
+            handleCountryDropdownChange('Oman', true);
+            loadBranchesAndManagers();
+        };
+
+        // 8. Dismiss / Close Branch Modal & Handler
+        window.openDismissModal = function(branch) {
+            pendingDismissBranch = branch;
+            document.getElementById('dismissModalTitle').textContent = `Dismiss ${branch.branch_name} (${branch.branch_code})?`;
+            const modal = document.getElementById('dismissBranchModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+
+        window.closeDismissModal = function() {
+            pendingDismissBranch = null;
+            const modal = document.getElementById('dismissBranchModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        };
+
+        document.getElementById('confirmDismissBtn').addEventListener('click', async () => {
+            if (!pendingDismissBranch) return;
+            await toggleBranchDismissStatus(pendingDismissBranch, 'Dismissed');
+            closeDismissModal();
+        });
+
+        window.toggleBranchDismissStatus = async function(branch, targetStatus = 'Optimal') {
+            const token = localStorage.getItem('cargo_auth_token');
+            const alertBox = document.getElementById('branchAlertBox');
+
+            try {
+                const res = await fetch('/api/branches', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ id: branch.id, status: targetStatus })
+                });
+
+                if (res.ok) {
+                    alertBox.className = 'p-4 rounded-2xl text-xs font-bold mb-5 border bg-emerald-50 text-emerald-700 border-emerald-100 block';
+                    alertBox.innerHTML = targetStatus === 'Dismissed'
+                        ? `Branch <b>${branch.branch_name} (${branch.branch_code})</b> has been dismissed and closed.`
+                        : `Branch <b>${branch.branch_name} (${branch.branch_code})</b> has been reactivated!`;
+                    await loadBranchesAndManagers();
+                } else {
+                    // Fallback update in local state if previewing default cards
+                    branch.status = targetStatus;
+                    renderBranchCards();
+                }
+            } catch (e) {
+                branch.status = targetStatus;
+                renderBranchCards();
+            }
+        };
+
+        // 9. Handle Create or Edit Form Submission
+        document.getElementById('branchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const editingId = document.getElementById('editingBranchId').value;
             const alertBox = document.getElementById('branchAlertBox');
             const submitBtn = document.getElementById('submitBranchBtn');
             const btnText = document.getElementById('submitBranchBtnText');
 
             const managerSelect = document.getElementById('assignedManager');
-            const selectedOption = managerSelect.options[managerSelect.selectedIndex];
+            const selectedOpt = managerSelect.options[managerSelect.selectedIndex];
             const managerId = managerSelect.value || null;
-            const managerName = managerId ? (selectedOption.getAttribute('data-name') || 'Assigned') : 'Unassigned';
+            const managerName = managerId ? (selectedOpt.getAttribute('data-name') || 'Assigned') : 'Unassigned';
+
+            const dialCode = document.getElementById('phoneDialCodeBadge').textContent.trim();
+            const localPhone = document.getElementById('phoneLocalNumber').value.trim();
 
             const payload = {
-                branchName: document.getElementById('branchName').value,
-                branchCode: document.getElementById('branchCode').value,
-                bookingCode: document.getElementById('bookingCode').value,
-                country: document.getElementById('countrySearchInput').value,
-                location: document.getElementById('branchLocation').value,
-                address: document.getElementById('branchAddress').value,
-                phoneNumber: document.getElementById('phoneNumber').value,
+                id: editingId || undefined,
+                branchName: document.getElementById('branchName').value.trim(),
+                branchCode: document.getElementById('branchCode').value.trim().toUpperCase(),
+                bookingCode: document.getElementById('bookingCode').value.trim().toUpperCase(),
+                country: document.getElementById('countrySelect').value,
+                location: document.getElementById('branchLocation').value.trim(),
+                address: document.getElementById('branchAddress').value.trim(),
+                phoneNumber: `${dialCode} ${localPhone}`,
                 managerId,
                 managerName
             };
 
             submitBtn.disabled = true;
-            btnText.textContent = 'Registering Branch...';
+            btnText.textContent = editingId ? 'Updating Branch...' : 'Registering Branch...';
             alertBox.classList.add('hidden');
 
             try {
                 const token = localStorage.getItem('cargo_auth_token');
                 const res = await fetch('/api/branches', {
-                    method: 'POST',
+                    method: editingId ? 'PUT' : 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
@@ -585,30 +1071,29 @@
                 });
 
                 const result = await res.json();
-                if (!res.ok) throw new Error(result.error || 'Failed to create branch');
+                if (!res.ok) throw new Error(result.error || 'Failed to save branch');
 
                 alertBox.className = 'p-4 rounded-2xl text-xs font-bold mb-5 border bg-emerald-50 text-emerald-700 border-emerald-100 block';
-                alertBox.innerHTML = `✓ Branch <b>${payload.branchName}</b> created with Unique AWB Code <b>${payload.bookingCode}</b>!`;
+                alertBox.innerHTML = editingId
+                    ? `✓ Branch <b>${payload.branchName} (${payload.branchCode})</b> updated!`
+                    : `✓ Branch <b>${payload.branchName} (${payload.branchCode})</b> created with AWB Booking Digit <b>${payload.bookingCode}</b>!`;
 
-                document.getElementById('createBranchForm').reset();
-                delete document.getElementById('branchCode').dataset.manualEdit;
-                delete document.getElementById('bookingCode').dataset.manualEdit;
-                document.getElementById('countrySearchInput').value = selectedCountryMeta.name;
-                document.getElementById('phoneNumber').value = `${selectedCountryMeta.dialCode} `;
-                updateAwbPreview();
-
-                await loadBranchesAndManagers();
+                exitEditMode();
             } catch (err) {
                 alertBox.className = 'p-4 rounded-2xl text-xs font-bold mb-5 border bg-red-50 text-red-600 border-red-100 block';
                 alertBox.textContent = err.message;
             } finally {
                 submitBtn.disabled = false;
-                btnText.textContent = 'Create Branch & Activate AWB Prefix';
+                btnText.textContent = document.getElementById('editingBranchId').value
+                    ? 'Save Branch Changes'
+                    : 'Create Branch & Activate AWB Code';
             }
         });
 
-        document.addEventListener('DOMContentLoaded', () => {
-            loadBranchesAndManagers();
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadAllCountries();
+            await loadBranchesAndManagers();
+            updateSmartAwbSimulator();
         });
     </script>
 </body>
