@@ -22,10 +22,10 @@ export default async function handler(req, res) {
             return res.status(401).json({ error: 'Invalid or expired session' });
         }
 
-        // 2. GET: Fetch All Branches + Available Managers from `employees`
+        // 2. GET: Fetch All Branches + Available Staff Managers
         if (req.method === 'GET') {
             const [branchesRes, managersRes] = await Promise.all([
-                fetch(`${SUPABASE_URL}/rest/v1/branches?select=*&order=created_at.desc`, {
+                fetch(`${SUPABASE_URL}/rest/v1/branches?select=*&order=created_at.asc`, {
                     headers: {
                         'apikey': SUPABASE_SERVICE_KEY,
                         'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
             const payload = {
                 branch_name: branchName.trim(),
                 branch_code: branchCode.trim().toUpperCase(),
-                booking_code: bookingCode.trim().toUpperCase(),
+                booking_code: String(bookingCode).trim().toUpperCase(),
                 country: (country || 'Oman').trim(),
                 location: location.trim(),
                 address: address.trim(),
@@ -92,12 +92,97 @@ export default async function handler(req, res) {
             if (!insertRes.ok) {
                 const msg = data?.message || data?.details || 'Failed to create branch.';
                 if (msg.includes('branch_code')) {
-                    return res.status(400).json({ error: 'Branch Code already exists. Please use a unique code.' });
+                    return res.status(400).json({ error: 'Branch Code (e.g. ALFSLL) already exists.' });
                 }
                 if (msg.includes('booking_code')) {
-                    return res.status(400).json({ error: 'Unique Booking Code (AWB Prefix) is already in use by another branch.' });
+                    return res.status(400).json({ error: 'Unique Booking Code digit is already assigned to another branch.' });
                 }
                 return res.status(400).json({ error: msg });
+            }
+
+            return res.status(200).json({
+                success: true,
+                branch: Array.isArray(data) ? data[0] : data
+            });
+        }
+
+        // 4. PUT: Edit / Update Existing Branch Details
+        if (req.method === 'PUT') {
+            const {
+                id,
+                branchName,
+                branchCode,
+                bookingCode,
+                country,
+                location,
+                address,
+                phoneNumber,
+                managerId,
+                managerName,
+                status
+            } = req.body;
+
+            if (!id) {
+                return res.status(400).json({ error: 'Branch ID is required for updating.' });
+            }
+
+            const updatePayload = {
+                branch_name: branchName.trim(),
+                branch_code: branchCode.trim().toUpperCase(),
+                booking_code: String(bookingCode).trim().toUpperCase(),
+                country: (country || 'Oman').trim(),
+                location: location.trim(),
+                address: address.trim(),
+                phone_number: phoneNumber.trim(),
+                manager_id: managerId || null,
+                manager_name: managerName || 'Unassigned'
+            };
+            if (status) updatePayload.status = status;
+
+            const updateRes = await fetch(`${SUPABASE_URL}/rest/v1/branches?id=eq.${id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_SERVICE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(updatePayload)
+            });
+
+            const data = await updateRes.json();
+            if (!updateRes.ok) {
+                const msg = data?.message || data?.details || 'Failed to update branch.';
+                return res.status(400).json({ error: msg });
+            }
+
+            return res.status(200).json({
+                success: true,
+                branch: Array.isArray(data) ? data[0] : data
+            });
+        }
+
+        // 5. PATCH: Dismiss / Close Branch or Reactivate Branch
+        if (req.method === 'PATCH') {
+            const { id, status } = req.body;
+            if (!id || !status) {
+                return res.status(400).json({ error: 'Branch ID and target status are required.' });
+            }
+
+            const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/branches?id=eq.${id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_SERVICE_KEY,
+                    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify({ status })
+            });
+
+            const data = await patchRes.json();
+            if (!patchRes.ok) {
+                return res.status(400).json({ error: 'Failed to update branch status.' });
             }
 
             return res.status(200).json({
