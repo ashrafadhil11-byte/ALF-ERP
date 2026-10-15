@@ -10,7 +10,6 @@ export default async function handler(req, res) {
     }
 
     try {
-        // 1. Verify User Session
         const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
             headers: {
                 'apikey': SUPABASE_ANON_KEY,
@@ -22,7 +21,7 @@ export default async function handler(req, res) {
             return res.status(401).json({ error: 'Invalid or expired session' });
         }
 
-        // 2. GET: Fetch All Branches + Available Staff Managers
+        // GET: Fetch All Branches + Available Staff Managers
         if (req.method === 'GET') {
             const [branchesRes, managersRes] = await Promise.all([
                 fetch(`${SUPABASE_URL}/rest/v1/branches?select=*&order=created_at.asc`, {
@@ -45,13 +44,16 @@ export default async function handler(req, res) {
             return res.status(200).json({ branches, managers });
         }
 
-        // 3. POST: Create a New Branch
+        // POST: Create a New Branch
         if (req.method === 'POST') {
             const {
                 branchName,
                 branchCode,
                 bookingCode,
                 country,
+                postalCode,
+                postOffice,
+                state,
                 location,
                 address,
                 phoneNumber,
@@ -59,7 +61,7 @@ export default async function handler(req, res) {
                 managerName
             } = req.body;
 
-            if (!branchName || !branchCode || !bookingCode || !location || !address || !phoneNumber) {
+            if (!branchName || !branchCode || !bookingCode || !country || !location || !address || !phoneNumber) {
                 return res.status(400).json({ error: 'Please complete all required branch fields.' });
             }
 
@@ -67,7 +69,10 @@ export default async function handler(req, res) {
                 branch_name: branchName.trim(),
                 branch_code: branchCode.trim().toUpperCase(),
                 booking_code: String(bookingCode).trim().toUpperCase(),
-                country: (country || 'Oman').trim(),
+                country: country.trim(),
+                postal_code: (postalCode || '').trim(),
+                post_office: (postOffice || '').trim(),
+                state: (state || '').trim(),
                 location: location.trim(),
                 address: address.trim(),
                 phone_number: phoneNumber.trim(),
@@ -106,7 +111,7 @@ export default async function handler(req, res) {
             });
         }
 
-        // 4. PUT: Edit / Update Existing Branch Details
+        // PUT: Edit / Update Existing Branch Details
         if (req.method === 'PUT') {
             const {
                 id,
@@ -114,6 +119,9 @@ export default async function handler(req, res) {
                 branchCode,
                 bookingCode,
                 country,
+                postalCode,
+                postOffice,
+                state,
                 location,
                 address,
                 phoneNumber,
@@ -130,7 +138,10 @@ export default async function handler(req, res) {
                 branch_name: branchName.trim(),
                 branch_code: branchCode.trim().toUpperCase(),
                 booking_code: String(bookingCode).trim().toUpperCase(),
-                country: (country || 'Oman').trim(),
+                country: country.trim(),
+                postal_code: (postalCode || '').trim(),
+                post_office: (postOffice || '').trim(),
+                state: (state || '').trim(),
                 location: location.trim(),
                 address: address.trim(),
                 phone_number: phoneNumber.trim(),
@@ -162,7 +173,7 @@ export default async function handler(req, res) {
             });
         }
 
-        // 5. PATCH: Dismiss / Close Branch or Reactivate Branch
+        // PATCH: Dismiss / Close Branch or Reactivate Branch
         if (req.method === 'PATCH') {
             const { id, status } = req.body;
             if (!id || !status) {
