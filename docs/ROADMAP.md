@@ -76,5 +76,19 @@ To decide when we get there:
 
 ---
 
+## Phase G — AI (space reserved, built later)
+Already prepared: an **AI** integration type in Admin → Integrations, an "AI slot" in `api/_lib/integrations/connectors.js`
+(any provider plugs in there and is called through `callApi`), and an **AI Assistant** place in the menu (marked "Soon").
+Ideas to choose from later:
+- Ask-the-ERP assistant ("how many Nepal shipments are stuck in customs?") answering from live data, per role.
+- Read a photo of an invoice / ID / parcel label and fill the booking form.
+- Smart WhatsApp replies (with Phase F): understand free-text customer questions, not only AWB numbers.
+- Delay / exception prediction from carrier events; daily summary for managers.
+
+## Camera scanning
+Every barcode field (Shipments scan, booking-form fetch, Scan & Update) has a camera button.
+Scan & Update keeps the camera open for batch scanning. Add camera scanning to any new field with
+`data-camera="submit"` (or `data-camera="click:<buttonId>"`, plus `data-camera-continuous` for batches).
+
 ## Order of work
-A → B → C → D → E → F. Each phase ships on its own, with tests, without changing earlier behaviour.
+A → B → C → D → E → F → G. Each phase ships on its own, with tests, without changing earlier behaviour.

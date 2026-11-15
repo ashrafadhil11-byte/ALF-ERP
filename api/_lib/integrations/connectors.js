@@ -15,7 +15,7 @@
 //
 //  FIELDS
 //   label          name shown in the admin page
-//   kinds          'order_source' | 'carrier' | 'notification' | 'other'
+//   kinds          'order_source' | 'carrier' | 'notification' | 'ai' | 'other'
 //   baseUrl        default URL (can be overridden per integration in the admin page)
 //   fallbackUrls   tried in order if the base URL fails (network error / 5xx / 404)
 //   secrets        { fieldName: 'ENV_VAR_NAME' } — value comes from the admin page first,
@@ -308,7 +308,7 @@ export default {
     // -----------------------------------------------------------------
     generic_rest: {
         label: 'Generic REST API (connectivity check)',
-        kinds: ['order_source', 'carrier', 'notification', 'other'],
+        kinds: ['order_source', 'carrier', 'notification', 'ai', 'other'],
         secrets: { header_name: '', header_value: '' },
         requiredSecrets: [],
         config: { test_path: '' },
@@ -319,6 +319,14 @@ export default {
             return { ok: true, message: 'API answered.' };
         }
     }
+
+    // -----------------------------------------------------------------
+    //  AI SLOT (reserved — see docs/ROADMAP.md "Phase G — AI")
+    //  When we add AI: create a connector here with kinds: ['ai'], its key in
+    //  secrets (e.g. { api_key: 'AI_API_KEY' }) and endpoints such as `chat`.
+    //  The rest of the ERP will call it through callApi('<id>', 'chat', {...}),
+    //  so the provider can be swapped later without touching any page.
+    // -----------------------------------------------------------------
 
     // -----------------------------------------------------------------
     //  TEMPLATE — copy, rename, fill in, remove the comment markers

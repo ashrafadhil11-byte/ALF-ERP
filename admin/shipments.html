@@ -76,7 +76,7 @@
                     </div>
                 </div>
                 <form id="scanForm" class="flex flex-col sm:flex-row gap-2">
-                    <input id="scanInput" class="field scan" placeholder="Scan order no." autocomplete="off" aria-label="Order number">
+                    <input id="scanInput" class="field scan" placeholder="Scan order no." autocomplete="off" aria-label="Order number" data-camera="submit">
                     <button class="btn btn-dark">Fetch & review</button>
                 </form>
                 <details class="mt-3">
@@ -130,7 +130,7 @@
                 <div id="fetchRow" class="bg-[#F8F8FA] rounded-2xl p-4 border border-gray-100">
                     <label class="ui-label" for="fetchInput">Fetch from Al-Farha Online (optional)</label>
                     <div class="flex gap-2">
-                        <input id="fetchInput" class="field" placeholder="Order no. — fills the form below" autocomplete="off">
+                        <input id="fetchInput" class="field" placeholder="Order no. — fills the form below" autocomplete="off" aria-label="Order number" data-camera="click:fetchBtn">
                         <button type="button" id="fetchBtn" class="btn btn-dark">Fetch</button>
                     </div>
                 </div>

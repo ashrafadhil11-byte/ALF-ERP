@@ -3,7 +3,7 @@
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 import { connectorCatalog, testConnector } from '../_lib/integrations/http.js';
 
-const KINDS = ['order_source', 'carrier', 'notification', 'other'];
+const KINDS = ['order_source', 'carrier', 'notification', 'ai', 'other'];
 const PUBLIC_COLS = 'id,name,kind,adapter,base_url,config,active,last_sync_at,last_status,last_error,updated_at';
 
 function toPublic(row) {

@@ -114,6 +114,8 @@ window.UI = (() => {
         menu: '<path d="M3 6h18M3 12h18M3 18h18"/>',
         plus: '<path d="M12 5v14M5 12h14"/>',
         upload: '<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/>',
+        camera: '<path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/>',
+        sparkles: '<path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
         sync: '<path d="M21 12a9 9 0 01-15.3 6.4L3 16"/><path d="M3 21v-5h5"/><path d="M3 12a9 9 0 0115.3-6.4L21 8"/><path d="M21 3v5h-5"/>'
     };
     const icon = (name, cls = 'w-4 h-4') =>
@@ -137,12 +139,101 @@ window.UI = (() => {
     window.addEventListener('scroll', () => document.querySelectorAll('.row-menu').forEach(m => m.remove()), true);
     window.addEventListener('resize', () => document.querySelectorAll('.row-menu').forEach(m => m.remove()));
 
+    // ---------- Camera barcode / QR scanning ----------
+    // Mark any input with data-camera="submit" (submits its form) or data-camera="click:buttonId";
+    // add data-camera-continuous to keep scanning (batch). A camera button appears inside the input.
+    const SCANNER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
+    let scannerLib;
+    const loadScanner = () => scannerLib || (scannerLib = new Promise((ok, fail) => {
+        if (window.Html5Qrcode) return ok();
+        const s = document.createElement('script');
+        s.src = SCANNER_SRC; s.onload = ok; s.onerror = () => { scannerLib = null; fail(new Error('Could not load the scanner. Check your connection.')); };
+        document.head.appendChild(s);
+    }));
+
+    async function camera({ title = 'Scan barcode', continuous = false, onScan }) {
+        const m = document.createElement('div');
+        m.className = 'ui-modal open';
+        m.innerHTML = `
+            <div class="panel max-w-md !p-5" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2"><span class="w-8 h-8 rounded-full bg-[#111827] text-white flex items-center justify-center">${icon('camera')}</span>
+                        <div><p class="text-sm font-extrabold">${esc(title)}</p><p data-hint class="text-[11px] text-gray-400">${continuous ? 'Keep scanning — each code is added' : 'Point the camera at the barcode'}</p></div></div>
+                    <button type="button" data-close class="icon-btn bg-[#F8F8FA]" aria-label="Close camera">${icon('x')}</button>
+                </div>
+                <div class="relative rounded-[1.5rem] overflow-hidden bg-black aspect-[4/3]"><div id="ui-cam-reader" class="w-full h-full"></div>
+                    <p data-status class="absolute inset-0 flex items-center justify-center px-8 text-center text-xs font-bold text-white/80 leading-relaxed">Starting camera…</p></div>
+                ${continuous ? '<div data-log class="flex flex-wrap gap-1.5 mt-3 min-h-[26px]"></div>' : ''}
+                <button type="button" data-close class="btn btn-dark w-full mt-4">${continuous ? 'Done' : 'Cancel'}</button>
+            </div>`;
+        document.body.appendChild(m);
+        let scanner = null, last = '', lastAt = 0, closed = false;
+        const close = async () => {
+            if (closed) return; closed = true;
+            try { if (scanner && scanner.isScanning) await scanner.stop(); } catch (e) {}
+            m.remove();
+        };
+        m.addEventListener('click', (e) => { if (e.target === m || e.target.closest('[data-close]')) close(); });
+        try {
+            await loadScanner();
+            if (closed) return;
+            scanner = new window.Html5Qrcode('ui-cam-reader', { verbose: false });
+            await scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: (w, h) => ({ width: Math.round(w * 0.8), height: Math.round(h * 0.45) }) },
+                (text) => {
+                    const code = String(text).trim();
+                    if (!code || (code === last && Date.now() - lastAt < 2500)) return; // ignore the same code held in view
+                    last = code; lastAt = Date.now();
+                    beep(true);
+                    if (navigator.vibrate) navigator.vibrate(60);
+                    onScan(code);
+                    if (continuous) m.querySelector('[data-log]').insertAdjacentHTML('afterbegin', `<span class="pill-tag pill-dark">${esc(code)}</span>`);
+                    else close();
+                }, () => {});
+            m.querySelector('[data-status]').remove();
+        } catch (err) {
+            const msg = /permission|notallowed/i.test(String(err)) ? 'Camera permission was denied. Allow camera access for this site and try again.'
+                : /notfound|no camera|devices/i.test(String(err)) ? 'No camera found on this device.' : (err.message || String(err));
+            m.querySelector('[data-status]').textContent = msg;
+        }
+    }
+
+    function wireCameraInputs(root = document) {
+        root.querySelectorAll('input[data-camera]:not([data-camera-ready])').forEach((input) => {
+            input.setAttribute('data-camera-ready', '');
+            const wrap = document.createElement('div');
+            wrap.className = 'relative flex-1 min-w-0';
+            input.parentNode.insertBefore(wrap, input);
+            wrap.appendChild(input);
+            input.classList.add('!pr-14');
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'absolute right-1.5 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center hover:bg-[#E86D58] transition-colors';
+            btn.setAttribute('aria-label', 'Scan with camera');
+            btn.title = 'Scan with camera';
+            btn.innerHTML = icon('camera', 'w-[18px] h-[18px]');
+            btn.addEventListener('click', () => {
+                const action = input.dataset.camera || 'submit';
+                camera({
+                    title: input.getAttribute('aria-label') ? `Scan ${input.getAttribute('aria-label')}` : 'Scan barcode',
+                    continuous: input.hasAttribute('data-camera-continuous'),
+                    onScan: (code) => {
+                        input.value = code;
+                        if (action.startsWith('click:')) document.getElementById(action.slice(6))?.click();
+                        else if (input.form) input.form.requestSubmit();
+                    }
+                });
+            });
+            wrap.appendChild(btn);
+        });
+    }
+
     // <span data-icon="truck" data-cls="w-5 h-5"></span> in static HTML → SVG
     const paintIcons = (root = document) => root.querySelectorAll('[data-icon]').forEach(el => {
         el.outerHTML = icon(el.dataset.icon, el.dataset.cls || 'w-4 h-4') ;
     });
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => paintIcons());
-    else paintIcons();
+    const boot = () => { paintIcons(); wireCameraInputs(); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
 
-    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu };
+    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs };
 })();

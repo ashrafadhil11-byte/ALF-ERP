@@ -63,6 +63,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     Branch Financials
                 </a>`)}
+                <div class="flex items-center justify-between gap-3.5 px-4 py-3.5 text-gray-400 rounded-2xl font-medium text-sm cursor-default" title="Reserved for AI features — coming later">
+                    <span class="flex items-center gap-3.5">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+                        AI Assistant
+                    </span>
+                    <span class="text-[9px] font-extrabold uppercase bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Soon</span>
+                </div>
             </nav>
         </div>
         
