@@ -4,32 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shipments - Al-Farha Cargo</title>
-    <script>
-        (function checkAuth() {
-            if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');
-        })();
-    </script>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
     <script>
-        tailwind.config = {
-            theme: { extend: {
-                fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
-                colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
-            } }
-        }
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
     </script>
-    <style>
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
-        .field { width: 100%; padding: .7rem 1rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: .9rem; font-size: .8rem; }
-        .field:focus { outline: none; box-shadow: 0 0 0 2px #E86D58; border-color: transparent; }
-        .scan { font-size: 1rem; font-weight: 800; letter-spacing: .03em; background: #fff; }
-        .seg button[aria-pressed="true"] { background: #111827; color: #fff; }
-    </style>
 </head>
 <body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
     <div id="sidebar-container" class="hidden lg:block z-20"></div>
@@ -38,6 +26,7 @@
         <div id="topbar-container"></div>
 
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+            <!-- Header -->
             <section class="flex flex-wrap items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-3">
                 <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
                     <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center">
@@ -45,92 +34,68 @@
                     </div>
                     <div>
                         <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Shipments & AWB</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
-                        <p id="scopeLabel" class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Import • Scan & update • Track</p>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Add • Import • Edit • Track</p>
                     </div>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <div id="alert" class="hidden text-xs font-bold px-4 py-2.5 rounded-full border"></div>
-                    <button id="syncBtn" type="button" class="hidden bg-white hover:bg-gray-50 text-gray-800 px-4 py-2.5 rounded-full border border-gray-200/80 text-xs font-bold items-center gap-2 shadow-sm"
-                            title="Pull the latest tracking from SMSA, Aramex, DHL and 17Track">
+                    <select id="workBranch" class="field pill !w-auto !py-2.5 hidden" aria-label="Branch for new shipments"></select>
+                    <button id="syncBtn" type="button" class="btn btn-light hidden" title="Pull latest tracking from SMSA, Aramex, DHL and 17Track">
                         <svg class="w-3.5 h-3.5 text-coral-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                         <span>Sync carriers</span>
                     </button>
+                    <button type="button" class="btn btn-light" onclick="openCsv()">
+                        <svg class="w-3.5 h-3.5 text-coral-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Upload CSV
+                    </button>
+                    <button type="button" class="btn btn-coral" onclick="openForm('new')">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                        New Shipment
+                    </button>
                 </div>
             </section>
-            <datalist id="carrierList">
-                <option value="SMSA"></option><option value="Aramex"></option><option value="DHL"></option>
-                <option value="FedEx"></option><option value="UPS"></option><option value="India Post"></option><option value="Nepal Post"></option>
-            </datalist>
 
-            <section class="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-5">
-                <!-- IMPORT -->
-                <div class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 flex flex-col gap-4">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <div class="flex items-center gap-2"><span class="font-extrabold text-xs uppercase tracking-wider">Import from Al-Farha Online</span><span class="w-2 h-2 rounded-full bg-coral-500"></span></div>
-                        <div class="seg flex bg-white rounded-full p-1 border border-gray-200/70 text-[11px] font-bold" role="group" aria-label="How the parcel arrives">
-                            <button type="button" data-intake="drop_off" aria-pressed="true" class="px-3 py-1.5 rounded-full">Drop-off</button>
-                            <button type="button" data-intake="pickup" aria-pressed="false" class="px-3 py-1.5 rounded-full">Pickup</button>
-                        </div>
-                    </div>
-                    <label id="importBranchWrap" class="hidden"><span class="text-[11px] font-bold text-gray-500">Receiving branch</span>
-                        <select id="importBranch" class="field mt-1 bg-white"></select>
-                    </label>
-                    <form id="importForm" class="flex gap-2">
-                        <input id="importInput" class="field scan" placeholder="Scan order no." autocomplete="off" aria-label="Order number">
-                        <button class="bg-[#111827] hover:bg-gray-800 text-white text-xs font-bold px-5 rounded-full flex-shrink-0">Import</button>
-                    </form>
-                    <details class="text-xs">
-                        <summary class="cursor-pointer font-bold text-gray-500">Bulk: paste a list of order numbers</summary>
-                        <textarea id="bulkInput" rows="4" class="field mt-2 bg-white" placeholder="One per line, or separated by commas"></textarea>
-                        <button id="bulkBtn" type="button" class="mt-2 bg-white hover:bg-gray-50 border border-gray-200 text-xs font-bold px-5 py-2.5 rounded-full">Import list</button>
-                    </details>
+            <!-- Quick scan import -->
+            <section class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 mb-5">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>
-                        <div class="flex justify-between items-center mb-2"><p class="text-[10px] font-extrabold text-gray-400 uppercase">This session</p><span id="importCount" class="text-[10px] font-bold text-gray-500"></span></div>
-                        <ul id="importLog" class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar" aria-live="polite">
-                            <li class="text-xs text-gray-400">Scanned orders appear here.</li>
-                        </ul>
+                        <div class="flex items-center gap-2"><span class="font-extrabold text-xs uppercase tracking-wider">Quick add from Al-Farha Online</span><span class="w-2 h-2 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[11px] text-gray-400 mt-1">Scan an order — you'll review and can edit the details before it's added.</p>
+                    </div>
+                    <div class="seg" role="group" aria-label="How the parcel arrives">
+                        <button type="button" data-intake="drop_off" aria-pressed="true">Drop-off</button>
+                        <button type="button" data-intake="pickup" aria-pressed="false">Pickup</button>
                     </div>
                 </div>
-
-                <!-- STATUS UPDATE -->
-                <div class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 flex flex-col gap-4">
-                    <div class="flex items-center gap-2"><span class="font-extrabold text-xs uppercase tracking-wider">Scan & Update Status</span><span class="w-2 h-2 rounded-full bg-coral-500"></span></div>
-                    <form id="scanForm" class="flex gap-2">
-                        <input id="scanInput" class="field scan" placeholder="Scan AWB" autocomplete="off" aria-label="AWB">
-                        <button class="bg-white hover:bg-gray-50 border border-gray-200 text-xs font-bold px-5 rounded-full flex-shrink-0">Add</button>
-                    </form>
-                    <div class="flex flex-wrap gap-1.5 min-h-[34px]" id="batch"></div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <label><span class="text-[11px] font-bold text-gray-500">New status</span><select id="statusSelect" class="field mt-1 bg-white"></select></label>
-                        <label><span class="text-[11px] font-bold text-gray-500">Date & time</span><input id="eventAt" type="datetime-local" class="field mt-1 bg-white"></label>
+                <form id="scanForm" class="flex gap-2">
+                    <input id="scanInput" class="field scan" placeholder="Scan order no." autocomplete="off" aria-label="Order number">
+                    <button class="btn btn-dark">Fetch & review</button>
+                </form>
+                <details class="mt-3">
+                    <summary class="cursor-pointer text-[11px] font-bold text-gray-500">Bulk: import a list without review</summary>
+                    <div class="flex flex-col sm:flex-row gap-2 mt-2">
+                        <textarea id="bulkInput" rows="3" class="field" placeholder="Order numbers — one per line or comma separated"></textarea>
+                        <button id="bulkBtn" type="button" class="btn btn-light self-start">Import list</button>
                     </div>
-                    <div id="extraFields" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <label><span class="text-[11px] font-bold text-gray-500">Location (optional)</span><input id="location" class="field mt-1 bg-white" placeholder="Defaults to your branch"></label>
-                        <label><span class="text-[11px] font-bold text-gray-500">Remark <span id="remarkReq" class="text-coral-500 hidden">required</span></span><input id="remark" class="field mt-1 bg-white"></label>
-                    </div>
-                    <button id="updateBtn" type="button" disabled class="bg-coral-500 hover:bg-coral-600 disabled:opacity-40 text-white text-sm font-extrabold py-3.5 rounded-full shadow-sm">Update 0 shipments</button>
-                </div>
+                    <ul id="bulkLog" class="space-y-1.5 mt-3 max-h-48 overflow-y-auto custom-scrollbar text-[11px]"></ul>
+                </details>
             </section>
 
-            <!-- LIST -->
+            <!-- List -->
             <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
                 <div class="flex flex-wrap gap-2 items-center justify-between mb-4">
-                    <div class="flex items-center gap-2"><span class="font-extrabold text-xs uppercase tracking-wider">Shipments</span><span id="listCount" class="text-[10px] font-bold bg-white border border-gray-100 px-2.5 py-1 rounded-full">…</span></div>
+                    <div class="flex items-center gap-2"><span class="font-extrabold text-xs uppercase tracking-wider">Shipments</span><span id="listCount" class="pill-tag pill-gray">…</span></div>
                     <div class="flex flex-wrap gap-2">
-                        <input id="search" type="search" placeholder="Search AWB, name, country…" class="field bg-white !w-56 !rounded-full">
-                        <select id="statusFilter" class="field bg-white !w-48 !rounded-full"><option value="">All statuses</option></select>
-                        <select id="branchFilter" class="hidden field bg-white !w-40 !rounded-full"></select>
-                        <button id="addSelectedBtn" type="button" class="bg-[#111827] text-white text-xs font-bold px-4 rounded-full">Add selected to batch</button>
+                        <input id="search" type="search" placeholder="Search AWB, name, country…" class="field pill !w-60 !py-2.5">
+                        <select id="statusFilter" class="field pill !w-48 !py-2.5" aria-label="Filter by status"><option value="">All statuses</option></select>
+                        <select id="branchFilter" class="field pill !w-44 !py-2.5 hidden" aria-label="Filter by branch"></select>
                     </div>
                 </div>
                 <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-xs min-w-[760px]">
+                    <table class="w-full text-xs min-w-[820px]">
                         <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
-                            <th class="p-3 w-8"><input type="checkbox" id="selectAll" aria-label="Select all" class="accent-[#E86D58]"></th>
-                            <th class="p-3 font-extrabold">AWB</th><th class="p-3 font-extrabold">Branch</th><th class="p-3 font-extrabold">Shipper → Consignee</th>
+                            <th class="p-3 pl-4 font-extrabold">AWB</th><th class="p-3 font-extrabold">Branch</th><th class="p-3 font-extrabold">Shipper → Consignee</th>
                             <th class="p-3 font-extrabold">Destination</th><th class="p-3 font-extrabold text-right">Wt / Pcs</th>
-                            <th class="p-3 font-extrabold">Status</th><th class="p-3 font-extrabold text-right">Booked</th>
+                            <th class="p-3 font-extrabold">Status</th><th class="p-3 font-extrabold text-right">Booked</th><th class="p-3 w-12"></th>
                         </tr></thead>
                         <tbody id="rows" class="divide-y divide-gray-100"><tr><td colspan="8" class="p-8 text-center text-gray-400">Loading…</td></tr></tbody>
                     </table>
@@ -139,200 +104,434 @@
         </div>
     </main>
 
+    <!-- SHIPMENT FORM (new / review fetched order / edit) -->
+    <div id="formModal" class="ui-modal">
+        <form id="shipForm" class="panel max-w-3xl" novalidate>
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div>
+                    <h3 id="formTitle" class="text-lg font-extrabold">New Shipment</h3>
+                    <p id="formSub" class="text-xs text-gray-400 mt-0.5">Enter details manually, or fetch them from Al-Farha Online.</p>
+                </div>
+                <button type="button" onclick="UI.closeModal('formModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar my-5 pr-1 space-y-5">
+                <div id="fetchRow" class="bg-[#F8F8FA] rounded-2xl p-4 border border-gray-100">
+                    <label class="ui-label" for="fetchInput">Fetch from Al-Farha Online (optional)</label>
+                    <div class="flex gap-2">
+                        <input id="fetchInput" class="field" placeholder="Order no. — fills the form below" autocomplete="off">
+                        <button type="button" id="fetchBtn" class="btn btn-dark">Fetch</button>
+                    </div>
+                </div>
+                <div id="dupWarn" class="hidden text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-2xl px-4 py-3"></div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div><label class="ui-label" for="f_awb">Booking ID / AWB <span class="req">*</span></label><input id="f_awb" class="field" required placeholder="e.g. 0620366" autocomplete="off"></div>
+                    <div><label class="ui-label" for="f_branch">Branch</label><select id="f_branch" class="field"></select></div>
+                    <div><label class="ui-label">Intake</label>
+                        <div class="seg w-full" role="group" aria-label="Intake mode" id="f_intake">
+                            <button type="button" data-v="drop_off" aria-pressed="true" class="flex-1">Drop-off</button>
+                            <button type="button" data-v="pickup" aria-pressed="false" class="flex-1">Pickup</button>
+                        </div>
+                    </div>
+                </div>
+
+                <fieldset class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Package</legend>
+                    <div><label class="ui-label" for="f_package_type">Package type</label>
+                        <select id="f_package_type" class="field">
+                            <option>Parcel</option><option>Document</option><option>Air Freight</option><option>Sea Freight</option><option>Freight</option>
+                        </select></div>
+                    <div><label class="ui-label" for="f_weight">Weight (kg)</label><input id="f_weight" class="field" type="number" step="0.01" min="0" placeholder="0.00"></div>
+                    <div><label class="ui-label" for="f_pieces">Pieces / boxes</label><input id="f_pieces" class="field" type="number" min="1" step="1" placeholder="1"></div>
+                </fieldset>
+
+                <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Shipper</legend>
+                    <div><label class="ui-label" for="f_shipper">Name <span class="req">*</span></label><input id="f_shipper" class="field" placeholder="Sender's name"></div>
+                    <div><label class="ui-label" for="f_shipper_phone">Phone</label><input id="f_shipper_phone" class="field" type="tel" placeholder="968 9XXXXXXX"></div>
+                    <div><label class="ui-label" for="f_origin_city">Origin city</label><input id="f_origin_city" class="field" placeholder="e.g. Salalah"></div>
+                    <div><label class="ui-label" for="f_origin_country">Origin country</label><input id="f_origin_country" class="field" placeholder="e.g. Oman" list="countryList"></div>
+                </fieldset>
+
+                <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Consignee</legend>
+                    <div><label class="ui-label" for="f_consignee">Name <span class="req">*</span></label><input id="f_consignee" class="field" placeholder="Receiver's name"></div>
+                    <div><label class="ui-label" for="f_consignee_phone">Phone</label><input id="f_consignee_phone" class="field" type="tel"></div>
+                    <div class="sm:col-span-2"><label class="ui-label" for="f_consignee_address">Address</label><input id="f_consignee_address" class="field" placeholder="House, street, post office, district, state, PIN"></div>
+                    <div><label class="ui-label" for="f_dest_city">Destination city</label><input id="f_dest_city" class="field" placeholder="e.g. Kochi"></div>
+                    <div><label class="ui-label" for="f_dest_country">Destination country</label><input id="f_dest_country" class="field" placeholder="e.g. India" list="countryList"></div>
+                </fieldset>
+
+                <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Value (optional)</legend>
+                    <div><label class="ui-label" for="f_declared_value">Declared value</label><input id="f_declared_value" class="field" type="number" step="0.01" min="0"></div>
+                    <div><label class="ui-label" for="f_amount">Charge / amount</label><input id="f_amount" class="field" type="number" step="0.01" min="0"></div>
+                </fieldset>
+            </div>
+
+            <div class="flex justify-between items-center pt-4 border-t border-gray-100 gap-2">
+                <p id="formSource" class="text-[11px] text-gray-400"></p>
+                <div class="flex gap-2">
+                    <button type="button" class="btn btn-light" onclick="UI.closeModal('formModal')">Cancel</button>
+                    <button id="saveBtn" type="submit" class="btn btn-coral">Review & add</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <datalist id="countryList"><option>Oman</option><option>India</option><option>Nepal</option><option>Sri Lanka</option><option>Bangladesh</option><option>Pakistan</option><option>Philippines</option><option>United Arab Emirates</option><option>Saudi Arabia</option><option>Qatar</option><option>Kuwait</option><option>Bahrain</option></datalist>
+
+    <!-- CSV UPLOAD -->
+    <div id="csvModal" class="ui-modal">
+        <div class="panel max-w-5xl">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div>
+                    <h3 class="text-lg font-extrabold">Upload shipments (CSV)</h3>
+                    <p class="text-xs text-gray-400 mt-0.5">Same columns as the old system. Review the rows, then add them.</p>
+                </div>
+                <button type="button" onclick="UI.closeModal('csvModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center my-4">
+                <button type="button" class="btn btn-light btn-sm" onclick="downloadTemplate()">Download template</button>
+                <label class="btn btn-dark btn-sm cursor-pointer">Choose CSV file<input id="csvFile" type="file" accept=".csv,text/csv" class="hidden"></label>
+                <span id="csvInfo" class="text-[11px] font-bold text-gray-500"></span>
+            </div>
+            <div class="flex-1 overflow-auto custom-scrollbar border border-gray-100 rounded-2xl min-h-[160px]">
+                <table class="w-full text-[11px]"><thead id="csvHead" class="text-[10px] text-gray-400 uppercase text-left bg-[#F8F8FA]"></thead><tbody id="csvRows" class="divide-y divide-gray-100"><tr><td class="p-8 text-center text-gray-400">No file chosen.</td></tr></tbody></table>
+            </div>
+            <div class="flex justify-end gap-2 pt-4">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('csvModal')">Cancel</button>
+                <button id="csvSave" type="button" class="btn btn-coral" disabled>Add shipments</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CANCEL SHIPMENT -->
+    <div id="cancelModal" class="ui-modal">
+        <form id="cancelForm" class="panel max-w-md">
+            <h3 class="text-lg font-extrabold">Cancel shipment <span id="cancelAwb" class="text-coral-500"></span>?</h3>
+            <p class="text-sm text-gray-500 mt-2">It stays in the system with status <b>Cancelled</b> and its history. Give a reason.</p>
+            <label class="ui-label mt-4" for="cancelReason">Reason <span class="req">*</span></label>
+            <input id="cancelReason" class="field" required placeholder="e.g. Customer cancelled the order">
+            <div class="flex justify-end gap-2 mt-6">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('cancelModal')">Keep shipment</button>
+                <button class="btn btn-coral">Cancel shipment</button>
+            </div>
+        </form>
+    </div>
+
     <!-- DETAIL DRAWER -->
-    <div id="drawer" class="hidden fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm justify-end" onclick="if(event.target===this)closeDrawer()">
+    <div id="drawer" class="hidden fixed inset-0 z-40 bg-gray-900/40 backdrop-blur-sm justify-end" onclick="if(event.target===this)closeDrawer()">
         <aside class="bg-white w-full max-w-md h-full p-6 lg:p-8 overflow-y-auto custom-scrollbar rounded-l-[2.5rem] shadow-2xl" aria-label="Shipment details">
             <div id="drawerBody"></div>
         </aside>
     </div>
 
     <script>
-        const token = localStorage.getItem('cargo_auth_token');
-        const role = localStorage.getItem('cargo_user_role') || 'staff';
-        const isAdmin = role === 'super_admin' || role === 'head_office';
+        const { api, esc, clean, toast, beep, openModal, closeModal } = UI;
+        const isAdmin = UI.isAdmin();
+        const canDelete = ['super_admin', 'head_office', 'branch_manager'].includes(UI.role());
         const STAGES = ['', 'Booking', 'Pickup', 'Origin', 'Export', 'Transit', 'Destination', 'Last Mile', 'Delivered', 'Review'];
-        const EXTRA = {
-            agent_docket: [['fwd_agent', 'Forwarding agent'], ['fwd_docket', 'Agent docket / AWB']],
-            to_branch: [['to_branch', 'To branch']],
-            mawb: [['mawb', 'MAWB number']],
-            driver: [['driver', 'Driver']]
-        };
-        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        const clean = (v) => String(v || '').trim().replace(/^'/, '').replace(/\s+/g, '').toUpperCase();
-        let statuses = [], batch = [], intake = 'drop_off', imported = 0;
+        const FIELDS = ['package_type', 'weight', 'pieces', 'shipper', 'shipper_phone', 'origin_city', 'origin_country', 'consignee', 'consignee_phone', 'consignee_address', 'dest_city', 'dest_country', 'declared_value', 'amount'];
+        let intake = 'drop_off', branches = [], listCache = [];
+        let form = { mode: 'new', source: 'manual', raw: null, external_ref: null, original: null };
 
-        async function api(path, opts = {}) {
-            const res = await fetch(path, {
-                ...opts,
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: opts.body ? JSON.stringify(opts.body) : undefined
-            });
-            if (res.status === 401) { localStorage.removeItem('cargo_auth_token'); location.replace('../login.html'); }
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-            return data;
-        }
+        const $ = (id) => document.getElementById(id);
+        const statusPill = (b) => `<span class="pill-tag ${b.current_status_code === 'CANCELLED' ? 'pill-gray' : b.current_stage >= 8 ? 'pill-green' : 'pill-coral'}">${esc(b.current_status || 'New')}</span>`;
+        const workBranch = () => (isAdmin ? $('workBranch').value : '');
 
-        function flash(ok, msg) {
-            const el = document.getElementById('alert');
-            el.className = `text-xs font-bold px-4 py-2.5 rounded-full border ${ok ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-coral-50 text-coral-600 border-coral-100'}`;
-            el.textContent = msg;
-            clearTimeout(flash.t); flash.t = setTimeout(() => el.classList.add('hidden'), 6000);
-        }
-        function beep(ok) { // audible scan feedback, like the old scanner
-            try { const a = new AudioContext(), o = a.createOscillator(); o.frequency.value = ok ? 880 : 220; o.connect(a.destination); o.start(); o.stop(a.currentTime + 0.12); } catch (e) {}
-        }
-
-        // ---------- Import ----------
+        // ---------- segmented toggles ----------
         document.querySelectorAll('[data-intake]').forEach(b => b.onclick = () => {
             intake = b.dataset.intake;
             document.querySelectorAll('[data-intake]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
         });
+        const setFormIntake = (v) => $('f_intake').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === v)));
+        $('f_intake').querySelectorAll('button').forEach(b => b.onclick = () => setFormIntake(b.dataset.v));
+        const getFormIntake = () => $('f_intake').querySelector('[aria-pressed="true"]').dataset.v;
 
-        function logImport(r) {
-            const log = document.getElementById('importLog');
-            if (!imported && log.firstElementChild?.classList.contains('text-gray-400')) log.innerHTML = '';
-            imported++;
-            const icon = r.result === 'imported' ? ['bg-emerald-50 text-emerald-700', 'Imported'] : r.result === 'refreshed' ? ['bg-amber-50 text-amber-700', 'Already in — refreshed'] : ['bg-coral-50 text-coral-600', 'Failed'];
-            log.insertAdjacentHTML('afterbegin', `
-                <li class="bg-white rounded-2xl px-4 py-2.5 border border-gray-100 flex justify-between items-center gap-3">
-                    <div class="min-w-0">
-                        <p class="text-xs font-extrabold">${esc(r.awb || r.order_no)}</p>
-                        <p class="text-[10px] text-gray-400 truncate">${r.result === 'error' ? esc(r.error) : `${esc(r.consignee || '—')} • ${esc(r.dest_country || '—')} • ${esc(r.weight ?? '—')} kg / ${esc(r.pieces ?? 1)} pcs`}</p>
-                    </div>
-                    <span class="text-[10px] font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${icon[0]}">${icon[1]}</span>
-                </li>`);
-            document.getElementById('importCount').textContent = `${imported} scanned`;
+        // ---------- shipment form ----------
+        function fillForm(row = {}) {
+            $('f_awb').value = row.awb || '';
+            FIELDS.forEach(k => { $('f_' + k).value = row[k] ?? (k === 'package_type' ? 'Parcel' : ''); });
+            if (row.package_type && ![...$('f_package_type').options].some(o => o.value === row.package_type)) $('f_package_type').add(new Option(row.package_type));
+            setFormIntake(row.intake_mode || intake);
+            if (row.branch_code) $('f_branch').value = row.branch_code;
         }
 
-        async function importOrders(list) {
-            const orders = [...new Set(list.map(clean).filter(Boolean))];
-            if (!orders.length) return;
-            const branch = document.getElementById('importBranch').value;
-            if (isAdmin && !branch) return flash(false, 'Choose the receiving branch first.');
-            for (let i = 0; i < orders.length; i += 5) { // small chunks keep each request fast
-                try {
-                    const { results } = await api('/api/bookings', { method: 'POST', body: { action: 'import', order_nos: orders.slice(i, i + 5), branch, intake_mode: intake } });
-                    results.forEach(r => { logImport(r); beep(r.result !== 'error'); });
-                } catch (e) { flash(false, e.message); beep(false); break; }
-            }
-            loadList();
-        }
-
-        document.getElementById('importForm').onsubmit = (e) => {
-            e.preventDefault();
-            const input = document.getElementById('importInput');
-            const v = input.value; input.value = ''; input.focus();
-            importOrders([v]);
-        };
-        document.getElementById('bulkBtn').onclick = () => {
-            const t = document.getElementById('bulkInput');
-            importOrders(t.value.split(/[\s,;]+/)); t.value = '';
+        window.openForm = async (mode, data = {}) => {
+            form = { mode, source: data.source || 'manual', raw: data.raw || null, external_ref: data.external_ref || null, original: data.original || null };
+            $('dupWarn').classList.add('hidden');
+            $('formTitle').textContent = mode === 'edit' ? `Edit ${data.row.awb}` : mode === 'review' ? 'Review fetched order' : 'New Shipment';
+            $('formSub').textContent = mode === 'edit' ? 'Change any detail — every change is recorded on the timeline.'
+                : mode === 'review' ? 'Check and correct the details before adding.' : 'Enter details manually, or fetch them from Al-Farha Online.';
+            $('fetchRow').classList.toggle('hidden', mode !== 'new');
+            $('f_awb').readOnly = mode !== 'new';
+            $('f_awb').classList.toggle('soft', mode !== 'new');
+            $('f_branch').disabled = !isAdmin;
+            $('saveBtn').textContent = mode === 'edit' ? 'Save changes' : 'Review & add';
+            $('formSource').textContent = form.source === 'alfarhaonline' ? `Source: Al-Farha Online order ${form.external_ref || ''}` : mode === 'edit' ? '' : 'Source: manual entry';
+            fillForm({ branch_code: workBranch() || branches[0]?.branch_code, ...(data.row || {}) });
+            if (data.exists) { $('dupWarn').textContent = `⚠ Shipment ${data.exists} already exists — saving will be refused. Open it from the list to edit.`; $('dupWarn').classList.remove('hidden'); }
+            openModal('formModal');
+            (mode === 'new' ? $('fetchInput') : $('f_weight')).focus();
         };
 
-        // ---------- Status update ----------
-        function renderBatch() {
-            document.getElementById('batch').innerHTML = batch.length
-                ? batch.map(a => `<span class="bg-white border border-gray-200 rounded-full pl-3 pr-1 py-1 text-[11px] font-extrabold flex items-center gap-1">${esc(a)}
-                    <button type="button" onclick="removeFromBatch('${esc(a)}')" aria-label="Remove ${esc(a)}" class="w-5 h-5 rounded-full hover:bg-coral-50 text-gray-400 hover:text-coral-600">×</button></span>`).join('')
-                  + `<button type="button" onclick="batch=[];renderBatch()" class="text-[11px] font-bold text-gray-400 hover:text-gray-900 underline ml-1">Clear</button>`
-                : '<span class="text-xs text-gray-400">No AWBs yet — scan, or tick rows below.</span>';
-            const btn = document.getElementById('updateBtn');
-            btn.disabled = !batch.length || !document.getElementById('statusSelect').value;
-            btn.textContent = `Update ${batch.length} shipment${batch.length === 1 ? '' : 's'}`;
+        async function fetchPreview(orderNo, branch) {
+            return api('/api/bookings', { method: 'POST', body: { action: 'preview', order_no: orderNo, branch } });
         }
-        window.removeFromBatch = (a) => { batch = batch.filter(x => x !== a); renderBatch(); };
-        function addToBatch(list) {
-            list.map(clean).filter(Boolean).forEach(a => { if (!batch.includes(a)) batch.push(a); });
-            renderBatch();
-        }
-        document.getElementById('scanForm').onsubmit = (e) => {
-            e.preventDefault();
-            const i = document.getElementById('scanInput');
-            if (i.value.trim()) { addToBatch([i.value]); beep(true); }
-            i.value = ''; i.focus();
-        };
 
-        function onStatusChange() {
-            const st = statuses.find(s => s.code === document.getElementById('statusSelect').value);
-            const req = st ? st.requires : [];
-            document.getElementById('extraFields').innerHTML = req.flatMap(r => EXTRA[r] || []).map(([id, lbl]) =>
-                `<label><span class="text-[11px] font-bold text-gray-500">${lbl} <span class="text-coral-500">required</span></span><input data-extra="${id}" ${id === 'fwd_agent' ? 'list="carrierList" placeholder="SMSA, Aramex, DHL… (others via 17Track)"' : ''} required class="field mt-1 bg-white"></label>`).join('');
-            document.getElementById('remarkReq').classList.toggle('hidden', !req.includes('remark'));
-            renderBatch();
-        }
-        document.getElementById('statusSelect').onchange = onStatusChange;
-
-        document.getElementById('updateBtn').onclick = async () => {
-            const btn = document.getElementById('updateBtn');
-            const body = {
-                awbs: batch,
-                code: document.getElementById('statusSelect').value,
-                location: document.getElementById('location').value,
-                remark: document.getElementById('remark').value,
-                event_at: document.getElementById('eventAt').value ? new Date(document.getElementById('eventAt').value).toISOString() : undefined
-            };
-            document.querySelectorAll('[data-extra]').forEach(el => body[el.dataset.extra] = el.value.trim());
-            btn.disabled = true; btn.textContent = 'Updating…';
+        $('fetchBtn').onclick = async () => {
+            const no = clean($('fetchInput').value);
+            if (!no) return toast(false, 'Enter an order number.');
+            $('fetchBtn').disabled = true; $('fetchBtn').textContent = 'Fetching…';
             try {
-                const r = await api('/api/status', { method: 'POST', body });
-                flash(true, `${r.updated} shipment(s) → ${r.status}`); beep(true);
-                batch = []; document.getElementById('remark').value = '';
-                loadList();
-            } catch (e) { flash(false, e.message); beep(false); }
-            renderBatch();
+                const { row, exists } = await fetchPreview(no, $('f_branch').value);
+                form.source = 'alfarhaonline'; form.raw = row.raw; form.external_ref = row.external_ref;
+                fillForm(row);
+                $('formSource').textContent = `Source: Al-Farha Online order ${row.external_ref}`;
+                $('dupWarn').classList.toggle('hidden', !exists);
+                if (exists) $('dupWarn').textContent = `⚠ Shipment ${exists} already exists — open it from the list to edit.`;
+                beep(true);
+            } catch (e) { toast(false, e.message); beep(false); }
+            $('fetchBtn').disabled = false; $('fetchBtn').textContent = 'Fetch';
+        };
+        $('fetchInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('fetchBtn').click(); } });
+
+        function readForm() {
+            const fields = Object.fromEntries(FIELDS.map(k => [k, $('f_' + k).value]));
+            fields.intake_mode = getFormIntake();
+            return { awb: clean($('f_awb').value), fields, branch: $('f_branch').value };
+        }
+
+        $('shipForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const { awb, fields, branch } = readForm();
+            if (!awb) return toast(false, 'Booking ID / AWB is required.');
+            if (!fields.shipper.trim() || !fields.consignee.trim()) return toast(false, 'Shipper and consignee names are required.');
+
+            if (form.mode === 'edit') {
+                const changed = Object.fromEntries(Object.entries(fields).filter(([k, v]) => String(v ?? '') !== String(form.original[k] ?? '')));
+                if (isAdmin && branch !== form.original.branch_code) changed.__branch = branch;
+                if (!Object.keys(changed).length) return closeModal('formModal');
+                const list = Object.keys(changed).map(k => k === '__branch' ? 'branch' : k.replace(/_/g, ' ')).join(', ');
+                if (!await UI.confirm({ title: `Save changes to ${awb}?`, message: `Changing: <b>${esc(list)}</b>. The change is recorded on the shipment timeline.`, confirmText: 'Save changes' })) return;
+                const branchCode = changed.__branch; delete changed.__branch;
+                try {
+                    await api('/api/bookings', { method: 'PATCH', body: { awb, fields: changed, branch_code: branchCode } });
+                    toast(true, `${awb} updated.`); closeModal('formModal'); loadList(); if (!$('drawer').classList.contains('hidden')) openDrawer(awb);
+                } catch (err) { toast(false, err.message); }
+                return;
+            }
+
+            // Ask before adding — last chance to go back and edit.
+            const summary = `<span class="block bg-[#F8F8FA] rounded-2xl p-4 mt-1 text-xs text-gray-700 leading-6">
+                <b>${esc(awb)}</b> • ${esc(fields.package_type)} • ${esc(fields.weight || '—')} kg • ${esc(fields.pieces || 1)} pcs<br>
+                ${esc(fields.shipper)} → <b>${esc(fields.consignee)}</b><br>
+                ${esc([fields.dest_city, fields.dest_country].filter(Boolean).join(', ') || 'No destination')} • ${fields.intake_mode === 'pickup' ? 'Pickup' : 'Drop-off'} • Branch ${esc(branch || '—')}</span>`;
+            if (!await UI.confirm({ title: 'Add this shipment?', message: `Please check the details. Choose <b>Cancel</b> to go back and edit.${summary}`, confirmText: 'Add shipment' })) return;
+            try {
+                const out = await api('/api/bookings', { method: 'POST', body: { action: 'create', awb, fields, branch, source: form.source, external_ref: form.external_ref, raw: form.raw } });
+                toast(true, `Shipment ${out.awb} added.`); beep(true);
+                closeModal('formModal'); loadList();
+            } catch (err) { toast(false, err.message); beep(false); }
         };
 
-        // ---------- List ----------
+        // ---------- quick scan → review ----------
+        $('scanForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const no = clean($('scanInput').value);
+            if (!no) return;
+            if (isAdmin && !workBranch()) return toast(false, 'Choose the branch (top right) first.');
+            $('scanInput').value = '';
+            try {
+                const { row, exists } = await fetchPreview(no, workBranch());
+                beep(true);
+                openForm('review', { row: { ...row, intake_mode: intake }, source: 'alfarhaonline', raw: row.raw, external_ref: row.external_ref, exists });
+            } catch (err) { toast(false, err.message); beep(false); $('scanInput').focus(); }
+        };
+
+        $('bulkBtn').onclick = async () => {
+            const orders = [...new Set($('bulkInput').value.split(/[\s,;]+/).map(clean).filter(Boolean))];
+            if (!orders.length) return;
+            if (isAdmin && !workBranch()) return toast(false, 'Choose the branch (top right) first.');
+            if (!await UI.confirm({ title: `Import ${orders.length} order(s) without review?`, message: 'They are added straight away with the details from Al-Farha Online. You can still edit each one afterwards.', confirmText: 'Import' })) return;
+            const log = $('bulkLog'); log.innerHTML = '';
+            for (let i = 0; i < orders.length; i += 5) {
+                try {
+                    const { results } = await api('/api/bookings', { method: 'POST', body: { action: 'import', order_nos: orders.slice(i, i + 5), branch: workBranch(), intake_mode: intake } });
+                    results.forEach(r => log.insertAdjacentHTML('beforeend', `<li class="flex justify-between bg-white rounded-xl px-3 py-2 border border-gray-100"><b>${esc(r.awb || r.order_no)}</b><span class="pill-tag ${r.result === 'error' ? 'pill-coral' : r.result === 'imported' ? 'pill-green' : 'pill-amber'}">${r.result === 'error' ? esc(r.error) : r.result}</span></li>`));
+                } catch (e) { toast(false, e.message); break; }
+            }
+            $('bulkInput').value = ''; loadList();
+        };
+
+        // ---------- CSV ----------
+        const CSV_COLS = [['BookingID', 'awb'], ['PackageType', 'package_type'], ['Weight', 'weight'], ['PCS', 'pieces'], ['Shipper', 'shipper'], ['ShipperPhone', 'shipper_phone'],
+            ['Consignee', 'consignee'], ['OriginCity', 'origin_city'], ['OriginCountry', 'origin_country'], ['DestCity', 'dest_city'], ['DestCountry', 'dest_country']];
+        let csvRows = [];
+        window.openCsv = () => { csvRows = []; $('csvFile').value = ''; $('csvInfo').textContent = ''; $('csvRows').innerHTML = '<tr><td class="p-8 text-center text-gray-400">No file chosen.</td></tr>'; $('csvHead').innerHTML = ''; $('csvSave').disabled = true; openModal('csvModal'); };
+        window.downloadTemplate = () => {
+            const a = document.createElement('a');
+            a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(CSV_COLS.map(c => c[0]).join(',') + '\n');
+            a.download = 'shipments-template.csv'; a.click();
+        };
+        function parseCsv(text) { // handles quoted fields, commas and new lines inside quotes
+            const rows = []; let row = [], cell = '', q = false;
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i];
+                if (q) { if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c; }
+                else if (c === '"') q = true;
+                else if (c === ',') { row.push(cell); cell = ''; }
+                else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+                else cell += c;
+            }
+            if (cell || row.length) { row.push(cell); rows.push(row); }
+            return rows.filter(r => r.some(v => v.trim()));
+        }
+        $('csvFile').onchange = async (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const rows = parseCsv(await file.text());
+            const head = (rows.shift() || []).map(h => h.trim().toLowerCase());
+            const idx = CSV_COLS.map(([h]) => head.indexOf(h.toLowerCase()));
+            if (idx[0] < 0) { toast(false, 'The file needs a BookingID column — use the template.'); return; }
+            const seen = new Set();
+            csvRows = rows.map(r => {
+                const o = Object.fromEntries(CSV_COLS.map(([, k], i) => [k, idx[i] >= 0 ? (r[idx[i]] || '').trim() : '']));
+                o.awb = clean(o.awb);
+                o.problem = !o.awb ? 'No Booking ID' : seen.has(o.awb) ? 'Duplicate in file' : !o.shipper || !o.consignee ? 'Shipper & consignee needed' : '';
+                seen.add(o.awb);
+                return o;
+            });
+            const ok = csvRows.filter(r => !r.problem).length;
+            $('csvInfo').textContent = `${csvRows.length} rows • ${ok} ready • ${csvRows.length - ok} with problems (skipped)`;
+            $('csvHead').innerHTML = `<tr>${CSV_COLS.map(([h]) => `<th class="p-2.5 font-extrabold">${h}</th>`).join('')}<th class="p-2.5 font-extrabold">Check</th></tr>`;
+            $('csvRows').innerHTML = csvRows.map(r => `<tr class="${r.problem ? 'bg-[#FFF5F3]' : ''}">${CSV_COLS.map(([, k]) => `<td class="p-2.5">${esc(r[k])}</td>`).join('')}<td class="p-2.5">${r.problem ? `<span class="pill-tag pill-coral">${r.problem}</span>` : '<span class="pill-tag pill-green">OK</span>'}</td></tr>`).join('');
+            $('csvSave').disabled = !ok;
+            $('csvSave').textContent = `Add ${ok} shipment${ok === 1 ? '' : 's'}`;
+        };
+        $('csvSave').onclick = async () => {
+            const good = csvRows.filter(r => !r.problem).map(({ problem, ...r }) => r);
+            if (isAdmin && !workBranch()) return toast(false, 'Choose the branch (top right) first.');
+            if (!await UI.confirm({ title: `Add ${good.length} shipments?`, message: `They will be added to branch <b>${esc(workBranch() || 'your branch')}</b>.`, confirmText: 'Add shipments' })) return;
+            $('csvSave').disabled = true; $('csvSave').textContent = 'Adding…';
+            let added = 0, failed = [];
+            for (let i = 0; i < good.length; i += 100) {
+                try {
+                    const { results } = await api('/api/bookings', { method: 'POST', body: { action: 'create_many', rows: good.slice(i, i + 100), branch: workBranch() } });
+                    results.forEach(r => (r.result === 'error' ? failed.push(`${r.awb}: ${r.error}`) : added++));
+                } catch (e) { failed.push(e.message); break; }
+            }
+            toast(!failed.length, `${added} added${failed.length ? ` • ${failed.length} failed — ${failed.slice(0, 3).join('; ')}` : ''}`);
+            closeModal('csvModal'); loadList();
+        };
+
+        // ---------- list + row actions ----------
         async function loadList() {
             const p = new URLSearchParams({ limit: '100' });
-            const q = document.getElementById('search').value.trim();
-            if (q) p.set('q', q);
-            if (document.getElementById('statusFilter').value) p.set('status', document.getElementById('statusFilter').value);
-            if (isAdmin && document.getElementById('branchFilter').value) p.set('branch', document.getElementById('branchFilter').value);
+            if ($('search').value.trim()) p.set('q', $('search').value.trim());
+            if ($('statusFilter').value) p.set('status', $('statusFilter').value);
+            if (isAdmin && $('branchFilter').value) p.set('branch', $('branchFilter').value);
             try {
                 const { bookings } = await api('/api/bookings?' + p);
-                document.getElementById('listCount').textContent = `${bookings.length}${bookings.length === 100 ? '+' : ''}`;
-                document.getElementById('rows').innerHTML = bookings.length ? bookings.map(b => `
+                listCache = bookings;
+                $('listCount').textContent = `${bookings.length}${bookings.length === 100 ? '+' : ''}`;
+                $('rows').innerHTML = bookings.length ? bookings.map(b => `
                     <tr class="hover:bg-[#F8F8FA] cursor-pointer" onclick="openDrawer('${esc(b.awb)}')">
-                        <td class="p-3" onclick="event.stopPropagation()"><input type="checkbox" class="rowSel accent-[#E86D58]" value="${esc(b.awb)}" aria-label="Select ${esc(b.awb)}"></td>
-                        <td class="p-3 font-extrabold whitespace-nowrap">${esc(b.awb)}${b.intake_mode === 'pickup' ? ' <span class="text-[9px] font-bold text-coral-500">PICKUP</span>' : ''}</td>
-                        <td class="p-3"><span class="text-[10px] font-bold bg-[#F8F8FA] border border-gray-100 px-2 py-0.5 rounded-full">${esc(b.branch_code || '—')}</span></td>
+                        <td class="p-3 pl-4 font-extrabold whitespace-nowrap">${esc(b.awb)}${b.intake_mode === 'pickup' ? ' <span class="pill-tag pill-coral">PICKUP</span>' : ''}${b.source === 'manual' ? ' <span class="pill-tag pill-gray">MANUAL</span>' : ''}</td>
+                        <td class="p-3"><span class="pill-tag pill-gray">${esc(b.branch_code || '—')}</span></td>
                         <td class="p-3 max-w-[220px] truncate">${esc(b.shipper || '—')} → <b>${esc(b.consignee || '—')}</b></td>
                         <td class="p-3 text-gray-500">${esc([b.dest_city, b.dest_country].filter(Boolean).join(', ') || '—')}</td>
                         <td class="p-3 text-right whitespace-nowrap">${esc(b.weight ?? '—')} kg / ${esc(b.pieces ?? '—')}</td>
-                        <td class="p-3"><span class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${b.current_stage >= 8 ? 'bg-emerald-50 text-emerald-700' : 'bg-coral-50 text-coral-600'}">${esc(b.current_status || 'New')}</span>
-                            <span class="block text-[9px] text-gray-400 mt-0.5">${STAGES[b.current_stage] || ''}</span></td>
+                        <td class="p-3">${statusPill(b)}<span class="block text-[9px] text-gray-400 mt-0.5">${STAGES[b.current_stage] || ''}</span></td>
                         <td class="p-3 text-right text-gray-400 whitespace-nowrap">${new Date(b.booked_at).toLocaleDateString()}</td>
+                        <td class="p-3 relative" data-menu-root onclick="event.stopPropagation()">
+                            <button type="button" onclick="rowMenu(this, '${esc(b.awb)}')" aria-label="Actions for ${esc(b.awb)}" class="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500 font-extrabold">⋯</button>
+                        </td>
                     </tr>`).join('')
-                    : '<tr><td colspan="8" class="p-8 text-center text-gray-400">No shipments yet. Scan an order number above to import it.</td></tr>';
-                document.getElementById('selectAll').checked = false;
-            } catch (e) { flash(false, e.message); }
+                    : '<tr><td colspan="8" class="p-8 text-center text-gray-400">No shipments yet. Use <b>New Shipment</b>, scan an order, or upload a CSV.</td></tr>';
+            } catch (e) { toast(false, e.message); }
         }
-        let searchT;
-        document.getElementById('search').oninput = () => { clearTimeout(searchT); searchT = setTimeout(loadList, 350); };
-        document.getElementById('statusFilter').onchange = loadList;
-        document.getElementById('branchFilter').onchange = loadList;
-        document.getElementById('selectAll').onchange = (e) => document.querySelectorAll('.rowSel').forEach(c => c.checked = e.target.checked);
-        document.getElementById('addSelectedBtn').onclick = () => {
-            const sel = [...document.querySelectorAll('.rowSel:checked')].map(c => c.value);
-            if (!sel.length) return flash(false, 'Tick some rows first.');
-            addToBatch(sel); document.getElementById('scanInput').focus();
+
+        window.rowMenu = (btn, awb) => {
+            document.querySelectorAll('.row-menu').forEach(m => m.remove());
+            const b = listCache.find(x => x.awb === awb) || {};
+            const cancelled = b.current_status_code === 'CANCELLED';
+            btn.insertAdjacentHTML('afterend', `
+                <div class="row-menu" role="menu">
+                    <button type="button" onclick="openDrawer('${esc(awb)}')">👁️ View details</button>
+                    <button type="button" onclick="editShipment('${esc(awb)}')">✏️ Edit details</button>
+                    <a href="status-update.html?awb=${encodeURIComponent(awb)}">🔄 Update status</a>
+                    ${b.shipper_phone ? `<button type="button" onclick="whatsapp('${esc(awb)}')">💬 WhatsApp shipper</button>` : ''}
+                    <hr>
+                    ${cancelled ? '' : `<button type="button" class="danger" onclick="cancelShipment('${esc(awb)}')">⛔ Cancel shipment</button>`}
+                    ${canDelete ? `<button type="button" class="danger" onclick="deleteShipment('${esc(awb)}')">🗑️ Delete</button>` : ''}
+                </div>`);
         };
 
-        // ---------- Detail drawer ----------
+        window.editShipment = async (awb) => {
+            document.querySelectorAll('.row-menu').forEach(m => m.remove());
+            try {
+                const { booking } = await api('/api/bookings?awb=' + encodeURIComponent(awb));
+                openForm('edit', { row: booking, original: booking, source: booking.source, external_ref: booking.external_ref });
+            } catch (e) { toast(false, e.message); }
+        };
+
+        let cancelTarget = null;
+        window.cancelShipment = (awb) => {
+            document.querySelectorAll('.row-menu').forEach(m => m.remove());
+            cancelTarget = awb; $('cancelAwb').textContent = awb; $('cancelReason').value = '';
+            openModal('cancelModal'); $('cancelReason').focus();
+        };
+        $('cancelForm').onsubmit = async (e) => {
+            e.preventDefault();
+            if (!$('cancelReason').value.trim()) return toast(false, 'Give a reason.');
+            try {
+                await api('/api/status', { method: 'POST', body: { awbs: [cancelTarget], code: 'CANCELLED', remark: $('cancelReason').value.trim() } });
+                toast(true, `${cancelTarget} cancelled.`); closeModal('cancelModal'); loadList(); closeDrawer();
+            } catch (err) { toast(false, err.message); }
+        };
+
+        window.deleteShipment = async (awb) => {
+            document.querySelectorAll('.row-menu').forEach(m => m.remove());
+            if (!await UI.confirm({ title: `Delete ${awb} permanently?`, message: 'The shipment and its whole tracking history are removed. <b>This cannot be undone.</b> To keep the record, cancel it instead.', confirmText: 'Delete permanently', danger: true })) return;
+            try {
+                await api('/api/bookings?awb=' + encodeURIComponent(awb), { method: 'DELETE' });
+                toast(true, `${awb} deleted.`); loadList(); closeDrawer();
+            } catch (e) { toast(false, e.message); }
+        };
+
+        window.whatsapp = (awb) => { // same confirmation message idea as the old mobile booking screen
+            const b = listCache.find(x => x.awb === awb); if (!b) return;
+            let phone = String(b.shipper_phone || '').replace(/[^0-9]/g, '');
+            if (phone.length === 8) phone = '968' + phone; // Omani local number
+            const text = `Hello ${b.shipper || 'Customer'},\n\nYour booking with *Al-Farha Cargo* is confirmed.\n\n📦 *Tracking ID:* ${awb}\n🎯 *To:* ${b.consignee || ''}, ${[b.dest_city, b.dest_country].filter(Boolean).join(', ')}\n\nThank you for choosing Al-Farha Cargo.`;
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+        };
+
+        // ---------- detail drawer ----------
         window.openDrawer = async (awb) => {
-            const d = document.getElementById('drawer'); d.classList.remove('hidden'); d.classList.add('flex');
-            const body = document.getElementById('drawerBody');
-            body.innerHTML = '<p class="text-xs text-gray-400">Loading…</p>';
+            document.querySelectorAll('.row-menu').forEach(m => m.remove());
+            const d = $('drawer'); d.classList.remove('hidden'); d.classList.add('flex');
+            $('drawerBody').innerHTML = '<p class="text-xs text-gray-400">Loading…</p>';
             try {
                 const { booking: b, events } = await api('/api/bookings?awb=' + encodeURIComponent(awb));
                 const row = (k, v) => v ? `<div class="flex justify-between gap-4 text-xs py-1.5"><span class="text-gray-400 font-bold">${k}</span><span class="font-bold text-right">${esc(v)}</span></div>` : '';
-                body.innerHTML = `
+                $('drawerBody').innerHTML = `
                     <div class="flex justify-between items-start mb-5">
                         <div><p class="text-[10px] font-extrabold text-gray-400 uppercase">AWB</p><h3 class="text-2xl font-extrabold">${esc(b.awb)}</h3>
-                        <span class="inline-block mt-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${b.current_stage >= 8 ? 'bg-emerald-50 text-emerald-700' : 'bg-coral-50 text-coral-600'}">${esc(b.current_status || 'New')} • ${STAGES[b.current_stage] || ''}</span></div>
+                        <div class="mt-1">${statusPill(b)} <span class="text-[10px] text-gray-400 font-bold">${STAGES[b.current_stage] || ''}</span></div></div>
                         <button onclick="closeDrawer()" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 text-gray-500">×</button>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-5">
+                        <button class="btn btn-dark btn-sm" onclick="editShipment('${esc(b.awb)}')">✏️ Edit</button>
+                        <a class="btn btn-light btn-sm" href="status-update.html?awb=${encodeURIComponent(b.awb)}">🔄 Update status</a>
+                        ${b.fwd_docket ? `<button class="btn btn-light btn-sm" onclick="syncCarriers('${esc(b.awb)}')">↻ Carrier</button>` : ''}
+                        ${b.current_status_code !== 'CANCELLED' ? `<button class="btn btn-danger btn-sm" onclick="cancelShipment('${esc(b.awb)}')">Cancel</button>` : ''}
+                        ${canDelete ? `<button class="btn btn-danger btn-sm" onclick="deleteShipment('${esc(b.awb)}')">Delete</button>` : ''}
                     </div>
                     <div class="bg-[#F8F8FA] rounded-2xl p-4 border border-gray-100 divide-y divide-gray-100 mb-5">
                         ${row('Shipper', [b.shipper, b.shipper_phone].filter(Boolean).join(' • '))}
@@ -340,73 +539,75 @@
                         ${row('Address', b.consignee_address)}
                         ${row('Route', `${[b.origin_city, b.origin_country].filter(Boolean).join(', ')} → ${[b.dest_city, b.dest_country].filter(Boolean).join(', ')}`)}
                         ${row('Package', `${b.package_type || '—'} • ${b.weight ?? '—'} kg • ${b.pieces ?? '—'} pcs`)}
+                        ${row('Value / charge', [b.declared_value, b.amount].some(v => v != null) ? `${b.declared_value ?? '—'} / ${b.amount ?? '—'}` : '')}
                         ${row('Branch', b.branch_code)}
                         ${row('Intake', b.intake_mode === 'pickup' ? 'Driver pickup' : 'Branch drop-off')}
+                        ${row('Source', b.source === 'alfarhaonline' ? `Al-Farha Online • ${b.external_ref || ''}` : 'Manual entry')}
                         ${row('Forwarding', [b.fwd_agent, b.fwd_docket].filter(Boolean).join(' / '))}
                         ${b.fwd_docket ? row('Carrier sync', b.carrier_error ? `⚠ ${b.carrier_error}` : b.carrier_synced_at ? `${(b.carrier || '').toUpperCase()} • ${new Date(b.carrier_synced_at).toLocaleString()}` : 'Not synced yet') : ''}
-                        ${row('Order no.', b.external_ref)}
                     </div>
-                    <div class="flex justify-between items-center mb-3"><p class="text-[10px] font-extrabold text-gray-400 uppercase">Tracking timeline</p>
-                        <span class="flex gap-3">
-                            ${b.fwd_docket ? `<button onclick="syncCarriers('${esc(b.awb)}')" class="text-[11px] font-bold text-gray-500 hover:text-gray-900">↻ Refresh from carrier</button>` : ''}
-                            <button onclick="addToBatch(['${esc(b.awb)}']);closeDrawer();document.getElementById('statusSelect').focus()" class="text-[11px] font-bold text-coral-500">Update status →</button>
-                        </span></div>
+                    <p class="text-[10px] font-extrabold text-gray-400 uppercase mb-3">Tracking timeline</p>
                     <ol class="relative border-l-2 border-gray-100 ml-2 space-y-4">
                         ${events.map((e, i) => `<li class="ml-4">
-                            <span class="absolute -left-[7px] w-3 h-3 rounded-full ${i === 0 ? 'bg-coral-500' : 'bg-gray-300'}"></span>
-                            <p class="text-xs font-extrabold">${esc(e.status)}</p>
+                            <span class="absolute -left-[7px] w-3 h-3 rounded-full ${i === 0 ? 'bg-coral-500' : e.status_code ? 'bg-gray-400' : 'bg-gray-200'}"></span>
+                            <p class="text-xs font-extrabold ${e.status_code ? '' : 'text-gray-500'}">${esc(e.status)}</p>
                             <p class="text-[10px] text-gray-400">${new Date(e.event_at).toLocaleString()} • ${esc(e.location || '')} • ${esc(e.created_by_name || e.source)}</p>
                             ${e.remark ? `<p class="text-[11px] text-gray-600 mt-0.5">${esc(e.remark)}</p>` : ''}
                         </li>`).join('') || '<li class="ml-4 text-xs text-gray-400">No events.</li>'}
                     </ol>`;
-            } catch (e) { body.innerHTML = `<p class="text-xs text-coral-600">${esc(e.message)}</p>`; }
+            } catch (e) { $('drawerBody').innerHTML = `<p class="text-xs text-coral-600">${esc(e.message)}</p>`; }
         };
-        window.closeDrawer = () => { const d = document.getElementById('drawer'); d.classList.add('hidden'); d.classList.remove('flex'); };
+        window.closeDrawer = () => { $('drawer').classList.add('hidden'); $('drawer').classList.remove('flex'); };
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
 
-        // ---------- Carrier sync ----------
+        // ---------- carrier sync ----------
         window.syncCarriers = async (awb) => {
-            const btn = document.getElementById('syncBtn');
-            btn.disabled = true; btn.querySelector('span').textContent = 'Syncing…';
+            const btn = $('syncBtn'); btn.disabled = true;
             try {
                 const r = await api('/api/carrier-sync', { method: 'POST', body: awb ? { awb } : {} });
                 const errs = r.errors.length ? ` • ${r.errors.length} error(s): ${r.errors[0].awb} ${r.errors[0].error}` : '';
-                const skipped = r.skipped ? ` • ${r.skipped} skipped (carrier not active in Integrations)` : '';
-                flash(!r.errors.length, r.found
-                    ? `Checked ${r.checked}, ${r.updated} with new events, ${r.moved} status change(s)${skipped}${errs}`
-                    : 'No shipments with a forwarding docket to sync.');
-                loadList();
-                if (awb) openDrawer(awb);
-            } catch (e) { flash(false, e.message); }
-            btn.disabled = false; btn.querySelector('span').textContent = 'Sync carriers';
+                const skipped = r.skipped ? ` • ${r.skipped} skipped (carrier not active)` : '';
+                toast(!r.errors.length, r.found ? `Checked ${r.checked}, ${r.updated} with new events, ${r.moved} status change(s)${skipped}${errs}` : 'No shipments with a forwarding docket to sync.');
+                loadList(); if (awb) openDrawer(awb);
+            } catch (e) { toast(false, e.message); }
+            btn.disabled = false;
         };
-        document.getElementById('syncBtn').onclick = () => syncCarriers();
-        if (role !== 'staff') { const s = document.getElementById('syncBtn'); s.classList.remove('hidden'); s.classList.add('flex'); }
+        $('syncBtn').onclick = () => syncCarriers();
+        if (UI.role() !== 'staff') $('syncBtn').classList.remove('hidden');
 
-        // ---------- Init ----------
+        // ---------- filters + init ----------
+        let searchT;
+        $('search').oninput = () => { clearTimeout(searchT); searchT = setTimeout(loadList, 350); };
+        $('statusFilter').onchange = loadList;
+        $('branchFilter').onchange = loadList;
+
         (async function init() {
-            renderBatch();
             try {
-                const { statuses: list } = await api('/api/status');
-                statuses = list;
+                const { statuses } = await api('/api/status');
                 const groups = {};
-                list.forEach(s => (groups[s.is_exception ? 'Exceptions' : STAGES[s.stage]] ||= []).push(s));
-                const opts = Object.entries(groups).map(([g, items]) => `<optgroup label="${esc(g)}">${items.map(s => `<option value="${esc(s.code)}">${esc(s.label)}</option>`).join('')}</optgroup>`).join('');
-                document.getElementById('statusSelect').innerHTML = '<option value="">Choose status…</option>' + opts;
-                document.getElementById('statusFilter').innerHTML = '<option value="">All statuses</option>' + opts;
-            } catch (e) { flash(false, e.message); }
-            if (isAdmin) {
-                try {
-                    const { branches } = await api('/api/branches');
-                    const opts = branches.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join('');
-                    document.getElementById('importBranch').innerHTML = '<option value="">Choose branch…</option>' + opts;
-                    document.getElementById('branchFilter').innerHTML = '<option value="">All branches</option>' + opts;
-                    document.getElementById('importBranchWrap').classList.remove('hidden');
-                    document.getElementById('branchFilter').classList.remove('hidden');
-                } catch (e) { flash(false, e.message); }
-            }
-            loadList();
-            document.getElementById('importInput').focus();
+                statuses.forEach(s => (groups[s.is_exception ? 'Exceptions' : STAGES[s.stage]] ||= []).push(s));
+                $('statusFilter').innerHTML = '<option value="">All statuses</option>' + Object.entries(groups).map(([g, items]) =>
+                    `<optgroup label="${esc(g)}">${items.map(s => `<option value="${esc(s.code)}">${esc(s.label)}</option>`).join('')}</optgroup>`).join('');
+            } catch (e) { toast(false, e.message); }
+            try {
+                const { branches: list } = await api('/api/branches');
+                branches = list;
+                const opts = list.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join('');
+                $('f_branch').innerHTML = opts;
+                if (isAdmin) {
+                    let saved = ''; try { saved = localStorage.getItem('alfarha_work_branch') || ''; } catch (e) {}
+                    $('workBranch').innerHTML = '<option value="">Branch for new shipments…</option>' + opts;
+                    $('workBranch').value = list.some(b => b.branch_code === saved) ? saved : '';
+                    $('workBranch').onchange = () => { try { localStorage.setItem('alfarha_work_branch', $('workBranch').value); } catch (e) {} };
+                    $('branchFilter').innerHTML = '<option value="">All branches</option>' + opts;
+                    $('workBranch').classList.remove('hidden'); $('branchFilter').classList.remove('hidden');
+                }
+            } catch (e) { /* branch list unavailable; the server uses the user's own branch */ }
+            if (!isAdmin) $('f_branch').closest('div').classList.add('hidden'); // staff always add to their own branch
+            await loadList();
+            const open = new URLSearchParams(location.search).get('awb');
+            if (open) openDrawer(open);
+            $('scanInput').focus();
         })();
     </script>
 </body>

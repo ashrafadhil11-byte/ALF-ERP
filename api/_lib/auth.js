@@ -39,6 +39,7 @@ export async function getSession(req) {
     );
     const rows = empRes.ok ? await empRes.json() : [];
     const employee = Array.isArray(rows) && rows.length ? rows[0] : null;
+    if (employee && employee.active === false) return null; // deactivated in Staff & Users
 
     const role = normalizeRole(employee?.role) || normalizeRole(user.app_metadata?.role);
     if (!role) return null; // no recognised role = no access

@@ -3,269 +3,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create User - Al-Farha Cargo Admin</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
+    <title>Staff & Users - Al-Farha Cargo</title>
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'], },
-                    colors: {
-                        brand: {
-                            orange: '#F58220', orangeHover: '#E06D10',
-                            purple: '#6A2C70', purpleDark: '#4A1D4E',
-                        }
-                    },
-                    boxShadow: {
-                        'soft': '0 20px 40px -15px rgba(0,0,0,0.05)',
-                        'glow': '0 10px 25px -5px rgba(245, 130, 32, 0.4)'
-                    }
-                }
-            }
-        }
+        (function checkAuth() {
+            const role = localStorage.getItem('cargo_user_role');
+            if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');
+            else if (role !== 'super_admin' && role !== 'head_office') window.location.replace('super-dashboard.html');
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
     </script>
 </head>
-<body class="bg-[#FBF8F1] min-h-screen flex items-center justify-center p-4 md:p-6 antialiased selection:bg-brand-orange selection:text-white">
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
 
-    <div class="max-w-5xl w-full bg-white rounded-[2.5rem] shadow-soft overflow-hidden flex flex-col md:flex-row relative z-10">
-        
-        <!-- Left Branding Panel -->
-        <div class="w-full md:w-4/12 bg-gradient-to-br from-brand-purple to-brand-purpleDark p-10 flex flex-col justify-between text-white relative overflow-hidden hidden md:flex">
-            <div class="relative z-10">
-                <div class="mb-8">
-                    <img src="../assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-12 w-auto object-contain">
-                </div>
-                <div>
-                    <h1 class="text-3xl font-extrabold leading-tight mb-4">
-                        Add New <br><span class="text-brand-orange">Team Member</span>
-                    </h1>
-                    <p class="text-purple-200 text-sm leading-relaxed">
-                        Create secure access credentials and set up organizational roles for the Al-Farha Cargo ERP system.
-                    </p>
-                </div>
-            </div>
-            
-            <a href="../dashboard.html" class="relative z-10 flex items-center gap-2 text-sm text-purple-300 hover:text-white transition-colors mt-8 w-max">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                Back to Dashboard
-            </a>
-        </div>
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
 
-        <!-- Right Form Panel -->
-        <div class="w-full md:w-8/12 p-6 sm:p-10 lg:p-12 flex flex-col justify-center bg-white relative">
-            
-            <div class="mb-6 md:hidden flex justify-between items-center">
-                <img src="../assets/LOGO%20BG%20B.svg" alt="Al-Farha Cargo Logo" class="h-8 w-auto object-contain">
-                <a href="../dashboard.html" class="text-sm text-gray-500 hover:text-brand-orange">Cancel</a>
-            </div>
-
-            <div class="w-full mx-auto">
-                <h2 class="text-2xl font-bold text-gray-900 mb-1">Employee Registration</h2>
-                <p class="text-gray-500 text-sm mb-8">Enter the user's personal and organizational details below.</p>
-
-                <form id="createUserForm" class="space-y-6">
-                    
-                    <div id="alertMsg" class="hidden text-sm p-4 rounded-xl border flex items-center gap-2 mb-4"></div>
-
-                    <!-- 2-Column Grid Layout -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        
-                        <!-- Full Name -->
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">Full Name</label>
-                            <input type="text" id="fullName" required placeholder="e.g. Muhammed Adhil" 
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
-                        </div>
-
-                        <!-- Date of Birth (Creative Addition) -->
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-semibold text-gray-700 ml-1 flex justify-between items-center">
-                                Date of Birth 
-                                <span class="text-brand-orange text-[10px] font-bold bg-orange-50 px-2 py-0.5 rounded-full">🎉 For team celebrations</span>
-                            </label>
-                            <input type="date" id="dob" required 
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
-                        </div>
-
-                        <!-- Contact Number -->
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">Contact Number</label>
-                            <input type="tel" id="contactNumber" required placeholder="+968 9XXXXXXX" 
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
-                        </div>
-
-                        <!-- Recovery Email -->
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">Recovery Email</label>
-                            <input type="email" id="recoveryEmail" required placeholder="user@personal.com" 
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
-                        </div>
-
-                        <!-- Oman Civil ID -->
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">Oman Civil ID</label>
-                            <input type="text" id="omanId" required placeholder="e.g. 12345678" pattern="\d+" title="Please enter numeric ID only"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
-                        </div>
-
-                        <!-- Username -->
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">System Username</label>
-                            <input type="text" id="username" required placeholder="e.g. madhil" 
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
-                        </div>
-
-                        <!-- User Role -->
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">User Role</label>
-                            <select id="role" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200 appearance-none cursor-pointer">
-                                <option value="" disabled selected>Select a role...</option>
-                                <option value="super_admin">Super Admin</option>
-                                <option value="head_office">Head Office</option>
-                                <option value="branch_manager">Branch Manager</option>
-                                <option value="staff">Staff</option>
-                                <option value="driver">Driver (Staff)</option>
-                            </select>
-                        </div>
-
-                        <!-- Branch Allocation -->
-                        <div class="space-y-1.5 transition-opacity duration-300" id="branchContainer">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">Branch Allocation</label>
-                            <select id="branch" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200 appearance-none cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
-                                <option value="" disabled selected>Select branch...</option>
-                            </select>
-                        </div>
-
-                        <!-- Temporary Password (Spans both columns) -->
-                        <div class="space-y-1.5 md:col-span-2">
-                            <label class="text-xs font-semibold text-gray-700 ml-1">Temporary Password</label>
-                            <input type="password" id="password" required placeholder="Set a secure initial password" minlength="8"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200">
-                        </div>
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+            <section class="flex flex-wrap items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-3">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                     </div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Staff & Users</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Accounts • Roles • Branch access</p>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-coral" onclick="openCreate()">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                    Add User
+                </button>
+            </section>
 
-                    <!-- Submit Button -->
-                    <button type="submit" id="submitBtn" 
-                        class="w-full md:w-auto md:min-w-[200px] md:float-right bg-brand-orange hover:bg-brand-orangeHover text-white font-semibold py-3.5 px-6 rounded-xl shadow-glow transition-all duration-300 flex justify-center items-center gap-2 group transform active:scale-[0.98] mt-6">
-                        <span id="btnText">Register Employee</span>
-                        <svg id="btnLoader" class="w-5 h-5 animate-spin hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </button>
-                    <!-- Clearfix for floated button -->
-                    <div class="clear-both"></div>
-                </form>
+            <!-- Stats -->
+            <section id="stats" class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5"></section>
 
-            </div>
+            <!-- List -->
+            <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
+                <div class="flex flex-wrap gap-2 items-center justify-between mb-4">
+                    <div class="flex items-center gap-2"><span class="font-extrabold text-xs uppercase tracking-wider">Team</span><span id="listCount" class="pill-tag pill-gray">…</span></div>
+                    <div class="flex flex-wrap gap-2">
+                        <input id="search" type="search" placeholder="Search name, username, email…" class="field pill !w-60 !py-2.5">
+                        <select id="roleFilter" class="field pill !w-44 !py-2.5" aria-label="Filter by role">
+                            <option value="">All roles</option><option value="super_admin">Super Admin</option><option value="head_office">Head Office</option>
+                            <option value="branch_manager">Branch Manager</option><option value="staff">Staff</option><option value="driver">Drivers</option>
+                        </select>
+                        <select id="branchFilter" class="field pill !w-44 !py-2.5" aria-label="Filter by branch"><option value="">All branches</option></select>
+                        <select id="activeFilter" class="field pill !w-36 !py-2.5" aria-label="Filter by status">
+                            <option value="">All</option><option value="1" selected>Active</option><option value="0">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-x-auto custom-scrollbar">
+                    <table class="w-full text-xs min-w-[760px]">
+                        <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                            <th class="p-3 pl-4 font-extrabold">Name</th><th class="p-3 font-extrabold">Role</th><th class="p-3 font-extrabold">Branch</th>
+                            <th class="p-3 font-extrabold">Contact</th><th class="p-3 font-extrabold">Last sign-in</th><th class="p-3 font-extrabold">Status</th><th class="p-3 w-12"></th>
+                        </tr></thead>
+                        <tbody id="rows" class="divide-y divide-gray-100"><tr><td colspan="7" class="p-8 text-center text-gray-400">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
         </div>
+    </main>
+
+    <!-- ADD USER -->
+    <div id="createModal" class="ui-modal">
+        <form id="createForm" class="panel max-w-2xl" autocomplete="off">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div>
+                    <h3 class="text-lg font-extrabold">Add User</h3>
+                    <p class="text-xs text-gray-400 mt-0.5">They receive a verification email, then sign in with their username or email.</p>
+                </div>
+                <button type="button" onclick="UI.closeModal('createModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar my-5 pr-1 space-y-5">
+                <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Personal</legend>
+                    <div class="sm:col-span-2"><label class="ui-label" for="c_fullName">Full name <span class="req">*</span></label><input id="c_fullName" class="field" required placeholder="e.g. Muhammed Adhil"></div>
+                    <div><label class="ui-label" for="c_dob">Date of birth</label><input id="c_dob" type="date" class="field"></div>
+                    <div><label class="ui-label" for="c_omanId">Civil ID</label><input id="c_omanId" class="field" inputmode="numeric" pattern="\d*" placeholder="e.g. 12345678"></div>
+                    <div><label class="ui-label" for="c_contact">Contact number <span class="req">*</span></label><input id="c_contact" type="tel" class="field" required placeholder="+968 9XXXXXXX"></div>
+                    <div><label class="ui-label" for="c_email">Email <span class="req">*</span></label><input id="c_email" type="email" class="field" required placeholder="user@example.com"></div>
+                </fieldset>
+                <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Access</legend>
+                    <div><label class="ui-label" for="c_username">Username <span class="req">*</span></label><input id="c_username" class="field" required pattern="[A-Za-z0-9._-]{3,30}" placeholder="e.g. madhil"></div>
+                    <div><label class="ui-label" for="c_password">Temporary password <span class="req">*</span></label><input id="c_password" type="password" class="field" required minlength="8" autocomplete="new-password" placeholder="At least 8 characters"></div>
+                    <div><label class="ui-label" for="c_role">Role <span class="req">*</span></label><select id="c_role" class="field" required></select></div>
+                    <div><label class="ui-label" for="c_branch">Branch <span id="c_branchReq" class="req">*</span></label><select id="c_branch" class="field"></select></div>
+                </fieldset>
+                <p id="roleHelp" class="text-[11px] text-gray-500 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100"></p>
+            </div>
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('createModal')">Cancel</button>
+                <button id="createBtn" class="btn btn-coral">Create user</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- EDIT USER -->
+    <div id="editModal" class="ui-modal">
+        <form id="editForm" class="panel max-w-xl">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div>
+                    <h3 id="e_title" class="text-lg font-extrabold">Edit user</h3>
+                    <p id="e_sub" class="text-xs text-gray-400 mt-0.5"></p>
+                </div>
+                <button type="button" onclick="UI.closeModal('editModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
+                <div class="sm:col-span-2"><label class="ui-label" for="e_name">Full name</label><input id="e_name" class="field" required></div>
+                <div class="sm:col-span-2"><label class="ui-label" for="e_contact">Contact number</label><input id="e_contact" type="tel" class="field"></div>
+                <div><label class="ui-label" for="e_role">Role</label><select id="e_role" class="field"></select></div>
+                <div><label class="ui-label" for="e_branch">Branch</label><select id="e_branch" class="field"></select></div>
+                <label class="sm:col-span-2 flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100 cursor-pointer">
+                    <input id="e_driver" type="checkbox" class="w-4 h-4"><span class="text-xs font-bold">Driver</span><span class="text-[11px] text-gray-400">— does pickups / deliveries</span>
+                </label>
+            </div>
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('editModal')">Cancel</button>
+                <button class="btn btn-dark">Save changes</button>
+            </div>
+        </form>
     </div>
 
     <script>
-        const form = document.getElementById('createUserForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const btnText = document.getElementById('btnText');
-        const btnLoader = document.getElementById('btnLoader');
-        const alertMsg = document.getElementById('alertMsg');
-        
-        // Branch list comes from Branch Network (value = branch code, used to scope the dashboard)
-        fetch('/api/branches', { headers: { Authorization: `Bearer ${localStorage.getItem('cargo_auth_token') || ''}` } })
-            .then(r => r.json())
-            .then(({ branches = [] }) => {
-                const sel = document.getElementById('branch');
-                branches.forEach(b => sel.add(new Option(`${b.branch_name} (${b.branch_code})`, b.branch_code)));
-            })
-            .catch(() => {});
+        const { api, esc, toast, openModal, closeModal } = UI;
+        const $ = (id) => document.getElementById(id);
+        const ROLES = { super_admin: 'Super Admin', head_office: 'Head Office', branch_manager: 'Branch Manager', staff: 'Staff' };
+        const ROLE_HELP = {
+            super_admin: 'Everything, including other Super Admins and Integrations.',
+            head_office: 'All branches and reports; manages staff (not Super Admins). No branch needed.',
+            branch_manager: 'Own branch: shipments, status updates, reports, finance. Can move a status back and delete shipments.',
+            staff: 'Own branch: add shipments and update statuses. No finance, no deleting.',
+            driver: 'Staff account flagged as driver (pickups / deliveries).'
+        };
+        const ROLE_PILL = { super_admin: 'pill-dark', head_office: 'pill-coral', branch_manager: 'pill-amber', staff: 'pill-gray' };
+        const myRole = UI.role();
+        let users = [], branches = [], editing = null;
 
-        // Role & Branch UI Logic
-        const roleSelect = document.getElementById('role');
-        const branchContainer = document.getElementById('branchContainer');
-        const branchSelect = document.getElementById('branch');
+        const roleOptions = (includeDriver) => Object.entries(ROLES)
+            .filter(([k]) => k !== 'super_admin' || myRole === 'super_admin')
+            .map(([k, v]) => `<option value="${k}">${v}</option>`).join('') + (includeDriver ? '<option value="driver">Driver (Staff)</option>' : '');
+        const branchName = (code) => (branches.find(b => b.branch_code === code) || {}).branch_name || code || '—';
+        const ago = (iso) => {
+            if (!iso) return 'Never';
+            const d = (Date.now() - new Date(iso)) / 864e5;
+            return d < 1 ? 'Today' : d < 2 ? 'Yesterday' : d < 30 ? `${Math.floor(d)} days ago` : new Date(iso).toLocaleDateString();
+        };
+        const initials = (n) => String(n || '?').split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
-        roleSelect.addEventListener('change', (e) => {
-            if (e.target.value === 'super_admin' || e.target.value === 'head_office') {
-                branchSelect.disabled = true;
-                branchSelect.value = ""; // Clear selection
-                branchSelect.removeAttribute('required');
-                branchContainer.classList.add('opacity-40', 'pointer-events-none');
-            } else {
-                branchSelect.disabled = false;
-                branchSelect.setAttribute('required', 'required');
-                branchContainer.classList.remove('opacity-40', 'pointer-events-none');
-            }
-        });
-
-        // Alert Helper Function
-        function showAlert(type, message) {
-            alertMsg.className = `text-sm p-4 rounded-xl border flex items-center gap-2 mb-4 ${
-                type === 'success' 
-                ? 'bg-green-50 text-green-700 border-green-100' 
-                : 'bg-red-50 text-red-600 border-red-100'
-            }`;
-            
-            const icon = type === 'success' 
-                ? `<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`
-                : `<svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`;
-                
-            alertMsg.innerHTML = `${icon} <span>${message}</span>`;
-            alertMsg.classList.remove('hidden');
+        function renderStats() {
+            const active = users.filter(u => u.active);
+            const count = (fn) => active.filter(fn).length;
+            const tile = (label, n, dark) => `<div class="${dark ? 'bg-[#111827] text-white' : 'bg-[#F8F8FA] border border-gray-100'} rounded-[1.5rem] p-4">
+                <p class="text-[10px] font-extrabold uppercase ${dark ? 'text-gray-400' : 'text-gray-400'}">${label}</p><p class="text-2xl font-extrabold mt-1">${n}</p></div>`;
+            $('stats').innerHTML = tile('Active users', active.length, true) + tile('Admins', count(u => ['super_admin', 'head_office'].includes(u.role)))
+                + tile('Branch managers', count(u => u.role === 'branch_manager')) + tile('Staff', count(u => u.role === 'staff')) + tile('Drivers', count(u => u.is_driver));
         }
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            // Gather all data
-            const payload = {
-                fullName: document.getElementById('fullName').value,
-                dob: document.getElementById('dob').value,
-                contactNumber: document.getElementById('contactNumber').value,
-                recoveryEmail: document.getElementById('recoveryEmail').value,
-                omanId: document.getElementById('omanId').value,
-                username: document.getElementById('username').value,
-                role: document.getElementById('role').value,
-                branch: document.getElementById('branch').value || 'Global',
-                password: document.getElementById('password').value
-            };
+        function renderList() {
+            const q = $('search').value.trim().toLowerCase(), role = $('roleFilter').value, br = $('branchFilter').value, act = $('activeFilter').value;
+            const list = users.filter(u =>
+                (!q || [u.full_name, u.username, u.recovery_email, u.contact_number].some(v => String(v || '').toLowerCase().includes(q))) &&
+                (!role || (role === 'driver' ? u.is_driver : u.role === role)) &&
+                (!br || u.branch === br) &&
+                (act === '' || String(Number(u.active)) === act));
+            $('listCount').textContent = list.length;
+            $('rows').innerHTML = list.length ? list.map(u => `
+                <tr class="hover:bg-[#F8F8FA] ${u.active ? '' : 'opacity-60'}">
+                    <td class="p-3 pl-4">
+                        <div class="flex items-center gap-3">
+                            <span class="w-9 h-9 rounded-full ${u.active ? 'bg-coral-50 text-coral-600' : 'bg-gray-100 text-gray-400'} flex items-center justify-center font-extrabold text-[11px] flex-shrink-0">${esc(initials(u.full_name))}</span>
+                            <div class="min-w-0"><p class="font-extrabold truncate">${esc(u.full_name || '—')}${u.is_me ? ' <span class="pill-tag pill-gray">You</span>' : ''}</p>
+                            <p class="text-[10px] text-gray-400 truncate">@${esc(u.username || '—')} • ${esc(u.recovery_email || '')}</p></div>
+                        </div>
+                    </td>
+                    <td class="p-3"><span class="pill-tag ${ROLE_PILL[u.role] || 'pill-gray'}">${esc(ROLES[u.role] || u.role || 'No role')}</span>${u.is_driver ? ' <span class="pill-tag pill-gray">Driver</span>' : ''}</td>
+                    <td class="p-3 font-bold">${esc(['super_admin', 'head_office'].includes(u.role) && !u.branch ? 'All branches' : branchName(u.branch))}</td>
+                    <td class="p-3 text-gray-500">${esc(u.contact_number || '—')}</td>
+                    <td class="p-3 text-gray-500">${ago(u.last_sign_in_at)}${u.email_confirmed ? '' : ' <span class="pill-tag pill-amber">Email not verified</span>'}</td>
+                    <td class="p-3"><span class="pill-tag ${u.active ? 'pill-green' : 'pill-gray'}">${u.active ? 'Active' : 'Inactive'}</span></td>
+                    <td class="p-3 relative" data-menu-root>
+                        <button type="button" onclick="userMenu(this, '${u.id}')" aria-label="Actions for ${esc(u.full_name)}" class="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500 font-extrabold">⋯</button>
+                    </td>
+                </tr>`).join('') : '<tr><td colspan="7" class="p-8 text-center text-gray-400">No users match.</td></tr>';
+        }
 
-            // Loading state
-            submitBtn.disabled = true;
-            btnText.textContent = 'Processing...';
-            btnLoader.classList.remove('hidden');
-            alertMsg.classList.add('hidden');
-
+        async function load() {
             try {
-                const response = await fetch('/api/create-user', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('cargo_auth_token') || ''}`
-                    },
-                    body: JSON.stringify(payload)
-                });
+                const d = await api('/api/users');
+                users = d.users;
+                renderStats(); renderList();
+            } catch (e) { toast(false, e.message); }
+        }
 
-                const result = await response.json();
+        window.userMenu = (btn, id) => {
+            document.querySelectorAll('.row-menu').forEach(m => m.remove());
+            const u = users.find(x => x.id === id);
+            const locked = u.role === 'super_admin' && myRole !== 'super_admin';
+            btn.insertAdjacentHTML('afterend', `<div class="row-menu" role="menu">
+                ${locked ? '<p class="px-3 py-2 text-[11px] text-gray-400">Only a Super Admin can change this account.</p>' : `
+                <button type="button" onclick="openEdit('${id}')">✏️ Edit user</button>
+                <button type="button" onclick="resetPassword('${id}')">🔑 Send password reset</button>
+                ${u.is_me ? '' : `<hr><button type="button" class="${u.active ? 'danger' : ''}" onclick="toggleActive('${id}')">${u.active ? '⛔ Deactivate' : '✅ Reactivate'}</button>`}`}
+            </div>`);
+        };
 
-                if (!response.ok) throw new Error(result.error || 'Failed to create user');
+        // ---------- add ----------
+        function syncBranchRequirement(roleSel, branchSel, reqEl) {
+            const global = ['super_admin', 'head_office'].includes(roleSel.value);
+            branchSel.disabled = global;
+            if (global) branchSel.value = '';
+            if (reqEl) reqEl.classList.toggle('hidden', global);
+            $('roleHelp').textContent = ROLE_HELP[roleSel.value] || '';
+        }
+        window.openCreate = () => {
+            $('createForm').reset();
+            $('c_role').innerHTML = '<option value="">Choose role…</option>' + roleOptions(true);
+            $('c_branch').innerHTML = '<option value="">Choose branch…</option>' + branches.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join('');
+            $('roleHelp').textContent = 'Pick a role to see what it can do.';
+            openModal('createModal'); $('c_fullName').focus();
+        };
+        $('c_role').onchange = () => syncBranchRequirement($('c_role'), $('c_branch'), $('c_branchReq'));
 
-                showAlert('success', `Employee profile for <b>${payload.fullName}</b> created successfully!`);
-                form.reset();
-                
-                // Reset branch state
-                branchSelect.disabled = false;
-                branchContainer.classList.remove('opacity-40', 'pointer-events-none');
+        $('createForm').onsubmit = async (e) => {
+            e.preventDefault();
+            if (!e.target.checkValidity()) return e.target.reportValidity();
+            const role = $('c_role').value;
+            if (!role) return toast(false, 'Choose a role.');
+            const global = ['super_admin', 'head_office'].includes(role);
+            if (!global && !$('c_branch').value) return toast(false, 'Choose a branch for this role.');
+            const payload = {
+                fullName: $('c_fullName').value.trim(), dob: $('c_dob').value || null, contactNumber: $('c_contact').value.trim(),
+                recoveryEmail: $('c_email').value.trim(), omanId: $('c_omanId').value.trim(), username: $('c_username').value.trim(),
+                role, branch: global ? null : $('c_branch').value, password: $('c_password').value
+            };
+            const summary = `<b>${esc(payload.fullName)}</b> (@${esc(payload.username)})<br>${esc(role === 'driver' ? 'Driver (Staff)' : ROLES[role])} • ${esc(global ? 'All branches' : branchName(payload.branch))}<br>${esc(payload.recoveryEmail)}`;
+            if (!await UI.confirm({ title: 'Create this user?', message: `${summary}<br><br>A verification email is sent to them.`, confirmText: 'Create user' })) return;
+            $('createBtn').disabled = true; $('createBtn').textContent = 'Creating…';
+            try {
+                await api('/api/create-user', { method: 'POST', body: payload });
+                toast(true, `${payload.fullName} added. Ask them to verify their email.`);
+                closeModal('createModal'); setTimeout(load, 800);
+            } catch (err) { toast(false, err.message); }
+            $('createBtn').disabled = false; $('createBtn').textContent = 'Create user';
+        };
 
-            } catch (error) {
-                showAlert('error', error.message);
-            } finally {
-                submitBtn.disabled = false;
-                btnText.textContent = 'Register Employee';
-                btnLoader.classList.add('hidden');
-            }
-        });
+        // ---------- edit ----------
+        window.openEdit = (id) => {
+            document.querySelectorAll('.row-menu').forEach(m => m.remove());
+            editing = users.find(u => u.id === id);
+            $('e_title').textContent = `Edit ${editing.full_name || 'user'}`;
+            $('e_sub').textContent = `@${editing.username || '—'} • ${editing.recovery_email || ''}`;
+            $('e_name').value = editing.full_name || '';
+            $('e_contact').value = editing.contact_number || '';
+            $('e_role').innerHTML = roleOptions(false);
+            $('e_role').value = editing.role;
+            $('e_role').disabled = editing.is_me;
+            $('e_branch').innerHTML = '<option value="">All branches</option>' + branches.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join('');
+            $('e_branch').value = editing.branch || '';
+            $('e_driver').checked = Boolean(editing.is_driver);
+            $('e_role').onchange = () => { const g = ['super_admin', 'head_office'].includes($('e_role').value); $('e_branch').disabled = g; if (g) $('e_branch').value = ''; };
+            $('e_role').onchange();
+            openModal('editModal');
+        };
+        $('editForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const body = { id: editing.id, full_name: $('e_name').value, contact_number: $('e_contact').value, branch: $('e_branch').value, is_driver: $('e_driver').checked };
+            if (!editing.is_me) body.role = $('e_role').value;
+            const roleChanged = body.role && body.role !== editing.role;
+            if (roleChanged && !await UI.confirm({ title: 'Change role?', message: `${esc(editing.full_name)}: <b>${esc(ROLES[editing.role] || editing.role)}</b> → <b>${esc(ROLES[body.role])}</b>. Their access changes at their next page load.`, confirmText: 'Change role' })) return;
+            try {
+                await api('/api/users', { method: 'PATCH', body });
+                toast(true, 'User updated.'); closeModal('editModal'); load();
+            } catch (err) { toast(false, err.message); }
+        };
+
+        window.toggleActive = async (id) => {
+            document.querySelectorAll('.row-menu').forEach(m => m.remove());
+            const u = users.find(x => x.id === id);
+            const ok = await UI.confirm(u.active
+                ? { title: `Deactivate ${u.full_name}?`, message: 'They are signed out and can no longer sign in. Their name stays on past shipments and history. You can reactivate them any time.', confirmText: 'Deactivate', danger: true }
+                : { title: `Reactivate ${u.full_name}?`, message: 'They can sign in again with their existing password.', confirmText: 'Reactivate' });
+            if (!ok) return;
+            try { await api('/api/users', { method: 'PATCH', body: { id, active: !u.active } }); toast(true, u.active ? 'User deactivated.' : 'User reactivated.'); load(); }
+            catch (e) { toast(false, e.message); }
+        };
+
+        window.resetPassword = async (id) => {
+            document.querySelectorAll('.row-menu').forEach(m => m.remove());
+            const u = users.find(x => x.id === id);
+            if (!await UI.confirm({ title: 'Send password reset?', message: `A reset link is emailed to <b>${esc(u.recovery_email || 'their email')}</b>.`, confirmText: 'Send link' })) return;
+            try { const r = await api('/api/users', { method: 'POST', body: { action: 'reset_password', id } }); toast(true, r.message); }
+            catch (e) { toast(false, e.message); }
+        };
+
+        ['search', 'roleFilter', 'branchFilter', 'activeFilter'].forEach(id => $(id).addEventListener(id === 'search' ? 'input' : 'change', renderList));
+
+        (async function init() {
+            try {
+                const d = await api('/api/branches');
+                branches = d.branches || [];
+                $('branchFilter').innerHTML = '<option value="">All branches</option>' + branches.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)}</option>`).join('');
+            } catch (e) { toast(false, e.message); }
+            load();
+        })();
     </script>
 </body>
 </html>

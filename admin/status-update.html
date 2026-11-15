@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan & Update - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
+    </script>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+            <section class="flex flex-wrap items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-3">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Scan & Update Status</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Scan AWBs • pick a milestone • update in one go</p>
+                    </div>
+                </div>
+                <a href="shipments.html" class="btn btn-light">← Shipments</a>
+            </section>
+
+            <section class="grid grid-cols-1 xl:grid-cols-5 gap-5">
+                <!-- 1. Scan batch -->
+                <div class="xl:col-span-3 bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 flex flex-col gap-4">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-[#111827] text-white text-[11px] font-extrabold flex items-center justify-center">1</span><span class="font-extrabold text-xs uppercase tracking-wider">Scan shipments</span></div>
+                        <span id="batchCount" class="pill-tag pill-dark">0 in batch</span>
+                    </div>
+                    <form id="scanForm" class="flex gap-2">
+                        <input id="scanInput" class="field scan" placeholder="Scan or type AWB, press Enter" autocomplete="off" aria-label="AWB">
+                        <button class="btn btn-dark">Add</button>
+                    </form>
+                    <details>
+                        <summary class="cursor-pointer text-[11px] font-bold text-gray-500">Paste a list of AWBs</summary>
+                        <div class="flex flex-col sm:flex-row gap-2 mt-2">
+                            <textarea id="pasteInput" rows="3" class="field" placeholder="One per line or comma separated"></textarea>
+                            <button id="pasteBtn" type="button" class="btn btn-light self-start">Add all</button>
+                        </div>
+                    </details>
+                    <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
+                        <table class="w-full text-xs">
+                            <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                                <th class="p-3 pl-4 font-extrabold">AWB</th><th class="p-3 font-extrabold">Consignee</th><th class="p-3 font-extrabold">Current status</th><th class="p-3 w-10"></th>
+                            </tr></thead>
+                            <tbody id="batchRows" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                    <button type="button" onclick="clearBatch()" class="text-[11px] font-bold text-gray-400 hover:text-gray-900 underline self-start">Clear batch</button>
+                </div>
+
+                <!-- 2. Status -->
+                <div class="xl:col-span-2 bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 flex flex-col gap-4">
+                    <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-[#111827] text-white text-[11px] font-extrabold flex items-center justify-center">2</span><span class="font-extrabold text-xs uppercase tracking-wider">New status</span></div>
+                    <div><label class="ui-label" for="statusSelect">Milestone <span class="req">*</span></label><select id="statusSelect" class="field"></select></div>
+                    <div id="extraFields" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div><label class="ui-label" for="eventAt">Date & time</label><input id="eventAt" type="datetime-local" class="field"></div>
+                        <div><label class="ui-label" for="location">Location</label><input id="location" class="field" placeholder="Defaults to your branch"></div>
+                    </div>
+                    <div><label class="ui-label" for="remark">Remark <span id="remarkReq" class="req hidden">*</span></label><input id="remark" class="field" placeholder="Optional note shown on the timeline"></div>
+                    <button id="updateBtn" type="button" disabled class="btn btn-coral !py-4 !text-sm mt-auto">Update 0 shipments</button>
+                    <p class="text-[10px] text-gray-400 leading-relaxed">Statuses only move forward. Managers can move one back. Exceptions (hold, failed delivery…) need a remark.</p>
+                </div>
+            </section>
+
+            <!-- Session log -->
+            <section class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 mt-5">
+                <div class="flex items-center gap-2 mb-3"><span class="font-extrabold text-xs uppercase tracking-wider">Updated this session</span><span class="w-2 h-2 rounded-full bg-coral-500"></span></div>
+                <ul id="log" class="space-y-2"><li class="text-xs text-gray-400">Nothing yet.</li></ul>
+            </section>
+        </div>
+    </main>
+
+    <datalist id="carrierList"><option>SMSA</option><option>Aramex</option><option>DHL</option><option>FedEx</option><option>UPS</option><option>India Post</option><option>Nepal Post</option></datalist>
+
+    <script>
+        const { api, esc, clean, toast, beep } = UI;
+        const $ = (id) => document.getElementById(id);
+        const STAGES = ['', 'Booking', 'Pickup', 'Origin', 'Export', 'Transit', 'Destination', 'Last Mile', 'Delivered', 'Review'];
+        const EXTRA = {
+            agent_docket: [['fwd_agent', 'Forwarding agent', 'list="carrierList" placeholder="SMSA, Aramex, DHL… (others via 17Track)"'], ['fwd_docket', 'Agent docket / AWB', '']],
+            to_branch: [['to_branch', 'To branch', '']],
+            mawb: [['mawb', 'MAWB number', '']],
+            driver: [['driver', 'Driver', '']]
+        };
+        let statuses = [], batch = []; // batch: [{ awb, consignee, status, error }]
+        let logged = 0;
+
+        function render() {
+            const ok = batch.filter(b => !b.error);
+            $('batchCount').textContent = `${ok.length} in batch`;
+            $('batchRows').innerHTML = batch.length ? batch.map((b, i) => `
+                <tr class="${b.error ? 'bg-[#FFF5F3]' : ''}">
+                    <td class="p-3 pl-4 font-extrabold"><a class="hover:text-coral-500" href="shipments.html?awb=${encodeURIComponent(b.awb)}">${esc(b.awb)}</a></td>
+                    <td class="p-3 truncate max-w-[180px]">${b.error ? `<span class="text-coral-600 font-bold">${esc(b.error)}</span>` : esc(b.consignee || '—')}</td>
+                    <td class="p-3">${b.error ? '' : `<span class="pill-tag pill-coral">${esc(b.status || 'New')}</span>`}</td>
+                    <td class="p-3"><button type="button" onclick="removeAt(${i})" aria-label="Remove ${esc(b.awb)}" class="w-7 h-7 rounded-full hover:bg-white text-gray-400 hover:text-coral-600">×</button></td>
+                </tr>`).join('') : '<tr><td colspan="4" class="p-6 text-center text-gray-400">Scan AWBs to build the batch.</td></tr>';
+            const btn = $('updateBtn');
+            btn.disabled = !ok.length || !$('statusSelect').value;
+            btn.textContent = `Update ${ok.length} shipment${ok.length === 1 ? '' : 's'}`;
+        }
+        window.removeAt = (i) => { batch.splice(i, 1); render(); };
+        window.clearBatch = () => { batch = []; render(); };
+
+        async function addAwb(raw) {
+            const awb = clean(raw);
+            if (!awb || batch.some(b => b.awb === awb)) return;
+            const item = { awb };
+            batch.unshift(item); render();
+            try {
+                const { booking } = await api('/api/bookings?awb=' + encodeURIComponent(awb));
+                item.awb = booking.awb; item.consignee = booking.consignee; item.status = booking.current_status;
+                beep(true);
+            } catch (e) { item.error = e.message; beep(false); }
+            render();
+        }
+        $('scanForm').onsubmit = (e) => { e.preventDefault(); const v = $('scanInput').value; $('scanInput').value = ''; $('scanInput').focus(); addAwb(v); };
+        $('pasteBtn').onclick = () => { $('pasteInput').value.split(/[\s,;]+/).forEach(addAwb); $('pasteInput').value = ''; };
+
+        $('statusSelect').onchange = () => {
+            const st = statuses.find(s => s.code === $('statusSelect').value);
+            const req = st ? st.requires : [];
+            $('extraFields').innerHTML = req.flatMap(r => EXTRA[r] || []).map(([id, lbl, attrs]) =>
+                `<div><label class="ui-label" for="x_${id}">${lbl} <span class="req">*</span></label><input id="x_${id}" data-extra="${id}" class="field" ${attrs}></div>`).join('');
+            $('remarkReq').classList.toggle('hidden', !req.includes('remark'));
+            render();
+        };
+
+        $('updateBtn').onclick = async () => {
+            const awbs = batch.filter(b => !b.error).map(b => b.awb);
+            const st = statuses.find(s => s.code === $('statusSelect').value);
+            const body = { awbs, code: st.code, location: $('location').value, remark: $('remark').value,
+                event_at: $('eventAt').value ? new Date($('eventAt').value).toISOString() : undefined };
+            document.querySelectorAll('[data-extra]').forEach(el => body[el.dataset.extra] = el.value.trim());
+            if (!await UI.confirm({ title: `Set ${awbs.length} shipment(s) to “${st.label}”?`, message: esc(awbs.slice(0, 12).join(', ')) + (awbs.length > 12 ? ` and ${awbs.length - 12} more` : ''), confirmText: 'Update' })) return;
+            const btn = $('updateBtn'); btn.disabled = true; btn.textContent = 'Updating…';
+            try {
+                const r = await api('/api/status', { method: 'POST', body });
+                toast(true, `${r.updated} shipment(s) → ${r.status}`); beep(true);
+                if (!logged) $('log').innerHTML = '';
+                logged++;
+                $('log').insertAdjacentHTML('afterbegin', `<li class="bg-white rounded-2xl px-4 py-3 border border-gray-100 flex flex-wrap justify-between gap-2 text-xs">
+                    <span><b>${esc(r.status)}</b> • ${esc(awbs.join(', '))}</span><span class="text-gray-400">${new Date().toLocaleTimeString()}</span></li>`);
+                batch = []; $('remark').value = '';
+            } catch (e) { toast(false, e.message); beep(false); }
+            render();
+        };
+
+        (async function init() {
+            render();
+            try {
+                const { statuses: list } = await api('/api/status');
+                statuses = list;
+                const groups = {};
+                list.forEach(s => (groups[s.is_exception ? 'Exceptions' : STAGES[s.stage]] ||= []).push(s));
+                $('statusSelect').innerHTML = '<option value="">Choose milestone…</option>' + Object.entries(groups).map(([g, items]) =>
+                    `<optgroup label="${esc(g)}">${items.map(s => `<option value="${esc(s.code)}">${esc(s.label)}</option>`).join('')}</optgroup>`).join('');
+            } catch (e) { toast(false, e.message); }
+            const pre = new URLSearchParams(location.search).get('awb');
+            if (pre) addAwb(pre);
+            $('scanInput').focus();
+        })();
+    </script>
+</body>
+</html>
