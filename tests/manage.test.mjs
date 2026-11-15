@@ -1,8 +1,8 @@
 // Run: node --test tests/
 import test from 'node:test';
 import assert from 'node:assert';
-import bookings from '../api/bookings.js';
-import users from '../api/users.js';
+import bookings from '../api/_routes/bookings.js';
+import users from '../api/_routes/users.js';
 import { getSession } from '../api/_lib/auth.js';
 import { cleanFields } from '../api/_lib/booking-map.js';
 
@@ -128,4 +128,17 @@ test('users: staff role needs a branch', async () => {
     await users(req('PATCH', { body: { id: OTHER, role: 'staff' } }), r);
     assert.equal(r.code, 400);
     assert.match(r.body.error, /need a branch/);
+});
+
+test('router: one function serves every endpoint; unknown → 404', async () => {
+    const { default: router } = await import('../api/router.js');
+    fake({ role: 'staff', branch: 'MCT' }, { '/rest/v1/statuses': () => [{ code: 'BOOKED' }] });
+    let r = res();
+    const rq = req('GET', { query: { __route: 'status' } });
+    await router(rq, r);
+    assert.deepEqual(r.body.statuses, [{ code: 'BOOKED' }]);
+    assert.equal('__route' in rq.query, false);
+    r = res();
+    await router(req('GET', { query: { __route: 'constructor' } }), r);
+    assert.equal(r.code, 404);
 });

@@ -1,9 +1,9 @@
 // File: api/carrier-sync.js
 //   GET  — scheduled run (Vercel Cron). Needs header Authorization: Bearer <CRON_SECRET>.
 //   POST — "Sync now" from the app: { awb? }. Managers sync their branch, admins everything.
-import { requireSession, ADMIN_ROLES } from './_lib/auth.js';
-import { runCarrierSync } from './_lib/carrier-sync.js';
-import { cleanOrderNo } from './_lib/booking-map.js';
+import { requireSession, ADMIN_ROLES } from '../_lib/auth.js';
+import { runCarrierSync } from '../_lib/carrier-sync.js';
+import { cleanOrderNo } from '../_lib/booking-map.js';
 
 export const config = { maxDuration: 60 };
 

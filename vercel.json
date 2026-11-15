@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/api/:route", "destination": "/api/router?__route=:route" }
+  ],
   "crons": [
     { "path": "/api/carrier-sync", "schedule": "0 3 * * *" }
   ]

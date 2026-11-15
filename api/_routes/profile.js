@@ -1,4 +1,4 @@
-import { normalizeRole } from './_lib/auth.js';
+import { normalizeRole } from '../_lib/auth.js';
 // File: api/profile.js
 export default async function handler(req, res) {
     const SUPABASE_URL = process.env.SUPABASE_URL;

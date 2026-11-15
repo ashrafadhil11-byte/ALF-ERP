@@ -1,8 +1,8 @@
 // File: api/status.js — status list + status updates (single or bulk scan).
 //   GET                      active statuses for dropdowns
 //   POST { awbs:[...], code, location?, remark?, event_at?, fwd_agent?, fwd_docket?, to_branch?, mawb?, driver? }
-import { requireSession, serviceHeaders, ADMIN_ROLES } from './_lib/auth.js';
-import { cleanOrderNo } from './_lib/booking-map.js';
+import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
+import { cleanOrderNo } from '../_lib/booking-map.js';
 
 const MAX_AWBS = 200;
 const CAN_GO_BACK = ['super_admin', 'head_office', 'branch_manager'];

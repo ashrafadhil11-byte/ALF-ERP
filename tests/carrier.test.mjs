@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import CONNECTORS, { carrierTextToStatus, carrierForAgent } from '../api/_lib/integrations/connectors.js';
 import { runCarrierSync } from '../api/_lib/carrier-sync.js';
-import carrierSync from '../api/carrier-sync.js';
+import carrierSync from '../api/_routes/carrier-sync.js';
 
 process.env.SUPABASE_URL = 'https://x.supabase.co';
 const callWith = (data) => async () => data;

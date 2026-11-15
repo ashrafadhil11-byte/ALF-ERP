@@ -1,8 +1,8 @@
 // Run: node --test tests/
 import test from 'node:test';
 import assert from 'node:assert';
-import dashboard from '../api/dashboard.js';
-import integrations from '../api/integrations.js';
+import dashboard from '../api/_routes/dashboard.js';
+import integrations from '../api/_routes/integrations.js';
 
 process.env.SUPABASE_URL = 'https://x.supabase.co';
 

@@ -1,7 +1,7 @@
 // File: api/integrations.js — manage 3rd-party APIs (super_admin edits, head_office views).
 // Secrets are write-only: GET never returns them, only which secret fields are set.
-import { requireSession, serviceHeaders, ADMIN_ROLES } from './_lib/auth.js';
-import { connectorCatalog, testConnector } from './_lib/integrations/http.js';
+import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
+import { connectorCatalog, testConnector } from '../_lib/integrations/http.js';
 
 const KINDS = ['order_source', 'carrier', 'notification', 'other'];
 const PUBLIC_COLS = 'id,name,kind,adapter,base_url,config,active,last_sync_at,last_status,last_error,updated_at';

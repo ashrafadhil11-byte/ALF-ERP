@@ -1,0 +1,44 @@
+// File: api/router.js — the ONLY Vercel function (Hobby plan allows 12).
+// vercel.json rewrites /api/<name> → /api/router?__route=<name>; each handler lives in api/_routes/<name>.js.
+// To add an endpoint: create api/_routes/<name>.js, import it below, add it to ROUTES.
+import bookings from './_routes/bookings.js';
+import branches from './_routes/branches.js';
+import carrierSync from './_routes/carrier-sync.js';
+import countries from './_routes/countries.js';
+import createUser from './_routes/create-user.js';
+import dashboardLayout from './_routes/dashboard-layout.js';
+import dashboard from './_routes/dashboard.js';
+import integrations from './_routes/integrations.js';
+import login from './_routes/login.js';
+import postalLookup from './_routes/postal-lookup.js';
+import profile from './_routes/profile.js';
+import status from './_routes/status.js';
+import users from './_routes/users.js';
+
+const ROUTES = {
+    bookings,
+    branches,
+    'carrier-sync': carrierSync,
+    countries,
+    'create-user': createUser,
+    'dashboard-layout': dashboardLayout,
+    dashboard,
+    integrations,
+    login,
+    'postal-lookup': postalLookup,
+    profile,
+    status,
+    users
+};
+
+// Longest job (carrier sync) needs up to 60s.
+export const config = { maxDuration: 60 };
+
+export default async function handler(req, res) {
+    const query = req.query || {};
+    const name = String(query.__route || '').split('/')[0];
+    delete query.__route; // handlers see the same query string as before
+    const route = Object.prototype.hasOwnProperty.call(ROUTES, name) ? ROUTES[name] : null;
+    if (!route) return res.status(404).json({ error: 'Not found' });
+    return route(req, res);
+}

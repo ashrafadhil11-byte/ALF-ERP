@@ -7,10 +7,10 @@
 //   POST   { action:'import', order_nos:[...], branch?, intake_mode? }            bulk import without review
 //   PATCH  { awb, fields }                edit details (logged on the timeline)
 //   DELETE ?awb=XXX                       delete (managers and admins only)
-import { requireSession, serviceHeaders, ADMIN_ROLES } from './_lib/auth.js';
-import { callApi, loadIntegration } from './_lib/integrations/http.js';
-import CONNECTORS from './_lib/integrations/connectors.js';
-import { cleanOrderNo, cleanFields } from './_lib/booking-map.js';
+import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
+import { callApi, loadIntegration } from '../_lib/integrations/http.js';
+import CONNECTORS from '../_lib/integrations/connectors.js';
+import { cleanOrderNo, cleanFields } from '../_lib/booking-map.js';
 
 const MAX_IMPORT = 10;   // Al-Farha calls per request (time limit)
 const MAX_CSV = 100;     // rows per CSV request

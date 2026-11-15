@@ -2,7 +2,7 @@
 //   GET                                   list staff with last sign-in
 //   PATCH { id, full_name?, contact_number?, role?, branch?, is_driver?, active? }
 //   POST  { action:'reset_password', id }  emails a password-reset link
-import { requireSession, serviceHeaders, normalizeRole, ADMIN_ROLES } from './_lib/auth.js';
+import { requireSession, serviceHeaders, normalizeRole, ADMIN_ROLES } from '../_lib/auth.js';
 
 const enc = encodeURIComponent;
 class UserError extends Error {

@@ -1,5 +1,5 @@
 // File: api/branches.js
-import { requireSession, serviceHeaders, ADMIN_ROLES } from './_lib/auth.js';
+import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 
 export default async function handler(req, res) {
     const SUPABASE_URL = process.env.SUPABASE_URL;

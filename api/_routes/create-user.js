@@ -1,4 +1,4 @@
-import { requireSession, serviceHeaders, normalizeRole, ADMIN_ROLES } from './_lib/auth.js';
+import { requireSession, serviceHeaders, normalizeRole, ADMIN_ROLES } from '../_lib/auth.js';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {

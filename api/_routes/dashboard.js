@@ -1,5 +1,5 @@
 // File: api/dashboard.js — one call feeds every dashboard widget, scoped by role.
-import { requireSession, serviceHeaders, ADMIN_ROLES } from './_lib/auth.js';
+import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 
 export default async function handler(req, res) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });

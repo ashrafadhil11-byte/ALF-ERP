@@ -1,8 +1,8 @@
 // Run: node --test tests/
 import test from 'node:test';
 import assert from 'node:assert';
-import bookings from '../api/bookings.js';
-import status from '../api/status.js';
+import bookings from '../api/_routes/bookings.js';
+import status from '../api/_routes/status.js';
 import { cleanOrderNo } from '../api/_lib/booking-map.js';
 import CONNECTORS from '../api/_lib/integrations/connectors.js';
 
