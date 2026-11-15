@@ -176,13 +176,9 @@
                 <!-- Location -->
                 <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Location</legend>
-                    <div>
-                        <label class="ui-label" for="b_country">Country <span class="req">*</span></label>
-                        <div class="relative">
-                            <img id="b_flag" class="flag absolute left-3 top-1/2 -translate-y-1/2 hidden" alt="">
-                            <input id="b_country" class="field" list="countryList" placeholder="Type to search…">
-                        </div>
-                    </div>
+                    <div><label class="ui-label" for="b_country">Country <span class="req">*</span></label><input id="b_country" class="field" placeholder="Select country"></div>
+                    <div><label class="ui-label" for="b_state">State / governorate</label><input id="b_state" class="field" placeholder="Select country first" disabled></div>
+                    <div><label class="ui-label" for="b_city">City <span class="req">*</span></label><input id="b_city" class="field" placeholder="Select state first" disabled></div>
                     <div class="relative">
                         <label class="ui-label" for="b_postal">Postal / PIN code</label>
                         <div class="relative">
@@ -192,8 +188,6 @@
                         <div id="postalList" class="hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl p-1.5 max-h-60 overflow-y-auto custom-scrollbar"></div>
                     </div>
                     <div><label class="ui-label" for="b_po">Post office / area</label><input id="b_po" class="field" placeholder="Locality"></div>
-                    <div><label class="ui-label" for="b_city">City <span class="req">*</span></label><input id="b_city" class="field" placeholder="e.g. Salalah"></div>
-                    <div><label class="ui-label" for="b_state">State / governorate</label><input id="b_state" class="field" placeholder="e.g. Dhofar"></div>
                     <div><label class="ui-label" for="b_street">Street / building</label><input id="b_street" class="field" placeholder="Building, street"></div>
                     <div class="sm:col-span-2"><label class="ui-label">Full address (auto)</label>
                         <p id="b_address" class="field soft !font-medium text-gray-600 min-h-[46px]">—</p></div>
@@ -230,7 +224,6 @@
             </div>
         </form>
     </div>
-    <datalist id="countryList"></datalist>
 
     <!-- DESTINATION CODE FORM -->
     <div id="destModal" class="ui-modal">
@@ -238,7 +231,7 @@
             <h3 id="destTitle" class="text-lg font-extrabold">Add destination code</h3>
             <p class="text-xs text-gray-400 mt-1">Give a frequent country its own number in the reference.</p>
             <div class="grid grid-cols-3 gap-3 mt-5">
-                <div class="col-span-2"><label class="ui-label" for="d_country">Country</label><input id="d_country" class="field" list="countryList" placeholder="Type to search…"></div>
+                <div class="col-span-2"><label class="ui-label" for="d_country">Country</label><input id="d_country" class="field" placeholder="Select countrye to search…"></div>
                 <div><label class="ui-label" for="d_code">Code</label><input id="d_code" class="field font-mono text-center" inputmode="numeric" maxlength="2" placeholder="e.g. 1"></div>
             </div>
             <label class="flex items-center gap-2 mt-4 cursor-pointer"><input id="d_active" type="checkbox" class="w-4 h-4" checked><span class="text-xs font-bold">Active</span></label>
@@ -283,7 +276,6 @@
 
         let branches = [], managers = [], destinations = [], cargoTypes = [], tab = 'branches', editing = null;
 
-        $('countryList').innerHTML = COUNTRIES.map(c => `<option value="${esc(c.n)}">${esc(c.c)} · ${esc(c.d)}</option>`).join('');
 
         // ---------- tabs ----------
         const TAB_LABEL = { branches: 'Add branch', destinations: 'Add destination code', cargo: 'Add cargo type' };
@@ -375,9 +367,7 @@
 
         // ----- branch form -----
         function setCountry(c) {
-            $('b_flag').classList.toggle('hidden', !c);
-            $('b_country').classList.toggle('!pl-11', Boolean(c));
-            if (c) { $('b_flag').src = flag(c.c); $('b_dial').textContent = c.d; }
+            if (c) $('b_dial').textContent = c.d;
             else $('b_dial').textContent = '+';
             composeAddress();
         }
@@ -413,14 +403,11 @@
             $('b_code').value = b.branch_code || '';
             $('b_code').dataset.manual = editing ? '1' : '';
             $('b_digit').value = b.booking_code || nextFreeDigit();
-            $('b_country').value = b.country || 'Oman';
             $('b_postal').value = b.postal_code || '';
             $('b_po').value = b.post_office || '';
-            $('b_city').value = b.location || '';
-            $('b_state').value = b.state || '';
             const street = (b.address || '').split(',')[0];
             $('b_street').value = editing ? street : '';
-            const c = findCountry($('b_country').value);
+            const c = findCountry(b.country || 'Oman');
             const dial = c ? c.d : '';
             $('b_phone').value = (b.phone_number || '').replace(dial, '').trim();
             $('b_manager').innerHTML = '<option value="">Unassigned</option>' + managers.map(m => `<option value="${esc(m.id)}">${esc(m.full_name || m.username)}</option>`).join('');
@@ -434,16 +421,57 @@
             $('pvCargo').innerHTML = cargoTypes.filter(t => t.active).map(t => `<option value="${esc(t.code)}">${esc(t.code)} · ${esc(t.name)}</option>`).join('');
             if (destinations.some(d => d.code === '3' && d.active)) $('pvDest').value = '3';
             setCountry(c);
+            (async () => {
+                await countryBox.setValue(c ? c.c : '');
+                curState = null; stateBox.reload(); cityBox.reload();
+                $('b_state').disabled = !c; $('b_state').placeholder = c ? 'Select or type state' : 'Select country first';
+                await stateBox.setValue(b.state || '');
+                curState = stateBox.value;
+                $('b_city').disabled = !curState && !b.location;
+                $('b_city').placeholder = 'Select or type city';
+                await cityBox.setValue(b.location || '');
+                composeAddress();
+            })();
             refreshPreview();
             openModal('branchModal'); $('b_name').focus();
         };
+
+        // Country → State → City (state/city lists from countriesnow; any value can also be typed)
+        let curState = null;
+        const stateBox = UI.combobox($('b_state'), {
+            load: () => { const c = findCountry($('b_country').value); return c ? UI.statesOf(c.c) : []; },
+            allowCustom: true, emptyText: 'No states listed — type one',
+            onSelect: (it) => {
+                curState = it;
+                cityBox.reload(); cityBox.clear();
+                $('b_city').disabled = !it; $('b_city').placeholder = it ? 'Select or type city' : 'Select state first';
+                if (it) cityBox.preload();
+                composeAddress();
+            }
+        });
+        const cityBox = UI.combobox($('b_city'), {
+            load: () => { const c = findCountry($('b_country').value); return c && curState ? UI.citiesOf(c.n, curState.value) : []; },
+            allowCustom: true, emptyText: 'No cities listed — type one',
+            onSelect: () => { suggestCode(); composeAddress(); }
+        });
+        const countryBox = UI.combobox($('b_country'), {
+            load: () => UI.countryItems(),
+            onSelect: (it) => {
+                setCountry(it ? byCode[it.value] : null);
+                curState = null;
+                stateBox.reload(); stateBox.clear(); cityBox.reload(); cityBox.clear();
+                $('b_state').disabled = !it; $('b_state').placeholder = it ? 'Select or type state' : 'Select country first';
+                $('b_city').disabled = true; $('b_city').placeholder = 'Select state first';
+                if (it) stateBox.preload();
+            }
+        });
+        UI.combobox($('d_country'), { load: () => UI.countryItems() });
 
         ['b_name', 'b_city', 'b_po'].forEach(id => $(id).addEventListener('input', () => { suggestCode(); composeAddress(); }));
         ['b_street', 'b_state', 'b_postal'].forEach(id => $(id).addEventListener('input', composeAddress));
         $('b_code').addEventListener('input', (e) => { e.target.dataset.manual = '1'; e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6); });
         $('b_digit').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 2); refreshPreview(); });
         $('pvDest').onchange = refreshPreview; $('pvCargo').onchange = refreshPreview;
-        $('b_country').addEventListener('change', () => setCountry(findCountry($('b_country').value)));
 
         // Postal / PIN lookup: India Post directly, others through the server (key stays server-side)
         let postalTimer;
@@ -478,8 +506,7 @@
             const l = window._postal[i];
             $('b_postal').value = l.postalCode || $('b_postal').value;
             $('b_po').value = l.postOffice || '';
-            $('b_city').value = l.city || l.postOffice || '';
-            $('b_state').value = l.state || '';
+            stateBox.setValue(l.state || '').then(() => { curState = stateBox.value; $('b_city').disabled = false; return cityBox.setValue(l.city || l.postOffice || ''); }).then(() => { suggestCode(); composeAddress(); });
             $('postalList').classList.add('hidden');
             suggestCode(); composeAddress();
         };

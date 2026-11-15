@@ -68,10 +68,7 @@
                             <div id="branchWrap"><label class="ui-label" for="branch">Booking branch</label><select id="branch" class="field"></select></div>
                             <div>
                                 <label class="ui-label" for="destCountry">Destination country <span class="req">*</span></label>
-                                <div class="relative">
-                                    <img id="destFlag" class="flag absolute left-3.5 top-1/2 -translate-y-1/2 hidden" alt="">
-                                    <input id="destCountry" class="field" list="countryList" placeholder="Type to search…">
-                                </div>
+                                <input id="destCountry" class="field" placeholder="Select country">
                             </div>
                         </div>
                         <div>
@@ -124,8 +121,8 @@
                                 <div id="pinList" class="hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl p-1.5 max-h-60 overflow-y-auto custom-scrollbar"></div>
                             </div>
                             <div><label class="ui-label" for="rcvPo">Post office / area</label><input id="rcvPo" class="field"></div>
-                            <div><label class="ui-label" for="rcvCity">District / city <span class="req">*</span></label><input id="rcvCity" class="field"></div>
-                            <div><label class="ui-label" for="rcvState">State / province</label><input id="rcvState" class="field"></div>
+                            <div><label class="ui-label" for="rcvState">State / province</label><input id="rcvState" class="field" placeholder="Select destination first" disabled></div>
+                            <div><label class="ui-label" for="rcvCity">District / city <span class="req">*</span></label><input id="rcvCity" class="field" placeholder="Select or type city"></div>
                         </div>
                     </section>
 
@@ -192,7 +189,6 @@
             </form>
         </div>
     </main>
-    <datalist id="countryList"></datalist>
 
     <!-- SUCCESS -->
     <div id="doneModal" class="ui-modal">
@@ -219,7 +215,6 @@
         const isAdmin = UI.isAdmin();
         let branches = [], destinations = [], cargoTypes = [], myBranch = null, intake = 'drop_off', done = null;
 
-        $('countryList').innerHTML = COUNTRIES.map(c => `<option value="${esc(c.n)}">${esc(c.c)} · ${esc(c.d)}</option>`).join('');
 
         const branch = () => branches.find(b => b.branch_code === (isAdmin ? $('branch').value : myBranch)) || {};
         const dest = () => findCountry($('destCountry').value);
@@ -265,8 +260,7 @@
             $('totActual').textContent = `${actual} kg`; $('totVol').textContent = `${vol} kg`; $('totCharge').textContent = `${charge} kg`;
             const c = dest(), t = cargo(), b = branch();
             $('pvD').textContent = destCode(c); $('pvB').textContent = b.booking_code || 'B'; $('pvC').textContent = t ? t.code : 'C';
-            $('destFlag').classList.toggle('hidden', !c); $('destCountry').classList.toggle('!pl-11', Boolean(c));
-            if (c) { $('destFlag').src = `https://flagcdn.com/w40/${c.c.toLowerCase()}.png`; $('rcvDial').textContent = c.d; }
+            if (c) $('rcvDial').textContent = c.d;
             $('sumRoute').textContent = `${b.location || '—'} → ${$('rcvCity').value || (c ? c.n : '—')}`;
             $('sumCargo').textContent = t ? `${t.code} · ${t.name}` : '—';
             $('sumBoxes').textContent = boxes.length;
@@ -278,7 +272,27 @@
             $('pinBadge').classList.toggle('hidden', !(c && c.c === 'IN'));
         }
         ['destCountry', 'rcvCity', 'amount', 'branch'].forEach(id => $(id).addEventListener('input', refresh));
-        $('destCountry').addEventListener('change', refresh);
+        // Destination country → receiver state → district / city (any value can also be typed)
+        let rcvState = null;
+        const cityBox = UI.combobox($('rcvCity'), {
+            load: () => { const c = dest(); return c && rcvState ? UI.citiesOf(c.n, rcvState.value) : []; },
+            allowCustom: true, emptyText: 'Type the district / city', onSelect: refresh
+        });
+        const stateBox = UI.combobox($('rcvState'), {
+            load: () => { const c = dest(); return c ? UI.statesOf(c.c) : []; },
+            allowCustom: true, emptyText: 'No states listed — type one',
+            onSelect: (it) => { rcvState = it; cityBox.reload(); cityBox.clear(); if (it) cityBox.preload(); refresh(); }
+        });
+        UI.combobox($('destCountry'), {
+            load: () => UI.countryItems(),
+            onSelect: (it) => {
+                rcvState = null;
+                stateBox.reload(); stateBox.clear(); cityBox.reload(); cityBox.clear();
+                $('rcvState').disabled = !it; $('rcvState').placeholder = it ? 'Select or type state' : 'Select destination first';
+                if (it) stateBox.preload();
+                refresh();
+            }
+        });
         $('cargoOptions').addEventListener('change', refresh);
         document.querySelectorAll('[data-intake]').forEach(b => b.onclick = () => {
             intake = b.dataset.intake;
@@ -306,7 +320,7 @@
                 $('pinList').classList.remove('hidden');
             }, 300);
         });
-        window.pickPin = (i) => { const p = window._pins[i]; $('rcvPo').value = p.po; $('rcvCity').value = p.city; $('rcvState').value = p.state; $('pinList').classList.add('hidden'); refresh(); };
+        window.pickPin = (i) => { const p = window._pins[i]; $('rcvPo').value = p.po; stateBox.setValue(p.state).then(() => { rcvState = stateBox.value; return cityBox.setValue(p.city); }).then(refresh); $('pinList').classList.add('hidden'); refresh(); };
         document.addEventListener('click', (e) => { if (!e.target.closest('#pinList') && e.target.id !== 'rcvPin') $('pinList').classList.add('hidden'); });
 
         // ---------- submit ----------

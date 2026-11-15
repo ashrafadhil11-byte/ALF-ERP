@@ -1,6 +1,6 @@
 // File: sw.js — makes the ERP installable and keeps the app shell available offline.
 // API calls (/api/*) are never cached: data is always live.
-const VERSION = 'alf-erp-v3';
+const VERSION = 'alf-erp-v4';
 const SHELL = [
     '/offline.html',
     '/admin/components/ui.css',
@@ -30,33 +30,17 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(req.url);
     if (req.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
 
-    // Pages: network first (always fresh), cached copy or offline page when there's no connection.
-    if (req.mode === 'navigate') {
-        event.respondWith(
-            fetch(req)
-                .then((res) => {
+    // Pages, scripts and styles: network first, so an update is live on the next load.
+    // The cached copy (or the offline page) is used only when there is no connection.
+    event.respondWith(
+        fetch(req)
+            .then((res) => {
+                if (res.ok) {
                     const copy = res.clone();
                     caches.open(VERSION).then((c) => c.put(req, copy));
-                    return res;
-                })
-                .catch(() => caches.match(req).then((hit) => hit || caches.match('/offline.html')))
-        );
-        return;
-    }
-
-    // Static files: serve cached copy immediately, refresh it in the background.
-    event.respondWith(
-        caches.match(req).then((hit) => {
-            const network = fetch(req)
-                .then((res) => {
-                    if (res.ok) {
-                        const copy = res.clone();
-                        caches.open(VERSION).then((c) => c.put(req, copy));
-                    }
-                    return res;
-                })
-                .catch(() => hit);
-            return hit || network;
-        })
+                }
+                return res;
+            })
+            .catch(() => caches.match(req).then((hit) => hit || (req.mode === 'navigate' ? caches.match('/offline.html') : Response.error())))
     );
 });

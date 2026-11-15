@@ -139,6 +139,154 @@ window.UI = (() => {
     window.addEventListener('scroll', () => document.querySelectorAll('.row-menu').forEach(m => m.remove()), true);
     window.addEventListener('resize', () => document.querySelectorAll('.row-menu').forEach(m => m.remove()));
 
+    // ---------- Searchable dropdown (combobox) ----------
+    // UI.combobox(input, { load: async () => [{ value, label, sub?, img? }], allowCustom, onSelect(item|null), placeholder })
+    // Returns { reload(), setValue(value), clear() }. Typing filters; ↑ ↓ Enter Esc work; flags via item.img.
+    function combobox(input, { load, allowCustom = false, onSelect = () => {}, emptyText = 'No matches' }) {
+        let items = [], open = false, active = -1, loaded = false, loading = null;
+        const wrap = document.createElement('div');
+        wrap.className = 'relative';
+        input.parentNode.insertBefore(wrap, input);
+        wrap.appendChild(input);
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-expanded', 'false');
+        input.setAttribute('autocomplete', 'off');
+        input.classList.add('!pr-10');
+        const chev = document.createElement('span');
+        chev.className = 'pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#E86D58]';
+        chev.innerHTML = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg>';
+        wrap.appendChild(chev);
+        const img = document.createElement('img');
+        img.className = 'hidden absolute left-3.5 top-1/2 -translate-y-1/2 w-[22px] h-4 object-cover rounded-[3px] border border-gray-200';
+        img.alt = '';
+        wrap.appendChild(img);
+        const list = document.createElement('div');
+        list.className = 'hidden absolute z-40 left-0 right-0 mt-1.5 bg-white border border-gray-100 rounded-2xl shadow-xl p-1.5 max-h-64 overflow-y-auto custom-scrollbar';
+        list.setAttribute('role', 'listbox');
+        wrap.appendChild(list);
+        let selected = null;
+
+        const showImg = (src) => { img.classList.toggle('hidden', !src); input.classList.toggle('!pl-11', Boolean(src)); if (src) img.src = src; };
+        async function ensure() {
+            if (loaded) return;
+            if (!loading) loading = Promise.resolve(load()).then(r => { items = r || []; loaded = true; }).catch(() => { items = []; loaded = true; });
+            await loading;
+        }
+        const matches = () => {
+            const fold = (v) => String(v || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+            const q = fold(input.value.trim());
+            const typed = selected && input.value === selected.label ? '' : q;
+            if (!typed) return items.slice(0, 300);
+            // Rank: exact name, then name starts with, then word starts with, then contains (label or code)
+            const rank = (it) => {
+                const l = fold(it.label);
+                if (l === typed || fold(it.value) === typed) return 0;
+                if (l.startsWith(typed)) return 1;
+                if (l.split(/[\s,()-]+/).some(w => w.startsWith(typed))) return 2;
+                if (l.includes(typed) || fold(it.sub).includes(typed)) return 3;
+                return 9;
+            };
+            return items.map(it => [rank(it), it]).filter(([r]) => r < 9).sort((x, y) => x[0] - y[0]).map(([, it]) => it).slice(0, 300);
+        };
+        function render() {
+            const m = matches();
+            active = Math.min(active, m.length - 1);
+            const custom = allowCustom && input.value.trim() && !m.some(it => it.label.toLowerCase() === input.value.trim().toLowerCase());
+            list.innerHTML = (loading && !loaded ? '<p class="p-3 text-xs text-gray-400 text-center">Loading…</p>' : '')
+                + m.map((it, i) => `<button type="button" role="option" data-i="${i}" aria-selected="${i === active}"
+                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left ${i === active ? 'bg-[#F8F8FA]' : 'hover:bg-[#F8F8FA]'}">
+                    ${it.img ? `<img src="${esc(it.img)}" alt="" class="w-[22px] h-4 object-cover rounded-[3px] border border-gray-200 flex-shrink-0" loading="lazy">` : ''}
+                    <span class="flex-1 min-w-0 text-xs font-bold truncate">${esc(it.label)}</span>
+                    ${it.sub ? `<span class="text-[10px] font-bold text-gray-400 flex-shrink-0">${esc(it.sub)}</span>` : ''}</button>`).join('')
+                + (custom ? `<button type="button" data-custom class="w-full px-3 py-2.5 rounded-xl text-left text-xs font-bold text-[#D55C48] hover:bg-[#FFF5F3]">Use “${esc(input.value.trim())}”</button>` : '')
+                + (loaded && !m.length && !custom ? `<p class="p-3 text-xs text-gray-400 text-center">${esc(emptyText)}</p>` : '');
+            list._m = m;
+        }
+        async function show() {
+            open = true; list.classList.remove('hidden'); input.setAttribute('aria-expanded', 'true');
+            render(); await ensure(); if (open) render();
+        }
+        function hide() { open = false; list.classList.add('hidden'); input.setAttribute('aria-expanded', 'false'); active = -1; }
+        function choose(it) {
+            selected = it;
+            input.value = it ? it.label : input.value;
+            showImg(it && it.img);
+            hide();
+            onSelect(it);
+        }
+        input.addEventListener('focus', show);
+        input.addEventListener('click', show);
+        input.addEventListener('input', () => { if (selected && input.value !== selected.label) { selected = null; showImg(null); } active = 0; if (!open) show(); else render(); });
+        input.addEventListener('keydown', (e) => {
+            const m = list._m || [];
+            if (e.key === 'ArrowDown') { e.preventDefault(); if (!open) show(); active = Math.min(m.length - 1, active + 1); render(); list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); active = Math.max(0, active - 1); render(); list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }
+            else if (e.key === 'Enter' && open) {
+                e.preventDefault();
+                // List still downloading: wait for it, then take the best match instead of the half-typed text.
+                (loaded ? Promise.resolve() : ensure()).then(() => {
+                    render();
+                    const mm = list._m || [];
+                    const pick = mm[Math.max(0, active)];
+                    if (pick) choose(pick);
+                    else if (allowCustom && input.value.trim()) choose({ value: input.value.trim(), label: input.value.trim(), custom: true });
+                });
+            }
+            else if (e.key === 'Escape') hide();
+        });
+        list.addEventListener('mousedown', (e) => e.preventDefault()); // keep focus while clicking
+        list.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-i]');
+            if (b) return choose(list._m[+b.dataset.i]);
+            if (e.target.closest('[data-custom]')) choose({ value: input.value.trim(), label: input.value.trim(), custom: true });
+        });
+        input.addEventListener('blur', () => setTimeout(async () => {
+            if (!open) return;
+            if (!loaded) await ensure();
+            hide();
+            const exact = items.find(it => it.label.toLowerCase() === input.value.trim().toLowerCase());
+            if (exact) choose(exact);
+            else if (allowCustom && input.value.trim()) { if (!selected || selected.label !== input.value) choose({ value: input.value.trim(), label: input.value.trim(), custom: true }); }
+            else if (!selected) { input.value = ''; onSelect(null); }
+            else input.value = selected.label;
+        }, 120));
+
+        return {
+            reload() { loaded = false; loading = null; items = []; },
+            preload() { return ensure(); },
+            async setValue(value) {
+                if (!value) { selected = null; input.value = ''; showImg(null); return; }
+                await ensure();
+                const v = String(value).toLowerCase();
+                const it = items.find(x => String(x.value).toLowerCase() === v || x.label.toLowerCase() === v);
+                selected = it || (allowCustom ? { value, label: value, custom: true } : null);
+                input.value = selected ? selected.label : '';
+                showImg(selected && selected.img);
+            },
+            clear() { selected = null; input.value = ''; showImg(null); },
+            get value() { return selected; }
+        };
+    }
+
+    // Country → state → city data (countriesnow.space, cached for the session).
+    const geoCache = {};
+    async function geo(url) {
+        if (geoCache[url]) return geoCache[url];
+        try { const ss = sessionStorage.getItem('geo:' + url); if (ss) return (geoCache[url] = JSON.parse(ss)); } catch (e) {}
+        const r = await fetch(url).then(x => x.json()).catch(() => null);
+        const data = r && !r.error ? r.data : null;
+        geoCache[url] = data;
+        try { if (data) sessionStorage.setItem('geo:' + url, JSON.stringify(data)); } catch (e) {}
+        return data;
+    }
+    const GEO = 'https://countriesnow.space/api/v0.1/countries';
+    const statesOf = async (iso2) => ((await geo(`${GEO}/states/q?iso2=${encodeURIComponent(iso2)}`))?.states || [])
+        .map(s => ({ value: s.name, label: s.name.replace(/ (Governorate|Region|Province|District)$/i, ''), sub: s.state_code || '' }));
+    const citiesOf = async (countryName, state) => ((await geo(`${GEO}/state/cities/q?country=${encodeURIComponent(countryName)}&state=${encodeURIComponent(state)}`)) || [])
+        .map(c => ({ value: c, label: c }));
+    const countryItems = () => (window.ALF_COUNTRIES || []).map(c => ({ value: c.c, label: c.n, sub: `${c.c} · ${c.d}`, img: `https://flagcdn.com/w40/${c.c.toLowerCase()}.png`, dial: c.d }));
+
     // ---------- Camera barcode / QR scanning ----------
     // Mark any input with data-camera="submit" (submits its form) or data-camera="click:buttonId";
     // add data-camera-continuous to keep scanning (batch). A camera button appears inside the input.
@@ -235,5 +383,5 @@ window.UI = (() => {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
 
-    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs };
+    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems };
 })();
