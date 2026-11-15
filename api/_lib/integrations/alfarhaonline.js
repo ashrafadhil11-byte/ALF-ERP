@@ -1,3 +1,5 @@
+import { extractOrder } from '../booking-map.js';
+
 // File: api/_lib/integrations/alfarhaonline.js — Al-Farha Online order lookup (same call as alfwebapp order-proxy).
 export default {
     label: 'Al-Farha Online (order details)',
@@ -27,7 +29,7 @@ export default {
                 });
                 const text = await r.text();
                 const data = JSON.parse(text);
-                if (data && (data.response === 'success' || data.data)) return data;
+                if (data && extractOrder(data) && (data.response === 'success' || data.data)) return data;
                 lastError = `Order not found (HTTP ${r.status}).`;
             } catch (e) {
                 lastError = e.message;
@@ -37,8 +39,7 @@ export default {
     },
 
     async test(integration, input = {}) {
-        const data = await this.fetchOrder(integration, input.order_no);
-        const o = data.data || data;
+        const o = extractOrder(await this.fetchOrder(integration, input.order_no)) || {};
         return { ok: true, message: `Found order ${o.o_unique_id || input.order_no}`, sample: { sender: o.sender_name, receiver: o.receiver_name, country: o.receiver_country } };
     }
 };

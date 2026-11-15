@@ -169,6 +169,7 @@
                     <p class="text-[11px] text-gray-400">${i.secret_set.length ? 'Credentials saved: ' + esc(i.secret_set.join(', ')) : 'No credentials saved'}</p>
                     ${i.last_error ? `<p class="text-[11px] text-coral-600 bg-coral-50 rounded-xl px-3 py-2">${esc(i.last_error)}</p>` : ''}
                     <p class="text-[10px] text-gray-400">${i.last_sync_at ? 'Last check: ' + new Date(i.last_sync_at).toLocaleString() : 'Never checked'}</p>
+                    ${i.adapter === 'alfarhaonline' ? `<input id="testno-${i.id}" class="field !py-2 !text-xs" placeholder="Order no. to test with" aria-label="Order number to test">` : ''}
                     <div class="flex gap-2 mt-auto pt-2">
                         <button onclick="testIntegration('${i.id}')" ${ad && !ad.planned ? '' : 'disabled title="Adapter code not written yet"'}
                             class="flex-1 bg-[#F8F8FA] hover:bg-gray-100 disabled:opacity-40 border border-gray-200/70 text-xs font-bold py-2.5 rounded-full">Test</button>
@@ -244,8 +245,8 @@
             const i = items.find(x => x.id === id);
             const input = {};
             if (i.adapter === 'alfarhaonline') {
-                const no = prompt('Enter an order number to look up:');
-                if (!no) return;
+                const no = (document.getElementById(`testno-${id}`)?.value || '').trim();
+                if (!no) return showAlert(false, 'Enter an order number to test with.');
                 input.order_no = no;
             }
             try {
