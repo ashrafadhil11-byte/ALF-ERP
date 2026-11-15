@@ -48,8 +48,19 @@
                         <p id="scopeLabel" class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Import • Scan & update • Track</p>
                     </div>
                 </div>
-                <div id="alert" class="hidden text-xs font-bold px-4 py-2.5 rounded-full border"></div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <div id="alert" class="hidden text-xs font-bold px-4 py-2.5 rounded-full border"></div>
+                    <button id="syncBtn" type="button" class="hidden bg-white hover:bg-gray-50 text-gray-800 px-4 py-2.5 rounded-full border border-gray-200/80 text-xs font-bold items-center gap-2 shadow-sm"
+                            title="Pull the latest tracking from SMSA, Aramex, DHL and 17Track">
+                        <svg class="w-3.5 h-3.5 text-coral-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <span>Sync carriers</span>
+                    </button>
+                </div>
             </section>
+            <datalist id="carrierList">
+                <option value="SMSA"></option><option value="Aramex"></option><option value="DHL"></option>
+                <option value="FedEx"></option><option value="UPS"></option><option value="India Post"></option><option value="Nepal Post"></option>
+            </datalist>
 
             <section class="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-5">
                 <!-- IMPORT -->
@@ -246,7 +257,7 @@
             const st = statuses.find(s => s.code === document.getElementById('statusSelect').value);
             const req = st ? st.requires : [];
             document.getElementById('extraFields').innerHTML = req.flatMap(r => EXTRA[r] || []).map(([id, lbl]) =>
-                `<label><span class="text-[11px] font-bold text-gray-500">${lbl} <span class="text-coral-500">required</span></span><input data-extra="${id}" required class="field mt-1 bg-white"></label>`).join('');
+                `<label><span class="text-[11px] font-bold text-gray-500">${lbl} <span class="text-coral-500">required</span></span><input data-extra="${id}" ${id === 'fwd_agent' ? 'list="carrierList" placeholder="SMSA, Aramex, DHL… (others via 17Track)"' : ''} required class="field mt-1 bg-white"></label>`).join('');
             document.getElementById('remarkReq').classList.toggle('hidden', !req.includes('remark'));
             renderBatch();
         }
@@ -332,10 +343,14 @@
                         ${row('Branch', b.branch_code)}
                         ${row('Intake', b.intake_mode === 'pickup' ? 'Driver pickup' : 'Branch drop-off')}
                         ${row('Forwarding', [b.fwd_agent, b.fwd_docket].filter(Boolean).join(' / '))}
+                        ${b.fwd_docket ? row('Carrier sync', b.carrier_error ? `⚠ ${b.carrier_error}` : b.carrier_synced_at ? `${(b.carrier || '').toUpperCase()} • ${new Date(b.carrier_synced_at).toLocaleString()}` : 'Not synced yet') : ''}
                         ${row('Order no.', b.external_ref)}
                     </div>
                     <div class="flex justify-between items-center mb-3"><p class="text-[10px] font-extrabold text-gray-400 uppercase">Tracking timeline</p>
-                        <button onclick="addToBatch(['${esc(b.awb)}']);closeDrawer();document.getElementById('statusSelect').focus()" class="text-[11px] font-bold text-coral-500">Update status →</button></div>
+                        <span class="flex gap-3">
+                            ${b.fwd_docket ? `<button onclick="syncCarriers('${esc(b.awb)}')" class="text-[11px] font-bold text-gray-500 hover:text-gray-900">↻ Refresh from carrier</button>` : ''}
+                            <button onclick="addToBatch(['${esc(b.awb)}']);closeDrawer();document.getElementById('statusSelect').focus()" class="text-[11px] font-bold text-coral-500">Update status →</button>
+                        </span></div>
                     <ol class="relative border-l-2 border-gray-100 ml-2 space-y-4">
                         ${events.map((e, i) => `<li class="ml-4">
                             <span class="absolute -left-[7px] w-3 h-3 rounded-full ${i === 0 ? 'bg-coral-500' : 'bg-gray-300'}"></span>
@@ -348,6 +363,25 @@
         };
         window.closeDrawer = () => { const d = document.getElementById('drawer'); d.classList.add('hidden'); d.classList.remove('flex'); };
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+        // ---------- Carrier sync ----------
+        window.syncCarriers = async (awb) => {
+            const btn = document.getElementById('syncBtn');
+            btn.disabled = true; btn.querySelector('span').textContent = 'Syncing…';
+            try {
+                const r = await api('/api/carrier-sync', { method: 'POST', body: awb ? { awb } : {} });
+                const errs = r.errors.length ? ` • ${r.errors.length} error(s): ${r.errors[0].awb} ${r.errors[0].error}` : '';
+                const skipped = r.skipped ? ` • ${r.skipped} skipped (carrier not active in Integrations)` : '';
+                flash(!r.errors.length, r.found
+                    ? `Checked ${r.checked}, ${r.updated} with new events, ${r.moved} status change(s)${skipped}${errs}`
+                    : 'No shipments with a forwarding docket to sync.');
+                loadList();
+                if (awb) openDrawer(awb);
+            } catch (e) { flash(false, e.message); }
+            btn.disabled = false; btn.querySelector('span').textContent = 'Sync carriers';
+        };
+        document.getElementById('syncBtn').onclick = () => syncCarriers();
+        if (role !== 'staff') { const s = document.getElementById('syncBtn'); s.classList.remove('hidden'); s.classList.add('flex'); }
 
         // ---------- Init ----------
         (async function init() {

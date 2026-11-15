@@ -26,6 +26,9 @@
 //                  path can be a string or ctx => string. body: object → JSON, string → sent as is (XML etc.)
 //   testInput      label for the input box next to the Test button (e.g. 'Order no.')
 //   test({ call, input })  what the Test button does; return { ok, message, sample? }
+//   fetchEvents({ call }, awb)  CARRIERS ONLY: return the tracking events (any order):
+//                  [{ at: ISO time, description, location, remark, code: <our status code or null> }]
+//                  The carrier sync job uses this to update shipment statuses automatically.
 //
 // =====================================================================
 
@@ -36,6 +39,46 @@ const first = (...vals) => vals.find(v => v !== undefined && v !== null && clean
 const num = (v) => {
     const n = parseFloat(clean(v).replace(/[^0-9.]/g, ''));
     return Number.isFinite(n) ? n : null;
+};
+
+// ---------------------------------------------------------------------
+//  CARRIER TEXT → OUR STATUS CODE
+//  First matching rule wins. Edit freely; codes must exist in the status master.
+//  No match = the event still shows on the timeline, but the shipment status doesn't change.
+// ---------------------------------------------------------------------
+export const CARRIER_STATUS_RULES = [
+    [/not delivered|undeliver|unable to deliver|delivery (attempt|exception|failed)|attempted/i, 'DELIVERY_FAILED'],
+    [/return(ed|ing)? to (shipper|sender|origin)/i, 'RETURNED_TO_SHIPPER'],
+    [/\bdelivered\b/i, 'DELIVERED'],
+    [/out for delivery|with delivery courier/i, 'OUT_FOR_DELIVERY'],
+    [/ready for (pick ?up|collection)|available for (pick ?up|collection)|consignee collection|awaiting collection/i, 'READY_FOR_COLLECTION'],
+    [/customs (released|cleared)|clearance (complete|completed|processing complete)|released by customs/i, 'IMPORT_CLEARED'],
+    [/held (by|at) customs|customs hold|customs (delay|inspection)/i, 'CUSTOMS_HOLD'],
+    [/customs|clearance/i, 'IMPORT_CUSTOMS'],
+    [/arrived (at )?(the )?(delivery|destination) (facility|hub|station)|arrived at destination/i, 'ARRIVED_DEST_HUB'],
+    [/depart|in transit|transit|forwarded|processed at|arrived at (sort|hub|facility)/i, 'IN_TRANSIT'],
+    [/on hold|shipment hold/i, 'ON_HOLD']
+];
+
+export function carrierTextToStatus(text) {
+    const t = String(text || '');
+    if (/not received yet from shipper/i.test(t)) return null;
+    const rule = CARRIER_STATUS_RULES.find(([re]) => re.test(t));
+    return rule ? rule[1] : null;
+}
+
+/** Which connector tracks a shipment, from the forwarding agent name entered on "Handed to Forwarding Agent". */
+export function carrierForAgent(agent) {
+    const a = String(agent || '').toUpperCase();
+    if (a.includes('SMSA')) return 'smsa';
+    if (a.includes('ARAMEX')) return 'aramex';
+    if (a.includes('DHL')) return 'dhl';
+    return '17track'; // FedEx, UPS, India Post, etc. — 17Track covers most carriers
+}
+
+const toIso = (v) => {
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
 };
 
 export default {
@@ -115,6 +158,18 @@ export default {
         endpoints: {
             track: { method: 'GET', path: ({ params }) => `/api/track/single/${enc(clean(params.awb))}` }
         },
+        // SMSA scan type codes from the old system; anything else goes through the text rules.
+        scanCodes: { AF: 'ARRIVED_DEST_HUB', CC: 'READY_FOR_COLLECTION', CR: 'IMPORT_CLEARED', DE: 'DELIVERY_FAILED', IC: 'IMPORT_CUSTOMS', ST77: 'IN_TRANSIT', HIP: null, PU: null },
+        async fetchEvents({ call }, awb) {
+            const d = await call('track', { awb });
+            return (d.Scans || []).map(s => ({
+                at: toIso(s.ScanDateTime),
+                description: clean(s.ScanDescription) || `SMSA ${clean(s.ScanType)}`,
+                location: clean(s.City) || null,
+                remark: clean(s.ReceivedBy) ? `Received by ${clean(s.ReceivedBy)}` : null,
+                code: s.ScanType in this.scanCodes ? this.scanCodes[s.ScanType] : carrierTextToStatus(s.ScanDescription)
+            }));
+        },
         testInput: 'AWB',
         async test({ call, input }) {
             const d = await call('track', { awb: input.value });
@@ -139,6 +194,16 @@ export default {
                 query: ({ params, config }) => ({ trackingNumber: clean(params.awb), service: config.service || undefined })
             }
         },
+        async fetchEvents({ call }, awb) {
+            const d = await call('track', { awb });
+            return (d.shipments?.[0]?.events || []).map(ev => ({
+                at: toIso(ev.timestamp),
+                description: clean(ev.description || ev.status || ev.statusCode) || 'DHL update',
+                location: clean(ev.location?.address?.addressLocality) || null,
+                remark: clean(ev.remark) || null,
+                code: ev.statusCode === 'delivered' ? 'DELIVERED' : ev.statusCode === 'failure' ? 'DELIVERY_FAILED' : carrierTextToStatus(ev.description || ev.status)
+            }));
+        },
         testInput: 'AWB',
         async test({ call, input }) {
             const d = await call('track', { awb: input.value });
@@ -159,6 +224,24 @@ export default {
         endpoints: {
             register: { method: 'POST', path: '/track/v2.4/register', body: ({ params }) => [{ number: clean(params.awb), ...(params.carrier ? { carrier: params.carrier } : {}) }] },
             track: { method: 'POST', path: '/track/v2.4/gettrackinfo', body: ({ params }) => [{ number: clean(params.awb), ...(params.carrier ? { carrier: params.carrier } : {}) }] }
+        },
+        // 17Track milestone stages → our codes (checked before the text rules).
+        stages: { Delivered: 'DELIVERED', OutForDelivery: 'OUT_FOR_DELIVERY', AvailableForPickup: 'READY_FOR_COLLECTION', DeliveryFailure: 'DELIVERY_FAILED', Returning: 'RETURNED_TO_SHIPPER', Returned: 'RETURNED_TO_SHIPPER' },
+        async fetchEvents({ call }, awb) {
+            const d = await call('track', { awb });
+            const item = d?.data?.accepted?.[0];
+            if (!item) {
+                // Not known to 17Track yet: register it; events arrive on a later sync.
+                await call('register', { awb });
+                return [];
+            }
+            return (item.track_info?.tracking?.providers || []).flatMap(p => p.events || []).map(ev => ({
+                at: toIso(ev.time_iso || ev.time_utc),
+                description: clean(ev.description) || '17Track update',
+                location: clean(ev.location) || null,
+                remark: clean(ev.sub_status) || null,
+                code: this.stages[ev.stage] || carrierTextToStatus(ev.description)
+            }));
         },
         testInput: 'Tracking no.',
         async test({ call, input }) {
@@ -196,6 +279,21 @@ export default {
                 },
                 isOk: (data, res) => res.ok && typeof data === 'string' && !/<HasErrors>true<\/HasErrors>/.test(data)
             }
+        },
+        async fetchEvents({ call }, awb) {
+            const xml = await call('track', { awb });
+            const tag = (block, name) => {
+                const m = block.match(new RegExp(`<(?:\\w+:)?${name}>([\\s\\S]*?)</(?:\\w+:)?${name}>`));
+                return m ? m[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').trim() : '';
+            };
+            const blocks = xml.match(/<(?:\w+:)?TrackingResult>[\s\S]*?<\/(?:\w+:)?TrackingResult>/g) || [];
+            return blocks.map(b => ({
+                at: toIso(tag(b, 'UpdateDateTime')),
+                description: tag(b, 'UpdateDescription') || 'Aramex update',
+                location: tag(b, 'UpdateLocation') || null,
+                remark: tag(b, 'Comments') || null,
+                code: carrierTextToStatus(tag(b, 'UpdateDescription'))
+            }));
         },
         testInput: 'AWB',
         async test({ call, input }) {
