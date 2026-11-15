@@ -1,55 +1,41 @@
-// File: admin/widgets/sla-staff-status.js
+// File: admin/widgets/sla-staff-status.js — delivery SLA + who updated what today (all roles).
 window.registerCargoWidget({
     id: 'sla-staff-status',
-    title: 'Branch SLA & Employee Status',
+    title: 'SLA & Staff Activity',
     category: 'HR & SLA',
-    description: 'Radial on-time delivery gauge and active branch staff & driver matrix.',
+    description: 'Average days to deliver, overdue shipments and staff status updates today.',
     defaultSize: '1x2',
     allowedSizes: ['1x1', '1x2', '2x1', '2x2'],
-    render: (size = '1x2') => {
+    render: withDash((d, size, ui) => {
+        const s = d.sla || {};
+        const staff = d.staff_today || [];
+        const max = Math.max(1, ...staff.map(x => x.updates));
+        const avg = s.avg_days_to_deliver == null ? '—' : ui.num(s.avg_days_to_deliver, 1);
+
         if (size === '1x1') {
-            return `
-                <div class="h-full bg-white rounded-[2rem] p-4 border border-gray-100/80 flex flex-col items-center justify-center text-center">
-                    <div class="w-20 h-20 flex items-center justify-center bg-[#111827] rounded-full shadow-md mb-2">
-                        <span class="text-white text-lg font-extrabold">94%</span>
-                    </div>
-                    <p class="text-xs font-bold text-gray-900">Global SLA</p>
-                    <p class="text-[10px] text-gray-400">42 Staff Active</p>
-                </div>
-            `;
+            return ui.card('SLA', `
+                <div class="mt-auto">
+                    <p class="text-2xl font-extrabold">${avg}<span class="text-xs text-gray-400 font-semibold"> days avg</span></p>
+                    <p class="text-[10px] font-bold text-coral-500 mt-1">${ui.num(s.overdue_10d)} overdue &gt;10 days</p>
+                </div>`, { pad: 'p-5' });
         }
-
-        const isHorizontal = size === '2x1';
-        return `
-            <div class="h-full flex ${isHorizontal ? 'flex-row' : 'flex-col'} gap-4">
-                <div class="bg-white rounded-[2rem] p-4 border border-gray-100/80 flex-1 flex flex-col items-center justify-between">
-                    <p class="text-[11px] font-bold text-gray-900">Avg. Branch SLA</p>
-                    <div class="relative w-24 h-24 flex items-center justify-center bg-[#111827] rounded-full shadow-md">
-                        <svg class="w-20 h-20 transform -rotate-90">
-                            <circle cx="40" cy="40" r="33" stroke="#262F3F" stroke-width="6" fill="none" />
-                            <circle cx="40" cy="40" r="33" stroke="#E86D58" stroke-width="6" fill="none" stroke-dasharray="207" stroke-dashoffset="30" stroke-linecap="round" />
-                        </svg>
-                        <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-                            <span class="text-white text-lg font-extrabold leading-none">94%</span>
-                            <span class="text-gray-400 text-[8px] mt-0.5">On-Time</span>
-                        </div>
-                    </div>
-                    <p class="text-[10px] text-gray-400 font-medium">Daily: 96% • Mo: 94%</p>
-                </div>
-
-                <div class="bg-white rounded-[2rem] p-4 border border-gray-100/80 flex-1 flex flex-col justify-between">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-extrabold text-gray-900">42 Active Staff</span>
-                        <span class="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Shift</span>
-                    </div>
-                    <p class="text-[10px] font-medium text-gray-400">28 Staff • 14 Drivers</p>
-                    <div class="grid grid-cols-10 gap-1.5 pt-1">
-                        ${'<span class="w-2 h-2 rounded-full bg-coral-500"></span>'.repeat(14)}
-                        ${'<span class="w-2 h-2 rounded-full bg-gray-800"></span>'.repeat(10)}
-                        ${'<span class="w-2 h-2 rounded-full bg-gray-200"></span>'.repeat(6)}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+        const gauge = `
+            <div class="grid grid-cols-3 gap-2">
+                <div class="bg-[#111827] text-white rounded-2xl p-3"><p class="text-[9px] text-gray-400 uppercase">Avg days</p><p class="text-lg font-extrabold">${avg}</p></div>
+                <div class="bg-[#F8F8FA] rounded-2xl p-3 border border-gray-100"><p class="text-[9px] text-gray-400 uppercase">Delivered</p><p class="text-lg font-extrabold">${ui.num(s.delivered_month)}</p></div>
+                <div class="bg-coral-50 rounded-2xl p-3 border border-coral-100"><p class="text-[9px] text-coral-600 uppercase">Overdue</p><p class="text-lg font-extrabold text-coral-600">${ui.num(s.overdue_10d)}</p></div>
+            </div>`;
+        const list = staff.length
+            ? staff.slice(0, size === '2x2' ? 8 : 4).map(x => `
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="w-24 truncate font-bold text-gray-700">${ui.esc(x.name)}</span>
+                    <div class="flex-1 h-2 bg-[#F8F8FA] rounded-full overflow-hidden"><div class="h-full bg-coral-500 rounded-full" style="width:${(x.updates / max) * 100}%"></div></div>
+                    <span class="w-8 text-right font-extrabold">${x.updates}</span>
+                </div>`).join('')
+            : ui.empty('No status updates yet today.');
+        return ui.card('SLA & Staff', `
+            ${gauge}
+            <p class="text-[10px] font-extrabold text-gray-400 uppercase mt-3 mb-2">Status updates today</p>
+            <div class="space-y-2 flex-1 overflow-y-auto custom-scrollbar">${list}</div>`, { badge: 'This month' });
+    })
 });

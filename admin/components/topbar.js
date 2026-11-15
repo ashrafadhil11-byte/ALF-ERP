@@ -15,9 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 fullName = payload.user_metadata.full_name;
                 localStorage.setItem('cargo_user_name', fullName);
             }
-            if (payload?.user_metadata?.role) {
-                roleLabel = payload.user_metadata.role.replace('_', ' ').toUpperCase();
-            }
+            const storedRole = localStorage.getItem('cargo_user_role');
+            if (storedRole) roleLabel = storedRole.replace('_', ' ').toUpperCase();
         }
     } catch (e) {}
 

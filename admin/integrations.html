@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrations - Al-Farha Cargo</title>
+    <script>
+        (function checkAuth() {
+            const token = localStorage.getItem('cargo_auth_token');
+            const role = localStorage.getItem('cargo_user_role');
+            if (!token) window.location.replace('../login.html');
+            if (role !== 'super_admin' && role !== 'head_office') window.location.replace('super-dashboard.html');
+        })();
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: {
+                fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+                colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+            } }
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+        .field { width: 100%; padding: .75rem 1rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: .75rem; font-size: .875rem; }
+        .field:focus { outline: none; box-shadow: 0 0 0 2px #E86D58; border-color: transparent; }
+    </style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-6 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+            <section class="flex flex-col md:flex-row md:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">3rd-Party Integrations</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Order sources • Carriers • Notifications</p>
+                    </div>
+                </div>
+                <button id="addBtn" onclick="openForm()" class="hidden self-start bg-[#111827] hover:bg-gray-800 text-white px-5 py-3 rounded-full text-xs font-bold items-center gap-2 shadow-sm">
+                    <svg class="w-4 h-4 text-coral-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                    Add API
+                </button>
+            </section>
+
+            <div id="alert" class="hidden text-sm p-4 rounded-xl border mb-5"></div>
+
+            <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
+                <div id="list" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                    <p class="text-xs text-gray-400">Loading…</p>
+                </div>
+            </section>
+
+            <p class="text-[11px] text-gray-400 mt-5 leading-relaxed">
+                API keys are stored server-side and never shown again after saving. To connect a brand-new provider,
+                a developer adds a small adapter file in <code class="bg-gray-100 px-1 rounded">api/_lib/integrations/</code>;
+                "Generic REST API" works for a quick connectivity check without code.
+            </p>
+        </div>
+    </main>
+
+    <!-- ADD / EDIT MODAL -->
+    <div id="formModal" class="hidden fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm items-center justify-center p-4">
+        <form id="form" class="bg-white rounded-[2.5rem] max-w-xl w-full p-6 lg:p-8 shadow-2xl border border-gray-100 flex flex-col max-h-[90vh]">
+            <div class="flex justify-between items-center pb-4 border-b border-gray-100">
+                <div>
+                    <h3 id="formTitle" class="text-lg font-extrabold">Add API</h3>
+                    <p class="text-xs text-gray-400 mt-0.5">Connection details for a 3rd-party service.</p>
+                </div>
+                <button type="button" onclick="closeForm()" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto space-y-4 my-5 pr-1 custom-scrollbar">
+                <input type="hidden" id="fId">
+                <label class="block"><span class="text-xs font-bold text-gray-600">Name</span><input id="fName" required class="field mt-1" placeholder="e.g. SMSA Express"></label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="block"><span class="text-xs font-bold text-gray-600">Type</span>
+                        <select id="fKind" class="field mt-1">
+                            <option value="order_source">Order source</option>
+                            <option value="carrier">Carrier / tracking</option>
+                            <option value="notification">Notification</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </label>
+                    <label class="block"><span class="text-xs font-bold text-gray-600">Adapter</span><select id="fAdapter" class="field mt-1"></select></label>
+                </div>
+                <label class="block"><span class="text-xs font-bold text-gray-600">Base URL</span><input id="fUrl" type="url" class="field mt-1" placeholder="https://api.example.com"></label>
+                <div id="configFields" class="space-y-3"></div>
+                <div class="bg-[#F8F8FA] rounded-2xl p-4 border border-gray-100 space-y-3">
+                    <p class="text-[10px] font-extrabold text-gray-400 uppercase">Credentials (write-only)</p>
+                    <div id="secretFields" class="space-y-3"></div>
+                </div>
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input id="fActive" type="checkbox" class="w-4 h-4 accent-[#E86D58]">
+                    <span class="text-sm font-bold">Active</span>
+                    <span class="text-xs text-gray-400">— the system uses this API</span>
+                </label>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <button type="button" onclick="closeForm()" class="text-xs font-bold text-gray-500 hover:text-gray-900 px-4">Cancel</button>
+                <button id="saveBtn" type="submit" class="bg-[#111827] hover:bg-gray-800 text-white text-xs font-bold px-6 py-3 rounded-full">Save</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('cargo_auth_token');
+        const canEdit = localStorage.getItem('cargo_user_role') === 'super_admin';
+        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const label = (k) => k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        let items = [], adapters = [];
+
+        function showAlert(ok, msg) {
+            const el = document.getElementById('alert');
+            el.className = `text-sm p-4 rounded-xl border mb-5 ${ok ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`;
+            el.textContent = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 6000);
+        }
+
+        async function api(method, body) {
+            const res = await fetch('/api/integrations', {
+                method,
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: body ? JSON.stringify(body) : undefined
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+            return data;
+        }
+
+        function statusPill(i) {
+            if (!i.active) return '<span class="text-[10px] font-bold bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">Inactive</span>';
+            if (i.last_status === 'error') return '<span class="text-[10px] font-bold bg-coral-50 text-coral-600 px-2.5 py-1 rounded-full">Error</span>';
+            if (i.last_status === 'ok') return '<span class="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-full">Healthy</span>';
+            return '<span class="text-[10px] font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full">Not tested</span>';
+        }
+
+        function render() {
+            const list = document.getElementById('list');
+            if (!items.length) { list.innerHTML = '<p class="text-xs text-gray-400">No integrations yet.</p>'; return; }
+            list.innerHTML = items.map(i => {
+                const ad = adapters.find(a => a.id === i.adapter);
+                return `
+                <div class="bg-white rounded-[2rem] p-6 border border-gray-100/80 flex flex-col gap-3">
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="min-w-0">
+                            <p class="text-sm font-extrabold truncate">${esc(i.name)}</p>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase mt-0.5">${esc(label(i.kind))} • ${esc(ad ? ad.label : i.adapter)}</p>
+                        </div>
+                        ${statusPill(i)}
+                    </div>
+                    <p class="text-xs text-gray-500 truncate">${esc(i.base_url || 'No base URL')}</p>
+                    <p class="text-[11px] text-gray-400">${i.secret_set.length ? 'Credentials saved: ' + esc(i.secret_set.join(', ')) : 'No credentials saved'}</p>
+                    ${i.last_error ? `<p class="text-[11px] text-coral-600 bg-coral-50 rounded-xl px-3 py-2">${esc(i.last_error)}</p>` : ''}
+                    <p class="text-[10px] text-gray-400">${i.last_sync_at ? 'Last check: ' + new Date(i.last_sync_at).toLocaleString() : 'Never checked'}</p>
+                    <div class="flex gap-2 mt-auto pt-2">
+                        <button onclick="testIntegration('${i.id}')" ${ad && !ad.planned ? '' : 'disabled title="Adapter code not written yet"'}
+                            class="flex-1 bg-[#F8F8FA] hover:bg-gray-100 disabled:opacity-40 border border-gray-200/70 text-xs font-bold py-2.5 rounded-full">Test</button>
+                        ${canEdit ? `<button onclick="openForm('${i.id}')" class="flex-1 bg-[#111827] hover:bg-gray-800 text-white text-xs font-bold py-2.5 rounded-full">Edit</button>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function load() {
+            try {
+                const d = await api('GET');
+                items = d.integrations; adapters = d.adapters;
+                render();
+            } catch (e) { showAlert(false, e.message); }
+        }
+
+        function fillAdapterFields(adapterId, current = {}) {
+            const ad = adapters.find(a => a.id === adapterId) || { secretFields: ['api_key'], configFields: [] };
+            document.getElementById('configFields').innerHTML = (ad.configFields || []).map(k => `
+                <label class="block"><span class="text-xs font-bold text-gray-600">${esc(label(k))}</span>
+                <input data-config="${esc(k)}" class="field mt-1" value="${esc((current.config || {})[k] || '')}"></label>`).join('');
+            document.getElementById('secretFields').innerHTML = (ad.secretFields || []).map(k => {
+                const saved = (current.secret_set || []).includes(k);
+                return `<label class="block"><span class="text-xs font-bold text-gray-600">${esc(label(k))}</span>
+                    <input data-secret="${esc(k)}" type="password" autocomplete="new-password" class="field mt-1 bg-white"
+                        placeholder="${saved ? '•••••••• saved — leave empty to keep' : 'Enter value'}"></label>`;
+            }).join('') || '<p class="text-xs text-gray-400">This adapter needs no credentials.</p>';
+        }
+
+        window.openForm = function (id) {
+            const cur = items.find(i => i.id === id) || null;
+            document.getElementById('formTitle').textContent = cur ? `Edit ${cur.name}` : 'Add API';
+            document.getElementById('fId').value = cur ? cur.id : '';
+            document.getElementById('fName').value = cur ? cur.name : '';
+            document.getElementById('fKind').value = cur ? cur.kind : 'carrier';
+            document.getElementById('fUrl').value = cur ? (cur.base_url || '') : '';
+            document.getElementById('fActive').checked = cur ? cur.active : false;
+            const sel = document.getElementById('fAdapter');
+            sel.innerHTML = adapters.map(a => `<option value="${esc(a.id)}">${esc(a.label)}</option>`).join('');
+            sel.value = cur ? cur.adapter : 'generic_rest';
+            sel.onchange = () => fillAdapterFields(sel.value, cur && cur.adapter === sel.value ? cur : {});
+            fillAdapterFields(sel.value, cur || {});
+            const m = document.getElementById('formModal'); m.classList.remove('hidden'); m.classList.add('flex');
+            document.getElementById('fName').focus();
+        };
+        window.closeForm = function () {
+            const m = document.getElementById('formModal'); m.classList.add('hidden'); m.classList.remove('flex');
+        };
+
+        document.getElementById('form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('fId').value;
+            const config = {}, secret = {};
+            document.querySelectorAll('[data-config]').forEach(el => { if (el.value.trim()) config[el.dataset.config] = el.value.trim(); });
+            document.querySelectorAll('[data-secret]').forEach(el => { if (el.value) secret[el.dataset.secret] = el.value; });
+            const btn = document.getElementById('saveBtn'); btn.disabled = true; btn.textContent = 'Saving…';
+            try {
+                await api(id ? 'PUT' : 'POST', {
+                    id, config, secret,
+                    name: document.getElementById('fName').value,
+                    kind: document.getElementById('fKind').value,
+                    adapter: document.getElementById('fAdapter').value,
+                    base_url: document.getElementById('fUrl').value,
+                    active: document.getElementById('fActive').checked
+                });
+                closeForm(); showAlert(true, 'Integration saved.'); load();
+            } catch (err) { showAlert(false, err.message); }
+            finally { btn.disabled = false; btn.textContent = 'Save'; }
+        });
+
+        window.testIntegration = async function (id) {
+            const i = items.find(x => x.id === id);
+            const input = {};
+            if (i.adapter === 'alfarhaonline') {
+                const no = prompt('Enter an order number to look up:');
+                if (!no) return;
+                input.order_no = no;
+            }
+            try {
+                const r = await api('POST', { action: 'test', id, input });
+                showAlert(r.ok, `${i.name}: ${r.message}`);
+            } catch (e) { showAlert(false, e.message); }
+            load();
+        };
+
+        if (canEdit) { const b = document.getElementById('addBtn'); b.classList.remove('hidden'); b.classList.add('flex'); }
+        load();
+    </script>
+</body>
+</html>

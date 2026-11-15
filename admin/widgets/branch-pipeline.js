@@ -1,116 +1,51 @@
-// File: admin/widgets/branch-pipeline.js
+// File: admin/widgets/branch-pipeline.js — where active shipments are in the 9-stage lifecycle (all roles).
 window.registerCargoWidget({
     id: 'branch-pipeline',
-    title: 'Branch Performance & Consolidation Pipeline',
+    title: 'Shipment Pipeline',
     category: 'Operations',
-    description: 'Tracks branch daily output, consolidation stages, break-bulk, and manifest approvals.',
+    description: 'Active shipments by stage (Booking → Review) plus exceptions on hold.',
     defaultSize: '2x2',
     allowedSizes: ['2x1', '2x2', '3x2', '4x2'],
-    render: (size = '2x2') => {
+    render: withDash((d, size, ui) => {
+        const byStage = Object.fromEntries((d.pipeline || []).map(p => [p.stage, p.count]));
+        const stages = [1, 2, 3, 4, 5, 6, 7];
+        const max = Math.max(1, ...stages.map(s => byStage[s] || 0));
+        const exc = d.exceptions || [];
+        const excTotal = exc.reduce((s, e) => s + e.count, 0);
+
         if (size === '2x1') {
-            return `
-                <div class="h-full bg-white rounded-[2rem] p-5 border border-gray-100/80 flex items-center justify-between gap-4">
-                    <div>
-                        <span class="font-bold text-gray-900 text-xs">Consolidation & Break-Bulk Pipeline</span>
-                        <p class="text-xs text-gray-400 mt-0.5">Salalah HQ • Muscat • Sohar</p>
-                    </div>
-                    <div class="flex gap-3">
-                        <div class="bg-[#F8F8FA] px-3.5 py-2 rounded-xl text-center"><span class="text-[9px] text-gray-400 block">Consolidated</span><span class="text-sm font-extrabold">640</span></div>
-                        <div class="bg-[#F8F8FA] px-3.5 py-2 rounded-xl text-center"><span class="text-[9px] text-gray-400 block">Cleared</span><span class="text-sm font-extrabold">412</span></div>
-                        <div class="bg-coral-50 text-coral-600 px-3.5 py-2 rounded-xl text-center"><span class="text-[9px] block">Out for Delivery</span><span class="text-sm font-extrabold">790</span></div>
-                    </div>
-                </div>
-            `;
+            return ui.card('Pipeline', `
+                <div class="flex gap-1.5 flex-1 items-end">
+                    ${stages.map(s => `
+                        <div class="flex-1 text-center">
+                            <p class="text-sm font-extrabold">${ui.num(byStage[s] || 0)}</p>
+                            <p class="text-[8px] font-bold text-gray-400 uppercase truncate">${ui.stageName(s)}</p>
+                        </div>`).join('')}
+                    <div class="flex-1 text-center bg-coral-50 rounded-xl py-1"><p class="text-sm font-extrabold text-coral-600">${ui.num(excTotal)}</p><p class="text-[8px] font-bold text-coral-500 uppercase">Hold</p></div>
+                </div>`, { pad: 'p-5' });
         }
 
-        return `
-            <div class="h-full bg-white rounded-[2rem] p-6 border border-gray-100/80 flex flex-col justify-between">
-                <div>
-                    <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
-                        <span class="font-bold text-gray-900 text-sm">Branch Performance & Consolidation Pipeline</span>
-                        <span class="text-[10px] font-bold text-gray-600 bg-[#F8F8FA] px-3 py-1 rounded-full border border-gray-100">Daily vs Monthly KPI</span>
-                    </div>
+        const bars = stages.map(s => {
+            const n = byStage[s] || 0;
+            return `
+                <div class="flex-1 flex flex-col items-center justify-end gap-1.5 min-w-0">
+                    <span class="text-xs font-extrabold">${ui.num(n)}</span>
+                    <div class="w-full max-w-[42px] rounded-xl ${n ? 'bg-[#111827]' : 'bg-gray-100'}" style="height:${Math.max(6, (n / max) * 100)}%"></div>
+                    <span class="text-[9px] font-bold text-gray-400 uppercase truncate w-full text-center">${ui.stageName(s)}</span>
+                </div>`;
+        }).join('');
+        const excList = exc.length
+            ? exc.map(e => `<div class="flex justify-between text-xs"><span class="font-bold text-gray-700 truncate">${ui.esc(e.label)}</span><span class="font-extrabold text-coral-600">${ui.num(e.count)}</span></div>`).join('')
+            : '<p class="text-xs text-gray-400">No exceptions 🎉</p>';
+        const wide = size === '3x2' || size === '4x2';
 
-                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-gray-100">
-                        <span class="text-xs text-gray-400">Active Branch Flow</span>
-                        <div class="flex flex-wrap gap-1.5">
-                            <span class="text-[10px] font-bold text-gray-900 bg-[#F8F8FA] px-2.5 py-1 rounded-full border border-gray-200/60 flex items-center gap-1">
-                                Salalah HQ <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
-                            </span>
-                            <span class="text-[10px] font-semibold text-gray-600 bg-[#F8F8FA] px-2.5 py-1 rounded-full">Muscat (92%)</span>
-                            <span class="text-[10px] font-semibold text-gray-600 bg-[#F8F8FA] px-2.5 py-1 rounded-full">Sohar (89%)</span>
-                        </div>
-                    </div>
+        return ui.card('Shipment Pipeline', `
+            <div class="flex ${wide ? 'flex-row' : 'flex-col'} gap-4 flex-1 min-h-0">
+                <div class="flex gap-2 flex-1 min-h-[120px] items-stretch">${bars}</div>
+                <div class="${wide ? 'w-56' : ''} bg-coral-50/60 rounded-2xl p-4 border border-coral-100 space-y-1.5 overflow-y-auto custom-scrollbar">
+                    <p class="text-[10px] font-extrabold text-coral-600 uppercase mb-1">Exceptions • ${ui.num(excTotal)}</p>
+                    ${excList}
                 </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 flex-1">
-                    <div class="bg-[#F8F8FA] rounded-2xl p-4 flex flex-col justify-between">
-                        <div>
-                            <p class="text-[10px] font-semibold text-gray-400 uppercase">Avg Branch Output</p>
-                            <p class="text-xl font-extrabold text-gray-900 mt-0.5"><span class="text-coral-500 text-sm">#</span>61.4 <span class="text-[10px] font-semibold text-gray-400">AWB/day</span></p>
-                        </div>
-                        <div class="flex items-end justify-between h-14 my-2 px-1">
-                            <div class="w-1 bg-coral-300 rounded-full h-7"></div>
-                            <div class="w-1 bg-coral-500 rounded-full h-12"></div>
-                            <div class="w-1 bg-gray-300 rounded-full h-5"></div>
-                            <div class="w-1 bg-coral-300 rounded-full h-9"></div>
-                            <div class="w-1 bg-coral-500 rounded-full h-11"></div>
-                            <div class="w-1 bg-gray-300 rounded-full h-6"></div>
-                            <div class="w-1 bg-coral-300 rounded-full h-8"></div>
-                            <div class="w-1 bg-gray-800 rounded-full h-10"></div>
-                            <div class="w-1 bg-coral-500 rounded-full h-14"></div>
-                        </div>
-                        <div class="flex justify-between items-center text-[10px] text-gray-500 font-semibold">
-                            <span>Daily: 74</span>
-                            <span class="text-coral-500 font-bold">Mo: 1,842</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-[#F8F8FA] rounded-2xl p-4 flex flex-col justify-between">
-                        <div class="flex justify-between items-center">
-                            <span class="font-bold text-gray-900 text-xs">Cargo Stages</span>
-                            <span class="text-[10px] font-bold text-coral-500">Active</span>
-                        </div>
-                        <div class="relative pl-3 space-y-2.5 my-auto">
-                            <div class="absolute left-[11px] top-2 bottom-2 w-[1.5px] bg-coral-200"></div>
-                            <div class="flex items-center justify-between relative z-10">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-4 h-4 rounded-full bg-coral-500 text-white flex items-center justify-center text-[8px] font-bold">1</span>
-                                    <span class="text-[11px] font-bold text-gray-900">Consolidated</span>
-                                </div>
-                                <span class="text-[10px] font-extrabold text-gray-700">640</span>
-                            </div>
-                            <div class="flex items-center justify-between relative z-10">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-4 h-4 rounded-full bg-coral-500 text-white flex items-center justify-center text-[8px] font-bold">2</span>
-                                    <span class="text-[11px] font-semibold text-gray-600">Cleared & Bulk</span>
-                                </div>
-                                <span class="text-[10px] font-extrabold text-gray-700">412</span>
-                            </div>
-                            <div class="flex items-center justify-between relative z-10">
-                                <div class="flex items-center gap-2">
-                                    <span class="w-4 h-4 rounded-full bg-coral-500 text-white flex items-center justify-center text-[8px] font-bold">3</span>
-                                    <span class="text-[11px] font-semibold text-gray-600">Delivery</span>
-                                </div>
-                                <span class="text-[10px] font-extrabold text-emerald-600">790</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-[#F8F8FA] rounded-2xl p-4 flex flex-col justify-between items-start">
-                        <div class="text-coral-500">
-                            <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                        </div>
-                        <div>
-                            <h4 class="text-xs font-bold text-gray-900 leading-tight mb-1">Manifest Release</h4>
-                            <p class="text-[10px] text-gray-400 leading-snug">3 Consolidated lots awaiting destination break-bulk approval.</p>
-                        </div>
-                        <button class="bg-coral-500 hover:bg-coral-600 text-white text-[11px] font-bold py-2 px-4 rounded-full w-full transition-colors">
-                            Approve Lots (3)
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+            </div>`, { badge: `${ui.num(d.kpis.active)} active` });
+    })
 });

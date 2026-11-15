@@ -210,11 +210,8 @@
                     localStorage.setItem('cargo_user_role', userRole);
 
                     // Role-Based Redirection
-                    if (userRole === 'super_admin') {
-                        window.location.href = 'admin/super-dashboard.html';
-                    } else {
-                        window.location.href = 'dashboard.html';
-                    }
+                    // One dashboard for every role; it adapts to the role.
+                    window.location.href = 'admin/super-dashboard.html';
                 } else {
                     throw new Error('Invalid response from server. Missing security token.');
                 }

@@ -1,78 +1,54 @@
-// File: admin/widgets/branch-efficiency.js
+// File: admin/widgets/branch-efficiency.js — branch-by-branch output table (admins).
 window.registerCargoWidget({
     id: 'branch-efficiency',
-    title: 'Average Performance by Branch',
+    title: 'Branch Performance',
     category: 'Branches',
-    description: 'Branch efficiency scores and daily shipment output across Salalah, Muscat, and Sohar.',
-    defaultSize: '1x2',
-    allowedSizes: ['1x1', '1x2', '2x1', '2x2'],
-    render: (size = '1x2') => {
+    description: 'Per-branch bookings today and this month, tonnage, active AWBs and status updates.',
+    defaultSize: '2x2',
+    allowedSizes: ['1x1', '1x2', '2x1', '2x2', '4x2'],
+    roles: ['super_admin', 'head_office'],
+    render: withDash((d, size, ui) => {
+        const rows = d.branches || [];
+        if (!rows.length) return ui.card('Branches', ui.empty('No branches yet. Add them in Branch Network.'));
+
         if (size === '1x1') {
-            return `
-                <div class="h-full bg-white rounded-[2rem] p-5 border border-gray-100/80 flex flex-col justify-between">
-                    <span class="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full w-max">93.4% Avg</span>
-                    <div>
-                        <p class="text-sm font-extrabold text-gray-900">Branch Performance</p>
-                        <p class="text-[11px] text-gray-400 mt-1">SLH 96% • MCT 92% • SHR 89%</p>
-                    </div>
-                </div>
-            `;
+            const busiest = rows.reduce((a, b) => (b.today > a.today ? b : a), rows[0]);
+            return ui.card('Busiest Today', `
+                <div class="mt-auto">
+                    <p class="text-lg font-extrabold truncate">${ui.esc(busiest.branch_name || busiest.branch_code)}</p>
+                    <p class="text-[10px] font-bold text-gray-500 mt-1">${ui.num(busiest.today)} AWBs • ${ui.num(busiest.events_today)} updates</p>
+                </div>`, { pad: 'p-5' });
         }
-
-        return `
-            <div class="h-full bg-white rounded-[2rem] p-6 border border-gray-100/80 flex flex-col justify-between">
-                <div class="flex justify-between items-center">
-                    <div class="flex gap-1 items-center">
-                        <span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-                        <span class="w-3.5 h-1.5 rounded-full bg-gray-900"></span>
-                    </div>
-                    <span class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">93.4% Global Avg</span>
-                </div>
-
-                <div class="my-2">
-                    <p class="text-[11px] text-gray-400 font-medium mb-0.5">Branch Efficiency Score</p>
-                    <h4 class="text-base font-extrabold text-gray-900 leading-snug">Average Performance by Branch</h4>
-                </div>
-
-                <div class="space-y-2.5 my-2">
-                    <div>
-                        <div class="flex justify-between text-xs font-bold mb-1">
-                            <span class="text-gray-800">Salalah HQ</span>
-                            <span class="text-gray-900">96% <span class="text-[10px] text-gray-400 font-medium">(34/day)</span></span>
-                        </div>
-                        <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div class="bg-coral-500 h-full rounded-full" style="width: 96%"></div>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-xs font-bold mb-1">
-                            <span class="text-gray-800">Muscat Branch</span>
-                            <span class="text-gray-900">92% <span class="text-[10px] text-gray-400 font-medium">(26/day)</span></span>
-                        </div>
-                        <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div class="bg-gray-900 h-full rounded-full" style="width: 92%"></div>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="flex justify-between text-xs font-bold mb-1">
-                            <span class="text-gray-800">Sohar Branch</span>
-                            <span class="text-gray-900">89% <span class="text-[10px] text-gray-400 font-medium">(14/day)</span></span>
-                        </div>
-                        <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div class="bg-coral-300 h-full rounded-full" style="width: 89%"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex justify-between items-center pt-2 border-t border-gray-50">
-                    <span class="text-[10px] font-semibold text-gray-400">Daily Health Check</span>
-                    <div class="flex gap-1.5">
-                        <span class="w-6 h-6 rounded-full bg-[#F8F8FA] border border-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-700">S</span>
-                        <span class="w-6 h-6 rounded-full bg-[#F8F8FA] border border-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-700">M</span>
-                        <span class="w-6 h-6 rounded-full bg-coral-500 text-white flex items-center justify-center text-[10px] font-bold">✓</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+        if (size === '1x2' || size === '2x1') {
+            return ui.card('Branch Performance', `
+                <div class="space-y-2 overflow-y-auto custom-scrollbar flex-1">
+                    ${rows.map(b => `
+                        <div class="bg-[#F8F8FA] rounded-2xl px-4 py-2.5 border border-gray-100 flex justify-between items-center">
+                            <div class="min-w-0"><p class="text-xs font-extrabold truncate">${ui.esc(b.branch_name || b.branch_code)}</p><p class="text-[10px] text-gray-400 font-bold">${ui.esc(b.branch_code)}</p></div>
+                            <div class="text-right"><p class="text-sm font-extrabold">${ui.num(b.today)}</p><p class="text-[9px] text-gray-400 uppercase font-bold">today</p></div>
+                        </div>`).join('')}
+                </div>`, { badge: `${rows.length} branches` });
+        }
+        return ui.card('Branch Performance', `
+            <div class="overflow-auto custom-scrollbar flex-1">
+                <table class="w-full text-xs">
+                    <thead><tr class="text-[10px] text-gray-400 uppercase text-left">
+                        <th class="pb-2 font-extrabold">Branch</th><th class="pb-2 font-extrabold text-right">Today</th>
+                        <th class="pb-2 font-extrabold text-right">Month</th><th class="pb-2 font-extrabold text-right">Weight</th>
+                        <th class="pb-2 font-extrabold text-right">Active</th><th class="pb-2 font-extrabold text-right">Updates</th>
+                    </tr></thead>
+                    <tbody class="divide-y divide-gray-100">
+                        ${rows.map(b => `
+                            <tr>
+                                <td class="py-2.5"><p class="font-extrabold">${ui.esc(b.branch_name || b.branch_code)}</p><p class="text-[10px] text-gray-400">${ui.esc(b.branch_code)} • ${ui.esc(b.branch_status || '')}</p></td>
+                                <td class="py-2.5 text-right font-extrabold">${ui.num(b.today)}</td>
+                                <td class="py-2.5 text-right font-bold">${ui.num(b.month)}</td>
+                                <td class="py-2.5 text-right text-gray-500">${ui.kg(b.month_kg)}</td>
+                                <td class="py-2.5 text-right font-bold">${ui.num(b.active)}</td>
+                                <td class="py-2.5 text-right"><span class="bg-coral-50 text-coral-600 font-extrabold px-2 py-0.5 rounded-full">${ui.num(b.events_today)}</span></td>
+                            </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`, { badge: `${rows.length} branches` });
+    })
 });

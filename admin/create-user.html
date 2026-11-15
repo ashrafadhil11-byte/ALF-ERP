@@ -137,9 +137,6 @@
                             <label class="text-xs font-semibold text-gray-700 ml-1">Branch Allocation</label>
                             <select id="branch" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200 appearance-none cursor-pointer disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
                                 <option value="" disabled selected>Select branch...</option>
-                                <option value="salalah">Salalah HQ</option>
-                                <option value="muscat">Muscat Branch</option>
-                                <option value="sohar">Sohar Branch</option>
                             </select>
                         </div>
 
@@ -175,13 +172,22 @@
         const btnLoader = document.getElementById('btnLoader');
         const alertMsg = document.getElementById('alertMsg');
         
+        // Branch list comes from Branch Network (value = branch code, used to scope the dashboard)
+        fetch('/api/branches', { headers: { Authorization: `Bearer ${localStorage.getItem('cargo_auth_token') || ''}` } })
+            .then(r => r.json())
+            .then(({ branches = [] }) => {
+                const sel = document.getElementById('branch');
+                branches.forEach(b => sel.add(new Option(`${b.branch_name} (${b.branch_code})`, b.branch_code)));
+            })
+            .catch(() => {});
+
         // Role & Branch UI Logic
         const roleSelect = document.getElementById('role');
         const branchContainer = document.getElementById('branchContainer');
         const branchSelect = document.getElementById('branch');
 
         roleSelect.addEventListener('change', (e) => {
-            if (e.target.value === 'super_admin') {
+            if (e.target.value === 'super_admin' || e.target.value === 'head_office') {
                 branchSelect.disabled = true;
                 branchSelect.value = ""; // Clear selection
                 branchSelect.removeAttribute('required');

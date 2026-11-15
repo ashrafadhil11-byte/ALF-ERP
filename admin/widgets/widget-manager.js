@@ -1,7 +1,7 @@
 // File: admin/widgets/widget-manager.js
 window.CargoWidgetRegistry = window.CargoWidgetRegistry || [];
 
-window.registerCargoWidget = function(widgetConfig) {
+window.registerCargoWidget = window.registerCargoWidget || function(widgetConfig) {
     const existingIndex = window.CargoWidgetRegistry.findIndex(w => w.id === widgetConfig.id);
     if (existingIndex > -1) {
         window.CargoWidgetRegistry[existingIndex] = widgetConfig;
@@ -10,7 +10,7 @@ window.registerCargoWidget = function(widgetConfig) {
     }
 };
 
-const LOCAL_CACHE_KEY = 'alfarha_super_layout_v2';
+const LOCAL_CACHE_KEY = 'alfarha_layout_v3_' + (localStorage.getItem('cargo_user_role') || 'staff');
 let isEditMode = false;
 let currentLayout = []; // Array of { id, size: '2x2' }
 let draggedWidgetId = null;
@@ -141,7 +141,7 @@ window.renderDashboardWidgets = function() {
     if (activeItems.length === 0) {
         grid.innerHTML = `
             <div style="grid-column: span 4; grid-row: span 2;" class="bg-white rounded-[2rem] p-12 text-center border border-dashed border-gray-300 flex flex-col items-center justify-center">
-                <p class="text-base font-bold text-gray-900 mb-1">Your Super Admin Canvas is Empty</p>
+                <p class="text-base font-bold text-gray-900 mb-1">Your Dashboard is Empty</p>
                 <p class="text-xs text-gray-400 mb-5">Add widgets from the catalog to build your custom workspace.</p>
                 <button onclick="openWidgetModal()" class="bg-coral-500 hover:bg-coral-600 text-white text-xs font-bold px-6 py-3 rounded-full shadow-sm transition-colors">
                     + Add Widgets

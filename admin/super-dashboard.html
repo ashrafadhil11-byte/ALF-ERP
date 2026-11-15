@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Admin Portal - Al-Farha Cargo</title>
+    <title>Dashboard - Al-Farha Cargo</title>
     
     <!-- STRICT AUTHENTICATION GATEKEEPER -->
     <script>
@@ -11,7 +11,8 @@
             const token = localStorage.getItem('cargo_auth_token');
             const role = localStorage.getItem('cargo_user_role');
             if (!token) window.location.replace('../login.html');
-            if (role !== 'super_admin' && role !== 'branch_admin') window.location.replace('../dashboard.html');
+            // Every role uses this dashboard; widgets and data are scoped by role (server enforces it).
+            window.CARGO_ROLE = role || 'staff';
         })();
     </script>
 
@@ -23,6 +24,7 @@
     <script>
         window.CargoWidgetRegistry = [];
         window.registerCargoWidget = function(widgetConfig) {
+            if (widgetConfig.roles && !widgetConfig.roles.includes(window.CARGO_ROLE)) return; // not for this role
             const idx = window.CargoWidgetRegistry.findIndex(w => w.id === widgetConfig.id);
             if (idx > -1) window.CargoWidgetRegistry[idx] = widgetConfig;
             else window.CargoWidgetRegistry.push(widgetConfig);
@@ -34,6 +36,9 @@
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
 
+    <!-- Live data loader + shared widget helpers (must load before widgets) -->
+    <script src="widgets/dashboard-data.js" defer></script>
+
     <!-- Modular Adaptive Widgets -->
     <script src="widgets/global-shipments.js" defer></script>
     <script src="widgets/global-financials.js" defer></script>
@@ -43,6 +48,8 @@
     <script src="widgets/branch-pipeline.js" defer></script>
     <script src="widgets/branch-efficiency.js" defer></script>
     <script src="widgets/latest-bookings.js" defer></script>
+    <script src="widgets/daily-trend.js" defer></script>
+    <script src="widgets/integrations-health.js" defer></script>
 
     <!-- Smartphone Grid & Cloud Sync Engine -->
     <script src="widgets/widget-manager.js" defer></script>
@@ -81,6 +88,7 @@
             grid-auto-flow: dense;
             gap: 1.25rem;
         }
+        .widget-cell { grid-row: span var(--w-rows, 2); }
         @media (min-width: 768px) {
             .smart-widget-grid {
                 grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -130,18 +138,23 @@
                         </div>
                         <div>
                             <div class="flex items-center gap-2">
-                                <span class="text-xs font-extrabold text-gray-900 tracking-tight">Super Admin Portal</span>
+                                <span id="portalTitle" class="text-xs font-extrabold text-gray-900 tracking-tight">Dashboard</span>
                                 <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
                             </div>
-                            <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">
-                                All Branches • Salalah HQ • Muscat • Sohar
+                            <p id="portalScope" class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">
+                                Loading…
                             </p>
                         </div>
                     </div>
 
+                    <!-- Branch picker (admins only; filled from live data) -->
+                    <select id="branchPicker" onchange="setDashboardBranch(this.value)" aria-label="Show branch"
+                            class="hidden bg-white border border-gray-200/80 rounded-full px-4 py-2 text-xs font-bold text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-coral-500 cursor-pointer">
+                    </select>
+
                     <!-- Cloud Sync Status Pill -->
                     <span id="cloudSyncStatus" class="text-[10px] font-bold text-emerald-600 bg-emerald-50/80 px-3 py-1.5 rounded-full border border-emerald-100">
-                        Cloud Synced
+                        Connecting…
                     </span>
                 </div>
 
@@ -215,7 +228,7 @@
             <div class="flex justify-between items-center pb-4 border-b border-gray-100">
                 <div>
                     <h3 class="text-lg font-extrabold text-gray-900">Manage Dashboard Widgets</h3>
-                    <p class="text-xs text-gray-400 mt-0.5">Add or remove modules from your Super Admin Portal.</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Add or remove modules from your dashboard.</p>
                 </div>
                 <button onclick="closeWidgetModal()" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -262,6 +275,34 @@
 
         updateDateTimeAndGreeting();
         setInterval(updateDateTimeAndGreeting, 1000);
+
+        // Portal header + branch picker follow the live data.
+        const PORTAL_TITLES = { super_admin: 'Super Admin Portal', head_office: 'Head Office Portal', branch_manager: 'Branch Manager Portal', staff: 'Staff Workspace' };
+        window.addEventListener('dashboard:data', (e) => {
+            const d = e.detail, me = d.me || {};
+            const esc = window.dashUI.esc;
+            document.getElementById('portalTitle').textContent = (PORTAL_TITLES[me.role] || 'Dashboard') + (me.is_driver ? ' • Driver' : '');
+            const names = (d.branches || []).map(b => b.branch_name || b.branch_code);
+            document.getElementById('portalScope').textContent = d.scope === 'ALL'
+                ? `All Branches${names.length ? ' • ' + names.slice(0, 4).join(' • ') : ''}`
+                : `Branch • ${names[0] || d.scope}`;
+
+            const picker = document.getElementById('branchPicker');
+            if (me.role === 'super_admin' || me.role === 'head_office') {
+                if (d.scope === 'ALL') window.ALL_BRANCHES = d.branches || [];
+                if (!window.ALL_BRANCHES && !window.branchFetchStarted) {
+                    // Opened on a single branch: load the full list once for the picker.
+                    window.branchFetchStarted = true;
+                    fetch('/api/branches', { headers: { Authorization: `Bearer ${localStorage.getItem('cargo_auth_token')}` } })
+                        .then(r => r.json()).then(j => { window.ALL_BRANCHES = j.branches || []; window.dispatchEvent(new CustomEvent('dashboard:data', { detail: window.DASH })); })
+                        .catch(() => {});
+                }
+                const opts = (window.ALL_BRANCHES || []).map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name || b.branch_code)}</option>`).join('');
+                picker.innerHTML = `<option value="">All branches</option>${opts}`;
+                picker.value = window.DASH_BRANCH || '';
+                picker.classList.remove('hidden');
+            }
+        });
     </script>
 </body>
 </html>
