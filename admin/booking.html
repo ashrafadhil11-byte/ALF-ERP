@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
+    <title>New Booking - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/countries.js"></script>
+    <script src="components/print.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
+    </script>
+    <style>
+        .ref-token { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; border-radius: .6rem; padding: .3rem .55rem; }
+        .flag { width: 22px; height: 16px; object-fit: cover; border-radius: 3px; border: 1px solid #E5E7EB; }
+        .cargo-opt input:checked + span { background: #111827; color: #fff; border-color: #111827; }
+        .cargo-opt input:checked + span .code { background: #E86D58; color: #fff; }
+        .cargo-opt input:focus-visible + span { box-shadow: 0 0 0 2px #E86D58; }
+        .step { width: 1.75rem; height: 1.75rem; border-radius: 9999px; background: #111827; color: #fff; font-size: 11px; font-weight: 800;
+                display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        input.num { text-align: right; font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 border border-white">
+        <div id="topbar-container"></div>
+
+        <div class="flex-1">
+            <section class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center"><span data-icon="clipboard"></span></div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">New Booking</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Counter booking with automatic reference</p>
+                    </div>
+                </div>
+                <a href="shipments.html" class="btn btn-light self-start sm:self-auto"><span data-icon="arrowLeft"></span>Shipments</a>
+            </section>
+
+            <form id="bookingForm" class="grid grid-cols-1 xl:grid-cols-3 gap-5" novalidate autocomplete="off">
+                <div class="xl:col-span-2 space-y-5">
+
+                    <!-- 1. Service -->
+                    <section class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 space-y-4">
+                        <div class="flex items-center gap-2"><span class="step">1</span><span class="font-extrabold text-xs uppercase tracking-wider">Service</span></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div id="branchWrap"><label class="ui-label" for="branch">Booking branch</label><select id="branch" class="field"></select></div>
+                            <div>
+                                <label class="ui-label" for="destCountry">Destination country <span class="req">*</span></label>
+                                <div class="relative">
+                                    <img id="destFlag" class="flag absolute left-3.5 top-1/2 -translate-y-1/2 hidden" alt="">
+                                    <input id="destCountry" class="field" list="countryList" placeholder="Type to search…">
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="ui-label">Cargo type <span class="req">*</span></p>
+                            <div id="cargoOptions" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div><p class="ui-label">How the parcel arrives</p>
+                                <div class="seg w-full" role="group" aria-label="Intake">
+                                    <button type="button" data-intake="drop_off" aria-pressed="true" class="flex-1">Drop-off at branch</button>
+                                    <button type="button" data-intake="pickup" aria-pressed="false" class="flex-1">Pickup</button>
+                                </div></div>
+                            <div><label class="ui-label" for="packageType">Package type</label>
+                                <select id="packageType" class="field"><option>Parcel</option><option>Document</option><option>Air Freight</option><option>Sea Freight</option><option>Freight</option></select></div>
+                        </div>
+                    </section>
+
+                    <!-- 2. Sender -->
+                    <section class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 space-y-4">
+                        <div class="flex items-center gap-2"><span class="step">2</span><span class="font-extrabold text-xs uppercase tracking-wider">Sender</span></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="ui-label" for="senderPhone">Mobile <span class="req">*</span></label>
+                                <div class="flex gap-2"><span id="senderDial" class="field soft !w-20 text-center flex-shrink-0">+968</span><input id="senderPhone" class="field" type="tel" inputmode="tel" placeholder="9XXXXXXX"></div>
+                            </div>
+                            <div><label class="ui-label" for="senderName">Full name <span class="req">*</span></label><input id="senderName" class="field" placeholder="As on ID"></div>
+                            <div><label class="ui-label" for="senderId">Civil ID / passport</label><input id="senderId" class="field" placeholder="Optional"></div>
+                        </div>
+                    </section>
+
+                    <!-- 3. Receiver -->
+                    <section class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 space-y-4">
+                        <div class="flex items-center gap-2"><span class="step">3</span><span class="font-extrabold text-xs uppercase tracking-wider">Receiver</span></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="sm:col-span-2"><label class="ui-label" for="rcvName">Full name <span class="req">*</span></label><input id="rcvName" class="field"></div>
+                            <div>
+                                <label class="ui-label" for="rcvPhone">Mobile <span class="req">*</span></label>
+                                <div class="flex gap-2"><span id="rcvDial" class="field soft !w-20 text-center flex-shrink-0">+</span><input id="rcvPhone" class="field" type="tel" inputmode="tel"></div>
+                            </div>
+                            <div>
+                                <label class="ui-label" for="rcvWhatsapp">WhatsApp</label>
+                                <input id="rcvWhatsapp" class="field" type="tel" inputmode="tel" placeholder="Same as mobile">
+                            </div>
+                            <div><label class="ui-label" for="rcvHouse">House / building</label><input id="rcvHouse" class="field"></div>
+                            <div><label class="ui-label" for="rcvStreet">Street</label><input id="rcvStreet" class="field"></div>
+                            <div><label class="ui-label" for="rcvLandmark">Landmark</label><input id="rcvLandmark" class="field"></div>
+                            <div class="relative">
+                                <label class="ui-label" for="rcvPin">PIN / postal code</label>
+                                <div class="relative"><input id="rcvPin" class="field !pr-24" inputmode="numeric"><span id="pinBadge" class="absolute right-3 top-1/2 -translate-y-1/2 pill-tag pill-gray hidden">Lookup</span></div>
+                                <div id="pinList" class="hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl p-1.5 max-h-60 overflow-y-auto custom-scrollbar"></div>
+                            </div>
+                            <div><label class="ui-label" for="rcvPo">Post office / area</label><input id="rcvPo" class="field"></div>
+                            <div><label class="ui-label" for="rcvCity">District / city <span class="req">*</span></label><input id="rcvCity" class="field"></div>
+                            <div><label class="ui-label" for="rcvState">State / province</label><input id="rcvState" class="field"></div>
+                        </div>
+                    </section>
+
+                    <!-- 4. Package -->
+                    <section class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 space-y-4">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2"><span class="step">4</span><span class="font-extrabold text-xs uppercase tracking-wider">Boxes & contents</span></div>
+                            <button type="button" id="addBox" class="btn btn-light btn-sm"><span data-icon="plus"></span>Add box</button>
+                        </div>
+                        <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-xs min-w-[520px]">
+                                <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                                    <th class="p-3 pl-4 font-extrabold w-10">#</th><th class="p-3 font-extrabold">Weight kg</th><th class="p-3 font-extrabold">L cm</th><th class="p-3 font-extrabold">W cm</th><th class="p-3 font-extrabold">H cm</th><th class="p-3 font-extrabold text-right">Vol. kg</th><th class="p-3 w-10"></th>
+                                </tr></thead>
+                                <tbody id="boxRows" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="sd-card !p-3 text-center"><p class="sd-label">Actual</p><p id="totActual" class="text-base font-extrabold">0 kg</p></div>
+                            <div class="sd-card !p-3 text-center"><p class="sd-label">Volumetric</p><p id="totVol" class="text-base font-extrabold">0 kg</p></div>
+                            <div class="rounded-[1.25rem] bg-[#111827] text-white p-3 text-center"><p class="text-[10px] font-extrabold uppercase text-gray-400">Chargeable</p><p id="totCharge" class="text-base font-extrabold">0 kg</p></div>
+                        </div>
+                        <p class="text-[10px] text-gray-400">Volumetric = L × W × H ÷ 5000 per box. Chargeable = the higher of actual and volumetric.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="sm:col-span-2"><label class="ui-label" for="contents">Contents</label><input id="contents" class="field" placeholder="e.g. Clothes, dates, documents"></div>
+                        </div>
+                    </section>
+
+                    <!-- 5. Charges -->
+                    <section class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 space-y-4">
+                        <div class="flex items-center gap-2"><span class="step">5</span><span class="font-extrabold text-xs uppercase tracking-wider">Charges & payment</span></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div><label class="ui-label" for="declared">Declared value</label><input id="declared" class="field num" type="number" min="0" step="0.001" inputmode="decimal"></div>
+                            <div><label class="ui-label" for="amount">Charge <span id="curLabel" class="text-gray-400">(OMR)</span></label><input id="amount" class="field num" type="number" min="0" step="0.001" inputmode="decimal"></div>
+                            <div><label class="ui-label" for="payment">Payment</label>
+                                <select id="payment" class="field"><option value="cash">Cash</option><option value="card">Card</option><option value="bank_transfer">Bank transfer</option><option value="credit">Credit account</option><option value="pay_on_delivery">Pay on delivery</option></select></div>
+                            <div class="sm:col-span-3"><label class="ui-label" for="notes">Notes</label><input id="notes" class="field" placeholder="Internal note (optional)"></div>
+                        </div>
+                        <p class="text-[10px] text-gray-400">Charges will come from rate cards when Accounts (Phase C) is ready; enter them manually for now.</p>
+                    </section>
+                </div>
+
+                <!-- Summary -->
+                <aside class="xl:sticky xl:top-5 self-start space-y-4">
+                    <div class="rounded-[2rem] bg-[#111827] text-white p-6">
+                        <p class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Booking reference</p>
+                        <div class="flex flex-wrap items-center gap-1.5 mt-3 text-lg">
+                            <span id="pvD" class="ref-token bg-emerald-500/20 text-emerald-300">D</span>
+                            <span id="pvB" class="ref-token bg-coral-500 text-white">B</span>
+                            <span id="pvC" class="ref-token bg-sky-500/20 text-sky-300">C</span>
+                            <span class="ref-token bg-white/10">••••••</span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 mt-2">The number is assigned when you book.</p>
+                        <div class="mt-5 pt-4 border-t border-white/10 space-y-2.5 text-xs">
+                            <div class="flex justify-between gap-3"><span class="text-gray-400">Route</span><span id="sumRoute" class="font-bold text-right">—</span></div>
+                            <div class="flex justify-between gap-3"><span class="text-gray-400">Cargo</span><span id="sumCargo" class="font-bold">—</span></div>
+                            <div class="flex justify-between gap-3"><span class="text-gray-400">Boxes</span><span id="sumBoxes" class="font-bold">1</span></div>
+                            <div class="flex justify-between gap-3"><span class="text-gray-400">Chargeable</span><span id="sumWeight" class="font-bold">0 kg</span></div>
+                            <div class="flex justify-between gap-3 pt-2 border-t border-white/10"><span class="text-gray-400">Total</span><span id="sumAmount" class="text-lg font-extrabold">—</span></div>
+                        </div>
+                        <button id="bookBtn" type="submit" class="btn btn-coral w-full !py-4 !text-sm mt-5">Review & book</button>
+                    </div>
+                </aside>
+            </form>
+        </div>
+    </main>
+    <datalist id="countryList"></datalist>
+
+    <!-- SUCCESS -->
+    <div id="doneModal" class="ui-modal">
+        <div class="panel max-w-md text-center">
+            <span class="w-16 h-16 mx-auto rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><span data-icon="checkCircle" data-cls="w-8 h-8"></span></span>
+            <p class="text-sm font-bold text-gray-500 mt-4">Booking created</p>
+            <p id="doneRef" class="text-3xl font-extrabold tracking-tight font-mono mt-1">—</p>
+            <p id="doneSub" class="text-xs text-gray-400 mt-1"></p>
+            <div class="grid grid-cols-2 gap-2 mt-6">
+                <button type="button" class="btn btn-dark" onclick="printDone('label')"><span data-icon="hash"></span>Print label</button>
+                <button type="button" class="btn btn-light" onclick="printDone('receipt')"><span data-icon="clipboard"></span>Receipt</button>
+                <button type="button" class="btn btn-light" onclick="whatsappDone()"><span data-icon="message"></span>WhatsApp</button>
+                <a id="doneView" class="btn btn-light" href="shipments.html"><span data-icon="eye"></span>View</a>
+            </div>
+            <button type="button" class="btn btn-coral w-full mt-3" onclick="location.href='booking.html'"><span data-icon="plus"></span>New booking</button>
+        </div>
+    </div>
+
+    <script>
+        const { api, esc, toast, openModal, icon: I } = UI;
+        const $ = (id) => document.getElementById(id);
+        const COUNTRIES = window.ALF_COUNTRIES || [];
+        const findCountry = (t) => { t = String(t || '').trim().toLowerCase(); return COUNTRIES.find(c => c.n.toLowerCase() === t || c.c.toLowerCase() === t) || null; };
+        const isAdmin = UI.isAdmin();
+        let branches = [], destinations = [], cargoTypes = [], myBranch = null, intake = 'drop_off', done = null;
+
+        $('countryList').innerHTML = COUNTRIES.map(c => `<option value="${esc(c.n)}">${esc(c.c)} · ${esc(c.d)}</option>`).join('');
+
+        const branch = () => branches.find(b => b.branch_code === (isAdmin ? $('branch').value : myBranch)) || {};
+        const dest = () => findCountry($('destCountry').value);
+        const cargo = () => cargoTypes.find(t => t.code === (document.querySelector('input[name="cargo"]:checked') || {}).value);
+        const destCode = (c) => { if (!c) return 'D'; const d = destinations.find(x => x.country_code === c.c && x.active); return d ? d.code : c.c; };
+        const cur = () => branch().currency || 'OMR';
+        const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) && n >= 0 ? n : 0; };
+        const round2 = (n) => Math.round(n * 100) / 100;
+
+        // ---------- boxes ----------
+        function boxRow(i, b = {}) {
+            return `<tr data-box>
+                <td class="p-2 pl-4 font-extrabold text-gray-400">${i + 1}</td>
+                ${['weight', 'l', 'w', 'h'].map(k => `<td class="p-2"><input data-k="${k}" class="field num !py-2 !px-3" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(b[k] ?? '')}" aria-label="Box ${i + 1} ${k}"></td>`).join('')}
+                <td class="p-2 text-right font-bold text-gray-500" data-vol>—</td>
+                <td class="p-2"><button type="button" class="icon-btn !w-8 !h-8" data-remove aria-label="Remove box ${i + 1}">${I('x', 'w-3.5 h-3.5')}</button></td>
+            </tr>`;
+        }
+        function readBoxes() {
+            return [...document.querySelectorAll('[data-box]')].map(tr => {
+                const v = Object.fromEntries([...tr.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value]));
+                const b = { weight: num(v.weight), l: num(v.l), w: num(v.w), h: num(v.h) };
+                b.vol = b.l && b.w && b.h ? round2(b.l * b.w * b.h / 5000) : 0;
+                return b;
+            });
+        }
+        function renumber() { document.querySelectorAll('[data-box]').forEach((tr, i) => { tr.firstElementChild.textContent = i + 1; }); }
+        $('addBox').onclick = () => { $('boxRows').insertAdjacentHTML('beforeend', boxRow(document.querySelectorAll('[data-box]').length)); refresh(); document.querySelector('[data-box]:last-child [data-k="weight"]').focus(); };
+        $('boxRows').addEventListener('click', (e) => {
+            if (!e.target.closest('[data-remove]')) return;
+            if (document.querySelectorAll('[data-box]').length === 1) return toast(false, 'At least one box.');
+            e.target.closest('tr').remove(); renumber(); refresh();
+        });
+        $('boxRows').addEventListener('input', refresh);
+
+        // ---------- live summary ----------
+        function refresh() {
+            const boxes = readBoxes();
+            document.querySelectorAll('[data-box]').forEach((tr, i) => { tr.querySelector('[data-vol]').textContent = boxes[i].vol ? boxes[i].vol : '—'; });
+            const actual = round2(boxes.reduce((s, b) => s + b.weight, 0));
+            const vol = round2(boxes.reduce((s, b) => s + b.vol, 0));
+            const charge = Math.max(actual, vol);
+            $('totActual').textContent = `${actual} kg`; $('totVol').textContent = `${vol} kg`; $('totCharge').textContent = `${charge} kg`;
+            const c = dest(), t = cargo(), b = branch();
+            $('pvD').textContent = destCode(c); $('pvB').textContent = b.booking_code || 'B'; $('pvC').textContent = t ? t.code : 'C';
+            $('destFlag').classList.toggle('hidden', !c); $('destCountry').classList.toggle('!pl-11', Boolean(c));
+            if (c) { $('destFlag').src = `https://flagcdn.com/w40/${c.c.toLowerCase()}.png`; $('rcvDial').textContent = c.d; }
+            $('sumRoute').textContent = `${b.location || '—'} → ${$('rcvCity').value || (c ? c.n : '—')}`;
+            $('sumCargo').textContent = t ? `${t.code} · ${t.name}` : '—';
+            $('sumBoxes').textContent = boxes.length;
+            $('sumWeight').textContent = `${charge} kg`;
+            $('sumAmount').textContent = $('amount').value ? `${cur()} ${num($('amount').value).toFixed(3)}` : '—';
+            $('curLabel').textContent = `(${cur()})`;
+            const bc = COUNTRIES.find(x => x.n === b.country);
+            if (bc) $('senderDial').textContent = bc.d;
+            $('pinBadge').classList.toggle('hidden', !(c && c.c === 'IN'));
+        }
+        ['destCountry', 'rcvCity', 'amount', 'branch'].forEach(id => $(id).addEventListener('input', refresh));
+        $('destCountry').addEventListener('change', refresh);
+        $('cargoOptions').addEventListener('change', refresh);
+        document.querySelectorAll('[data-intake]').forEach(b => b.onclick = () => {
+            intake = b.dataset.intake;
+            document.querySelectorAll('[data-intake]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+        });
+
+        // ---------- India PIN lookup ----------
+        let pinTimer;
+        $('rcvPin').addEventListener('input', () => {
+            clearTimeout(pinTimer);
+            const code = $('rcvPin').value.trim();
+            if (!(dest() && dest().c === 'IN' && /^\d{6}$/.test(code))) { $('pinList').classList.add('hidden'); return; }
+            $('pinBadge').textContent = 'Searching…';
+            pinTimer = setTimeout(async () => {
+                let found = [];
+                try {
+                    const j = await fetch(`https://api.postalpincode.in/pincode/${code}`).then(r => r.json());
+                    found = (j?.[0]?.PostOffice || []).map(p => ({ po: p.Name, city: p.District, state: p.State }));
+                } catch (e) {}
+                $('pinBadge').textContent = found.length ? `${found.length} found` : 'No match';
+                window._pins = found;
+                $('pinList').innerHTML = found.map((p, i) => `<button type="button" onclick="pickPin(${i})" class="w-full text-left px-3 py-2.5 rounded-xl hover:bg-[#F8F8FA]">
+                    <span class="block text-xs font-extrabold">${esc(p.po)}</span><span class="block text-[10px] text-gray-400">${esc(p.city)}, ${esc(p.state)}</span></button>`).join('')
+                    || '<p class="p-3 text-xs text-gray-400 text-center">No post office found.</p>';
+                $('pinList').classList.remove('hidden');
+            }, 300);
+        });
+        window.pickPin = (i) => { const p = window._pins[i]; $('rcvPo').value = p.po; $('rcvCity').value = p.city; $('rcvState').value = p.state; $('pinList').classList.add('hidden'); refresh(); };
+        document.addEventListener('click', (e) => { if (!e.target.closest('#pinList') && e.target.id !== 'rcvPin') $('pinList').classList.add('hidden'); });
+
+        // ---------- submit ----------
+        const phone = (dialId, v) => { const s = String(v || '').trim(); return !s ? '' : s.startsWith('+') ? s : `${$(dialId).textContent} ${s}`; };
+        $('bookingForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const c = dest(), t = cargo(), b = branch(), boxes = readBoxes();
+            const need = [
+                [!b.branch_code, 'branch', 'Choose the booking branch.'], [!c, 'destCountry', 'Choose the destination country from the list.'],
+                [!t, 'cargoOptions', 'Choose a cargo type.'], [!$('senderPhone').value.trim(), 'senderPhone', 'Sender mobile is required.'],
+                [!$('senderName').value.trim(), 'senderName', 'Sender name is required.'], [!$('rcvName').value.trim(), 'rcvName', 'Receiver name is required.'],
+                [!$('rcvPhone').value.trim(), 'rcvPhone', 'Receiver mobile is required.'], [!$('rcvCity').value.trim(), 'rcvCity', 'Receiver district / city is required.'],
+                [!boxes.some(x => x.weight > 0), 'boxRows', 'Enter the weight of at least one box.']
+            ].find(([bad]) => bad);
+            if (need) { toast(false, need[2]); $(need[1])?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+
+            const actual = round2(boxes.reduce((s, x) => s + x.weight, 0));
+            const charge = Math.max(actual, round2(boxes.reduce((s, x) => s + x.vol, 0)));
+            const address = ['rcvHouse', 'rcvStreet', 'rcvLandmark', 'rcvPo', 'rcvCity', 'rcvState', 'rcvPin'].map(id => $(id).value.trim()).filter(Boolean).join(', ');
+            const fields = {
+                shipper: $('senderName').value, shipper_phone: phone('senderDial', $('senderPhone').value), shipper_id_no: $('senderId').value,
+                consignee: $('rcvName').value, consignee_phone: phone('rcvDial', $('rcvPhone').value),
+                receiver_whatsapp: phone('rcvDial', $('rcvWhatsapp').value || $('rcvPhone').value),
+                consignee_address: address, dest_city: $('rcvCity').value, dest_country: c.n, dest_country_code: c.c,
+                origin_city: b.location || '', origin_country: b.country || '',
+                cargo_type_code: t.code, package_type: $('packageType').value, intake_mode: intake,
+                weight: actual, pieces: boxes.length, chargeable_weight: charge, boxes,
+                contents: $('contents').value, declared_value: $('declared').value, amount: $('amount').value,
+                payment_method: $('payment').value, notes: $('notes').value
+            };
+            const summary = `<span class="block bg-[#F8F8FA] rounded-2xl p-4 mt-2 text-xs text-gray-700 leading-6 text-left">
+                Reference <b class="font-mono">${esc(destCode(c))}${esc(b.booking_code)}${esc(t.code)}••••••</b><br>
+                ${esc(fields.shipper)} → <b>${esc(fields.consignee)}</b>, ${esc(fields.dest_city)}, ${esc(c.n)}<br>
+                ${esc(t.name)} · ${boxes.length} box(es) · ${charge} kg chargeable<br>
+                ${fields.amount ? `${esc(cur())} ${num(fields.amount).toFixed(3)} · ${esc($('payment').selectedOptions[0].text)}` : 'No charge entered'}</span>`;
+            if (!await UI.confirm({ title: 'Book this shipment?', message: `Check the details. Choose <b>Cancel</b> to go back and edit.${summary}`, confirmText: 'Book now' })) return;
+
+            $('bookBtn').disabled = true; $('bookBtn').textContent = 'Booking…';
+            try {
+                const out = await api('/api/bookings', { method: 'POST', body: { action: 'create', auto_ref: true, branch: b.branch_code, fields } });
+                if (!out.awb) throw new Error('The booking was saved but no reference came back. Check Shipments before booking again.');
+                done = { ...fields, awb: out.awb, booked_at: new Date().toISOString(), cargo_name: t.name, shipper: fields.shipper, consignee: fields.consignee,
+                         declared_value: fields.declared_value || null, amount: fields.amount || null };
+                $('doneRef').textContent = out.awb;
+                $('doneSub').textContent = `${fields.consignee} · ${fields.dest_city}, ${c.n}`;
+                $('doneView').href = `shipments.html?awb=${encodeURIComponent(out.awb)}`;
+                UI.beep(true);
+                openModal('doneModal');
+            } catch (err) { toast(false, err.message); UI.beep(false); }
+            $('bookBtn').disabled = false; $('bookBtn').textContent = 'Review & book';
+        };
+
+        window.printDone = (kind) => done && ALF_PRINT[kind](done, branch());
+        window.whatsappDone = () => {
+            if (!done) return;
+            const p = String(done.shipper_phone || '').replace(/[^0-9]/g, '');
+            const text = `Hello ${done.shipper},\n\nYour booking with *Al-Farha Cargo* is confirmed.\n\nTracking ID: *${done.awb}*\nTo: ${done.consignee}, ${done.dest_city}, ${done.dest_country}\nBoxes: ${done.pieces} · ${done.chargeable_weight} kg\n\nThank you for choosing Al-Farha Cargo.`;
+            window.open(`https://wa.me/${p}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+        };
+
+        // ---------- init ----------
+        (async function init() {
+            $('boxRows').innerHTML = boxRow(0);
+            try {
+                const [b, c, p] = await Promise.all([api('/api/branches'), api('/api/codes'), api('/api/profile').catch(() => ({}))]);
+                branches = (b.branches || []).filter(x => (x.status || '') !== 'Dismissed');
+                destinations = c.destinations || [];
+                cargoTypes = (c.cargo_types || []).filter(t => t.active);
+                myBranch = p.profile?.branch || null;
+                $('branch').innerHTML = branches.map(x => `<option value="${esc(x.branch_code)}">${esc(x.branch_name)} (${esc(x.branch_code)} · AWB ${esc(x.booking_code)})</option>`).join('');
+                if (!isAdmin) { $('branchWrap').classList.add('hidden'); }
+                else { let s = ''; try { s = localStorage.getItem('alfarha_work_branch') || ''; } catch (e) {} if (branches.some(x => x.branch_code === s)) $('branch').value = s; }
+                $('cargoOptions').innerHTML = cargoTypes.map((t, i) => `
+                    <label class="cargo-opt cursor-pointer">
+                        <input type="radio" name="cargo" value="${esc(t.code)}" class="sr-only" ${i === 0 ? 'checked' : ''}>
+                        <span class="flex items-center gap-2 bg-white border border-gray-200 rounded-2xl px-3 py-3 font-bold text-xs transition-colors">
+                            <span class="code ref-token bg-[#F8F8FA] text-gray-700 !py-1 !px-2">${esc(t.code)}</span>${esc(t.name)}
+                        </span>
+                    </label>`).join('');
+            } catch (e) { toast(false, e.message); }
+            refresh();
+            $('destCountry').focus();
+        })();
+    </script>
+</body>
+</html>

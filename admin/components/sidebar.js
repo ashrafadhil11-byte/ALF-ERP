@@ -39,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         Shipments & AWB
                     </span>
                 </a>
+                <a href="booking.html" class="${navItemClass('booking.html')}">
+                    <svg class="${iconClass('booking.html')}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    New Booking
+                </a>
                 <a href="status-update.html" class="${navItemClass('status-update.html')}">
                     <svg class="${iconClass('status-update.html')}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                     Scan & Update
@@ -92,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { href: 'super-dashboard.html', label: 'Home', d: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>' },
         { href: 'shipments.html', label: 'Shipments', d: '<path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/>' },
         { href: 'status-update.html', label: 'Scan', d: '<path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M7 12h10"/>', primary: true },
-        { href: 'shipments.html?new=1', label: 'New', d: '<path d="M12 5v14M5 12h14"/>' },
+        { href: 'booking.html', label: 'Book', d: '<path d="M12 5v14M5 12h14"/>' },
         { label: 'Menu', d: '<path d="M3 6h18M3 12h18M3 18h18"/>', menu: true }
     ];
     const nav = document.createElement('nav');
