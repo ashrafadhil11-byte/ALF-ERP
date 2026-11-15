@@ -1,7 +1,7 @@
 // File: api/integrations.js — manage 3rd-party APIs (super_admin edits, head_office views).
 // Secrets are write-only: GET never returns them, only which secret fields are set.
 import { requireSession, serviceHeaders, ADMIN_ROLES } from './_lib/auth.js';
-import { ADAPTERS, adapterCatalog } from './_lib/integrations/index.js';
+import { connectorCatalog, testConnector } from './_lib/integrations/http.js';
 
 const KINDS = ['order_source', 'carrier', 'notification', 'other'];
 const PUBLIC_COLS = 'id,name,kind,adapter,base_url,config,active,last_sync_at,last_status,last_error,updated_at';
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
         if (req.method === 'GET') {
             const r = await fetch(`${db}?select=${PUBLIC_COLS},secret&order=kind,name`, { headers: serviceHeaders() });
             const rows = r.ok ? await r.json() : [];
-            return res.status(200).json({ integrations: rows.map(toPublic), adapters: adapterCatalog() });
+            return res.status(200).json({ integrations: rows.map(toPublic), adapters: connectorCatalog() });
         }
 
         const body = req.body || {};
@@ -31,11 +31,9 @@ export default async function handler(req, res) {
             const r = await fetch(`${db}?id=eq.${encodeURIComponent(body.id)}&select=*`, { headers: serviceHeaders() });
             const row = (r.ok ? await r.json() : [])[0];
             if (!row) return res.status(404).json({ error: 'Integration not found.' });
-            const adapter = ADAPTERS[row.adapter];
             let result;
             try {
-                if (!adapter) throw new Error(`No code adapter "${row.adapter}" yet.`);
-                result = await adapter.test(row, body.input || {});
+                result = await testConnector(row, body.input || {});
             } catch (e) {
                 result = { ok: false, message: e.message };
             }
@@ -56,7 +54,7 @@ export default async function handler(req, res) {
             const { id, name, kind, adapter, base_url, config, active, secret } = body;
             if (!name || !String(name).trim()) return res.status(400).json({ error: 'Name is required.' });
             if (!KINDS.includes(kind)) return res.status(400).json({ error: 'Invalid type.' });
-            if (!adapter || !/^[a-z0-9_]+$/.test(adapter)) return res.status(400).json({ error: 'Invalid adapter.' });
+            if (!connectorCatalog().some(c => c.id === adapter)) return res.status(400).json({ error: 'Unknown connector — add it in api/_lib/integrations/connectors.js first.' });
             if (base_url && !/^https:\/\//i.test(base_url)) return res.status(400).json({ error: 'Base URL must start with https://' });
 
             let storedSecret = {};

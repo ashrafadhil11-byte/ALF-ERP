@@ -3,8 +3,9 @@
 //   GET  ?awb=XXX                     one booking + tracking timeline
 //   POST { action:'import', order_nos:[...], branch?, intake_mode? }
 import { requireSession, serviceHeaders, ADMIN_ROLES } from './_lib/auth.js';
-import { ADAPTERS } from './_lib/integrations/index.js';
-import { cleanOrderNo, extractOrder, mapOrderToBooking } from './_lib/booking-map.js';
+import { callApi, loadIntegration } from './_lib/integrations/http.js';
+import CONNECTORS from './_lib/integrations/connectors.js';
+import { cleanOrderNo } from './_lib/booking-map.js';
 
 const MAX_IMPORT = 10; // keeps one request well inside Vercel's time limit
 
@@ -59,9 +60,8 @@ export default async function handler(req, res) {
             const branch = (br.ok ? await br.json() : [])[0];
             if (!branch) return res.status(400).json({ error: `Branch ${branchCode} does not exist.` });
 
-            const ir = await fetch(`${rest}/integrations?adapter=eq.alfarhaonline&active=is.true&select=*&limit=1`, { headers: serviceHeaders() });
-            const integration = (ir.ok ? await ir.json() : [])[0];
-            if (!integration) return res.status(400).json({ error: 'Al-Farha Online is not active. Set it up in Integrations first.' });
+            const integration = await loadIntegration('alfarhaonline');
+            if (!integration || !integration.active) return res.status(400).json({ error: 'Al-Farha Online is not active. Set it up in Integrations first.' });
 
             const intake = body.intake_mode === 'pickup' ? 'pickup' : 'drop_off';
             const userName = session.employee?.full_name || session.user.email;
@@ -70,9 +70,13 @@ export default async function handler(req, res) {
 
             for (const orderNo of orderNos) {
                 try {
-                    const order = extractOrder(await ADAPTERS.alfarhaonline.fetchOrder(integration, orderNo));
-                    if (!order) throw new Error('Order not found.');
-                    const row = mapOrderToBooking(order, orderNo, branch);
+                    let resp;
+                    try {
+                        resp = await callApi('alfarhaonline', 'getOrder', { orderNo }, integration);
+                    } catch (e) {
+                        throw new Error(e.status === 200 || /HTTP 404/.test(e.message) ? 'Order not found.' : e.message);
+                    }
+                    const row = CONNECTORS.alfarhaonline.toBooking(resp, orderNo, branch);
                     const r = await fetch(`${rest}/rpc/import_booking`, {
                         method: 'POST',
                         headers: serviceHeaders(),

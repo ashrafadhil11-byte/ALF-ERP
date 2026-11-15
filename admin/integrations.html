@@ -65,8 +65,8 @@
 
             <p class="text-[11px] text-gray-400 mt-5 leading-relaxed">
                 API keys are stored server-side and never shown again after saving. To connect a brand-new provider,
-                a developer adds a small adapter file in <code class="bg-gray-100 px-1 rounded">api/_lib/integrations/</code>;
-                "Generic REST API" works for a quick connectivity check without code.
+                add it to <code class="bg-gray-100 px-1 rounded">api/_lib/integrations/connectors.js</code> (copy the template at the bottom),
+                push, then add it here. Keys can also come from Vercel environment variables named in that file.
             </p>
         </div>
     </main>
@@ -169,9 +169,9 @@
                     <p class="text-[11px] text-gray-400">${i.secret_set.length ? 'Credentials saved: ' + esc(i.secret_set.join(', ')) : 'No credentials saved'}</p>
                     ${i.last_error ? `<p class="text-[11px] text-coral-600 bg-coral-50 rounded-xl px-3 py-2">${esc(i.last_error)}</p>` : ''}
                     <p class="text-[10px] text-gray-400">${i.last_sync_at ? 'Last check: ' + new Date(i.last_sync_at).toLocaleString() : 'Never checked'}</p>
-                    ${i.adapter === 'alfarhaonline' ? `<input id="testno-${i.id}" class="field !py-2 !text-xs" placeholder="Order no. to test with" aria-label="Order number to test">` : ''}
+                    ${ad && ad.testInput ? `<input id="testno-${i.id}" class="field !py-2 !text-xs" placeholder="${esc(ad.testInput)} to test with" aria-label="${esc(ad.testInput)} to test">` : ''}
                     <div class="flex gap-2 mt-auto pt-2">
-                        <button onclick="testIntegration('${i.id}')" ${ad && !ad.planned ? '' : 'disabled title="Adapter code not written yet"'}
+                        <button onclick="testIntegration('${i.id}')" ${ad && ad.ready ? '' : 'disabled title="No test written for this connector in connectors.js"'}
                             class="flex-1 bg-[#F8F8FA] hover:bg-gray-100 disabled:opacity-40 border border-gray-200/70 text-xs font-bold py-2.5 rounded-full">Test</button>
                         ${canEdit ? `<button onclick="openForm('${i.id}')" class="flex-1 bg-[#111827] hover:bg-gray-800 text-white text-xs font-bold py-2.5 rounded-full">Edit</button>` : ''}
                     </div>
@@ -244,10 +244,10 @@
         window.testIntegration = async function (id) {
             const i = items.find(x => x.id === id);
             const input = {};
-            if (i.adapter === 'alfarhaonline') {
-                const no = (document.getElementById(`testno-${id}`)?.value || '').trim();
-                if (!no) return showAlert(false, 'Enter an order number to test with.');
-                input.order_no = no;
+            const box = document.getElementById(`testno-${id}`);
+            if (box) {
+                input.value = box.value.trim();
+                if (!input.value) return showAlert(false, 'Enter a value to test with.');
             }
             try {
                 const r = await api('POST', { action: 'test', id, input });

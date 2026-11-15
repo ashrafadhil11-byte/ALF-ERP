@@ -3,13 +3,15 @@ import test from 'node:test';
 import assert from 'node:assert';
 import bookings from '../api/bookings.js';
 import status from '../api/status.js';
-import { mapOrderToBooking, extractOrder, cleanOrderNo } from '../api/_lib/booking-map.js';
+import { cleanOrderNo } from '../api/_lib/booking-map.js';
+import CONNECTORS from '../api/_lib/integrations/connectors.js';
 
 process.env.SUPABASE_URL = 'https://x.supabase.co';
 
 function fake(employee, routes = {}) {
     const calls = [];
-    globalThis.fetch = async (url, opts = {}) => {
+    globalThis.fetch = async (u, opts = {}) => {
+        const url = String(u);
         calls.push({ url: decodeURIComponent(url), opts });
         const json = (body, ok = true) => ({ ok, status: ok ? 200 : 400, json: async () => body, text: async () => JSON.stringify(body) });
         if (url.includes('/auth/v1/user')) return json({ id: 'u1', email: 'a@b.c' });
@@ -22,19 +24,33 @@ function fake(employee, routes = {}) {
 const res = () => ({ code: 200, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } });
 const req = (method, { query = {}, body } = {}) => ({ method, query, body, headers: { authorization: 'Bearer t' } });
 
-test('booking-map: alfwebapp field rules', () => {
-    const o = extractOrder({ response: 'success', data: [{ o_unique_id: 'AB 12', sender_name: 'ALI khan', receiver_district: 'KOCHI', receiver_country: 'india', cargotype: 'MAIL', total_box: '2', chargeable_weight: '4.2' }] });
-    const r = mapOrderToBooking(o, "'ab12", { branch_code: 'MCT', location: 'Muscat' });
-    assert.deepEqual([r.awb, r.external_ref, r.shipper, r.dest_city, r.dest_country, r.package_type, r.pieces, r.weight, r.origin_city, r.origin_country],
-        ['AB12', 'AB12', 'Ali Khan', 'Kochi', 'India', 'Document', 2, 4.2, 'Muscat', 'Oman']);
+// Response copied from the Al-Farha Online API document (totals sit OUTSIDE data[0]).
+const DOC_RESPONSE = {
+    response: 'success',
+    data: [{ o_unique_id: '412 0431', order_date: '2024-09-16', booking_branch: 'AL-FARHA CARGO SALALAH', cargotype: 'AIR', order_from: 'Oman',
+        sender_name: 'SANGITA TAMANG', sender_id: '120979611', sender_phone: '99419783', sender_whatsappno: '',
+        receiver_name: 'SUBASH TAMANG', receiver_mobile: '9843468814', receiver_aadhar_id: '', receiver_housename: 'X',
+        receiver_postoffice: 'BHAKTAPUR', receiver_pincode: 0, receiver_street: 'GATTTHAGHAR  MARG BISAUNI RESTO',
+        receiver_district: 'BHAKTAPUR', receiver_state: 'BAGMATI PROVINCE', receiver_country: 'Nepal', receiver_landmark: '', receiver_whatsapp: '9749719785' }],
+    total_box: 1,
+    total_weight: 21.5
+};
+
+test('alfarhaonline.toBooking: maps the documented response', () => {
+    const r = CONNECTORS.alfarhaonline.toBooking(DOC_RESPONSE, '412 0431', { branch_code: 'SLL', location: 'Salalah' });
+    assert.deepEqual(
+        [r.awb, r.external_ref, r.shipper, r.shipper_phone, r.consignee, r.consignee_phone, r.dest_city, r.dest_country, r.package_type, r.pieces, r.weight, r.origin_city],
+        ['4120431', '4120431', 'Sangita Tamang', '99419783', 'Subash Tamang', '9843468814', 'Bhaktapur', 'Nepal', 'Air Freight', 1, 21.5, 'Salalah']);
+    assert.equal(r.consignee_address, 'GATTTHAGHAR  MARG BISAUNI RESTO, BHAKTAPUR, BHAKTAPUR, BAGMATI PROVINCE'); // "X" and pincode 0 dropped
+    assert.equal(r.raw.total_weight, 21.5);
     assert.equal(cleanOrderNo(" 'x 1 "), 'X1');
 });
 
 const ORDER = { response: 'success', data: [{ o_unique_id: 'ALF1', sender_name: 'A', receiver_name: 'B', receiver_country: 'Nepal' }] };
 const importRoutes = (extra = {}) => ({
     '/rest/v1/branches': () => [{ branch_code: 'MCT', branch_name: 'Muscat', location: 'Muscat' }],
-    '/rest/v1/integrations?adapter': () => [{ id: 'i1', adapter: 'alfarhaonline', base_url: 'https://api.test', secret: { api_key: 'K' } }],
-    'api.test/api/order-details': () => ORDER,
+    '/rest/v1/integrations?adapter': () => [{ id: 'i1', adapter: 'alfarhaonline', active: true, base_url: 'https://api.test', secret: { api_key: 'K' } }],
+    'api.test/api/order-details': (u, o) => (o.headers['X-API-KEY'] === 'K' && o.method === 'POST' && u.includes('order_no=ALF1') ? ORDER : { __fail: {} }),
     'rpc/import_booking': (u, o) => ({ result: 'imported', awb: JSON.parse(o.body).p_row.awb }),
     ...extra
 });
