@@ -116,8 +116,8 @@
                             <div><label class="ui-label" for="rcvStreet">Street</label><input id="rcvStreet" class="field"></div>
                             <div><label class="ui-label" for="rcvLandmark">Landmark</label><input id="rcvLandmark" class="field"></div>
                             <div class="relative">
-                                <label class="ui-label" for="rcvPin">PIN / postal code</label>
-                                <div class="relative"><input id="rcvPin" class="field !pr-24" inputmode="numeric"><span id="pinBadge" class="absolute right-3 top-1/2 -translate-y-1/2 pill-tag pill-gray hidden">Lookup</span></div>
+                                <label class="ui-label" for="rcvPin" id="rcvPinLabel">Postal / ZIP code</label>
+                                <div class="relative"><input id="rcvPin" class="field !pr-24" autocomplete="off"><span id="pinBadge" class="absolute right-3 top-1/2 -translate-y-1/2 pill-tag pill-gray hidden">Lookup</span></div>
                                 <div id="pinList" class="hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl p-1.5 max-h-60 overflow-y-auto custom-scrollbar"></div>
                             </div>
                             <div><label class="ui-label" for="rcvPo">Post office / area</label><input id="rcvPo" class="field"></div>
@@ -269,7 +269,10 @@
             $('curLabel').textContent = `(${cur()})`;
             const bc = COUNTRIES.find(x => x.n === b.country);
             if (bc) $('senderDial').textContent = bc.d;
-            $('pinBadge').classList.toggle('hidden', !(c && c.c === 'IN'));
+            $('pinBadge').classList.toggle('hidden', !c);
+            const sa = c && c.c === 'SA';
+            $('rcvPinLabel').textContent = !c ? 'Postal / ZIP code' : c.c === 'IN' ? 'PIN code' : c.c === 'US' ? 'ZIP code' : sa ? 'Short address or postal code' : 'Postcode / postal code';
+            $('rcvPin').placeholder = sa ? 'e.g. RAAA2919' : c && c.c === 'GB' ? 'e.g. SW1A 1AA' : c && c.c === 'CA' ? 'e.g. M5V 3L9' : '';
         }
         ['destCountry', 'rcvCity', 'amount', 'branch'].forEach(id => $(id).addEventListener('input', refresh));
         // Destination country → receiver state → district / city (any value can also be typed)
@@ -299,29 +302,18 @@
             document.querySelectorAll('[data-intake]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
         });
 
-        // ---------- India PIN lookup ----------
-        let pinTimer;
-        $('rcvPin').addEventListener('input', () => {
-            clearTimeout(pinTimer);
-            const code = $('rcvPin').value.trim();
-            if (!(dest() && dest().c === 'IN' && /^\d{6}$/.test(code))) { $('pinList').classList.add('hidden'); return; }
-            $('pinBadge').textContent = 'Searching…';
-            pinTimer = setTimeout(async () => {
-                let found = [];
-                try {
-                    const j = await fetch(`https://api.postalpincode.in/pincode/${code}`).then(r => r.json());
-                    found = (j?.[0]?.PostOffice || []).map(p => ({ po: p.Name, city: p.District, state: p.State }));
-                } catch (e) {}
-                $('pinBadge').textContent = found.length ? `${found.length} found` : 'No match';
-                window._pins = found;
-                $('pinList').innerHTML = found.map((p, i) => `<button type="button" onclick="pickPin(${i})" class="w-full text-left px-3 py-2.5 rounded-xl hover:bg-[#F8F8FA]">
-                    <span class="block text-xs font-extrabold">${esc(p.po)}</span><span class="block text-[10px] text-gray-400">${esc(p.city)}, ${esc(p.state)}</span></button>`).join('')
-                    || '<p class="p-3 text-xs text-gray-400 text-center">No post office found.</p>';
-                $('pinList').classList.remove('hidden');
-            }, 300);
+        // ---------- Postcode / ZIP / PIN / Saudi short address lookup (all countries, via /api/postal-lookup) ----------
+        UI.postalLookup($('rcvPin'), $('pinList'), $('pinBadge'), {
+            country: () => (dest() || {}).c || '',
+            onPick: (p) => {
+                $('rcvPin').value = p.postalCode || $('rcvPin').value;
+                $('rcvPo').value = p.postOffice || '';
+                if (p.building) $('rcvHouse').value = `Bldg ${p.building}`;
+                if (p.street) $('rcvStreet').value = p.street;
+                if (p.shortAddress || p.additionalNumber) $('rcvLandmark').value = [p.shortAddress && `Short address ${p.shortAddress}`, p.additionalNumber && `Addl no ${p.additionalNumber}`].filter(Boolean).join(' · ');
+                stateBox.setValue(p.state || '').then(() => { rcvState = stateBox.value; return cityBox.setValue(p.city || ''); }).then(refresh);
+            }
         });
-        window.pickPin = (i) => { const p = window._pins[i]; $('rcvPo').value = p.po; stateBox.setValue(p.state).then(() => { rcvState = stateBox.value; return cityBox.setValue(p.city); }).then(refresh); $('pinList').classList.add('hidden'); refresh(); };
-        document.addEventListener('click', (e) => { if (!e.target.closest('#pinList') && e.target.id !== 'rcvPin') $('pinList').classList.add('hidden'); });
 
         // ---------- submit ----------
         const phone = (dialId, v) => { const s = String(v || '').trim(); return !s ? '' : s.startsWith('+') ? s : `${$(dialId).textContent} ${s}`; };

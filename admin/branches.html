@@ -180,9 +180,9 @@
                     <div><label class="ui-label" for="b_state">State / governorate</label><input id="b_state" class="field" placeholder="Select country first" disabled></div>
                     <div><label class="ui-label" for="b_city">City <span class="req">*</span></label><input id="b_city" class="field" placeholder="Select state first" disabled></div>
                     <div class="relative">
-                        <label class="ui-label" for="b_postal">Postal / PIN code</label>
+                        <label class="ui-label" for="b_postal">Postal / ZIP / short address</label>
                         <div class="relative">
-                            <input id="b_postal" class="field !pr-24" placeholder="e.g. 211 or 670561">
+                            <input id="b_postal" class="field !pr-24" placeholder="e.g. 211, 670561, SW1A 1AA" autocomplete="off">
                             <span id="postalBadge" class="absolute right-3 top-1/2 -translate-y-1/2 pill-tag pill-gray">Lookup</span>
                         </div>
                         <div id="postalList" class="hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl p-1.5 max-h-60 overflow-y-auto custom-scrollbar"></div>
@@ -473,44 +473,17 @@
         $('b_digit').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 2); refreshPreview(); });
         $('pvDest').onchange = refreshPreview; $('pvCargo').onchange = refreshPreview;
 
-        // Postal / PIN lookup: India Post directly, others through the server (key stays server-side)
-        let postalTimer;
-        $('b_postal').addEventListener('input', () => {
-            clearTimeout(postalTimer);
-            const code = $('b_postal').value.trim(), list = $('postalList');
-            if (code.length < 3) { list.classList.add('hidden'); $('postalBadge').textContent = 'Lookup'; return; }
-            $('postalBadge').textContent = 'Searching…';
-            postalTimer = setTimeout(async () => {
-                const cc = (findCountry($('b_country').value) || {}).c || '';
-                let found = [];
-                if ((cc === 'IN' || !cc) && /^\d{6}$/.test(code)) {
-                    try {
-                        const j = await fetch(`https://api.postalpincode.in/pincode/${code}`).then(r => r.json());
-                        found = (j?.[0]?.PostOffice || []).map(p => ({ postOffice: p.Name, city: p.District || p.Block || '', state: p.State || '', postalCode: code }));
-                    } catch (e) {}
-                }
-                if (!found.length) {
-                    try { found = (await fetch(`/api/postal-lookup?code=${encodeURIComponent(code)}&countryCode=${encodeURIComponent(cc)}`).then(r => r.json())).locations || []; } catch (e) {}
-                }
-                $('postalBadge').textContent = found.length ? `${found.length} found` : 'No match';
-                window._postal = found;
-                list.innerHTML = found.length ? found.map((l, i) => `
-                    <button type="button" onclick="pickPostal(${i})" class="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F8F8FA] text-left">
-                        <span class="min-w-0"><span class="block text-xs font-extrabold truncate">${esc(l.postOffice)}</span><span class="block text-[10px] text-gray-400 truncate">${esc([l.city, l.state].filter(Boolean).join(', '))}</span></span>
-                        <span class="pill-tag pill-coral font-mono">${esc(l.postalCode)}</span></button>`).join('')
-                    : `<p class="p-3 text-xs text-gray-400 text-center">No areas found for "${esc(code)}"</p>`;
-                list.classList.remove('hidden');
-            }, 300);
+        // Postcode / ZIP / PIN / Saudi short address lookup (providers in api/_lib/integrations/connectors.js)
+        UI.postalLookup($('b_postal'), $('postalList'), $('postalBadge'), {
+            country: () => (findCountry($('b_country').value) || {}).c || '',
+            onPick: (l) => {
+                $('b_postal').value = l.postalCode || $('b_postal').value;
+                $('b_po').value = l.postOffice || '';
+                const street = [l.building && `Bldg ${l.building}`, l.street, l.shortAddress && `Short address ${l.shortAddress}`, l.additionalNumber && `Addl no ${l.additionalNumber}`].filter(Boolean).join(', ');
+                if (street) $('b_street').value = street;
+                stateBox.setValue(l.state || '').then(() => { curState = stateBox.value; $('b_city').disabled = false; return cityBox.setValue(l.city || l.postOffice || ''); }).then(() => { suggestCode(); composeAddress(); });
+            }
         });
-        window.pickPostal = (i) => {
-            const l = window._postal[i];
-            $('b_postal').value = l.postalCode || $('b_postal').value;
-            $('b_po').value = l.postOffice || '';
-            stateBox.setValue(l.state || '').then(() => { curState = stateBox.value; $('b_city').disabled = false; return cityBox.setValue(l.city || l.postOffice || ''); }).then(() => { suggestCode(); composeAddress(); });
-            $('postalList').classList.add('hidden');
-            suggestCode(); composeAddress();
-        };
-        document.addEventListener('click', (e) => { if (!e.target.closest('#postalList') && e.target.id !== 'b_postal') $('postalList').classList.add('hidden'); });
 
         $('branchForm').onsubmit = async (e) => {
             e.preventDefault();

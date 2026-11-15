@@ -26,6 +26,11 @@
 //                  path can be a string or ctx => string. body: object → JSON, string → sent as is (XML etc.)
 //   testInput      label for the input box next to the Test button (e.g. 'Order no.')
 //   test({ call, input })  what the Test button does; return { ok, message, sample? }
+//   postal         ADDRESS LOOKUP ONLY: { priority, covers(code, cc), lookup({ call }, code, cc) → places }
+//                  places = [{ postOffice, city, state, postalCode, countryCode, street?, building?,
+//                              additionalNumber?, shortAddress?, lat?, lng? }]
+//                  /api/postal-lookup tries each connector whose covers() is true, lowest priority first,
+//                  and returns the first non-empty result. New country = new connector here.
 //   fetchEvents({ call }, awb)  CARRIERS ONLY: return the tracking events (any order):
 //                  [{ at: ISO time, description, location, remark, code: <our status code or null> }]
 //                  The carrier sync job uses this to update shipment statuses automatically.
@@ -75,6 +80,11 @@ export function carrierForAgent(agent) {
     if (a.includes('DHL')) return 'dhl';
     return '17track'; // FedEx, UPS, India Post, etc. — 17Track covers most carriers
 }
+
+// Saudi National Address short address: 4 letters + 4 digits, e.g. RAAA2919
+export const SA_SHORT = /^[A-Z]{4}\d{4}$/i;
+// Countries zippopotam.us covers
+const ZIPPO = new Set('AD AR AS AT AU BD BE BG BR CA CH CZ DE DK DO ES FI FO FR GB GF GG GL GP GT GU HR HU IM IN IS IT JE JP LI LK LT LU MC MD MH MK MP MQ MX MY NL NO NZ PH PK PL PM PR PT RE RU SE SI SJ SK SM TH TR US VA VI YT ZA'.split(' '));
 
 const toIso = (v) => {
     const d = new Date(v);
@@ -301,6 +311,153 @@ export default {
             const updates = (xml.match(/<TrackingResult>/g) || []).length;
             return { ok: true, message: `${updates} tracking updates returned` };
         }
+    },
+
+    // =================================================================
+    //  POSTAL / ADDRESS LOOKUP  (used by /api/postal-lookup)
+    // =================================================================
+
+    // India Post — 6-digit PIN → post offices. Free, no key.
+    india_post: {
+        label: 'India Post (PIN code lookup, free)',
+        kinds: ['other'],
+        baseUrl: 'https://api.postalpincode.in',
+        endpoints: { pin: { method: 'GET', path: ({ params }) => `/pincode/${enc(params.code)}` } },
+        postal: {
+            priority: 10,
+            covers: (code, cc) => (cc === 'IN' || !cc) && /^\d{6}$/.test(code),
+            async lookup({ call }, code) {
+                const d = await call('pin', { code });
+                return (d?.[0]?.PostOffice || []).map(p => ({
+                    postOffice: p.Name, city: p.District || p.Block || '', state: p.State || '', postalCode: code, countryCode: 'IN'
+                }));
+            }
+        },
+        testInput: 'PIN code',
+        async test({ call, input }) { const d = await call('pin', { code: clean(input.value) }); return { ok: true, message: `${(d?.[0]?.PostOffice || []).length} post offices` }; }
+    },
+
+    // UK — postcodes.io (Royal Mail / ONS open data). Full or partial postcode. Free, no key.
+    postcodes_io: {
+        label: 'UK postcodes (postcodes.io, free)',
+        kinds: ['other'],
+        baseUrl: 'https://api.postcodes.io',
+        endpoints: { search: { method: 'GET', path: '/postcodes', query: ({ params }) => ({ q: params.code, limit: 15 }) } },
+        postal: {
+            priority: 10,
+            covers: (code, cc) => cc === 'GB' && /^[A-Z]{1,2}\d/i.test(code),
+            async lookup({ call }, code) {
+                const d = await call('search', { code });
+                return (d?.result || []).map(r => ({
+                    postOffice: r.admin_ward || r.parish || '', city: r.admin_district || '',
+                    state: r.admin_county || r.region || r.country || '', postalCode: r.postcode, countryCode: 'GB',
+                    lat: r.latitude, lng: r.longitude
+                }));
+            }
+        },
+        testInput: 'Postcode',
+        async test({ call, input }) { const d = await call('search', { code: clean(input.value) }); return { ok: true, message: `${(d?.result || []).length} postcodes` }; }
+    },
+
+    // Saudi Arabia — National Address (SPL). Short Address (ABCD1234) or 5-digit zip. Needs an API key:
+    // National Address developer portal → Profile → subscription key → paste in Integrations.
+    // If the portal shows a different URL or path, change it in Integrations (no code change needed).
+    saudi_address: {
+        label: 'Saudi National Address (Short Address / zip)',
+        kinds: ['other'],
+        baseUrl: 'https://apina.address.gov.sa',
+        secrets: { api_key: 'SAUDI_ADDRESS_API_KEY' },
+        config: {
+            short_address_path: '/NationalAddressByShortAddress/NationalAddressByShortAddress',
+            zip_path: '/NationalAddress/v3.1/address/address-fixed-params',
+            language: 'E'
+        },
+        // The old portal reads ?api_key=, the Azure portal reads this header — send both.
+        headers: ({ secrets }) => ({ 'Ocp-Apim-Subscription-Key': secrets.api_key }),
+        endpoints: {
+            short: {
+                method: 'GET', path: ({ config }) => config.short_address_path,
+                query: ({ params, secrets, config }) => ({ shortaddress: params.code, language: config.language, format: 'json', encode: 'utf8', api_key: secrets.api_key })
+            },
+            zip: {
+                method: 'GET', path: ({ config }) => config.zip_path,
+                query: ({ params, secrets, config }) => ({ zipcode: params.code, language: config.language, format: 'json', encode: 'utf8', page: 1, api_key: secrets.api_key })
+            }
+        },
+        postal: {
+            priority: 5,
+            covers: (code, cc) => cc === 'SA' && (SA_SHORT.test(code) || /^\d{5}$/.test(code)),
+            async lookup({ call }, code) {
+                const isShort = SA_SHORT.test(code);
+                const d = await call(isShort ? 'short' : 'zip', { code: code.toUpperCase() });
+                return (d?.Addresses || d?.addresses || []).map(a => ({
+                    postOffice: clean(a.District), city: clean(a.City), state: clean(a.RegionName || a.Region),
+                    postalCode: clean(a.PostCode), countryCode: 'SA',
+                    street: clean(a.Street), building: clean(a.BuildingNumber), additionalNumber: clean(a.AdditionalNumber),
+                    shortAddress: isShort ? code.toUpperCase() : clean(a.ShortAddress),
+                    lat: num(a.Latitude), lng: num(a.Longitude)
+                }));
+            }
+        },
+        testInput: 'Short address (e.g. RAAA2919)',
+        async test({ call, input }) {
+            const d = await call('short', { code: clean(input.value).toUpperCase() });
+            const a = (d?.Addresses || [])[0];
+            return { ok: Boolean(a), message: a ? `${a.BuildingNumber} ${a.Street}, ${a.District}, ${a.City} ${a.PostCode}` : 'No address found for that short address' };
+        }
+    },
+
+    // ~70 countries incl. USA, Canada (first 3 chars), Australia, Germany, France, Japan… Free, no key.
+    zippopotam: {
+        label: 'Zippopotam (US, CA, AU, EU & more — free)',
+        kinds: ['other'],
+        baseUrl: 'https://api.zippopotam.us',
+        endpoints: { lookup: { method: 'GET', path: ({ params }) => `/${enc(params.cc.toLowerCase())}/${enc(params.code)}` } },
+        postal: {
+            priority: 20,
+            covers: (code, cc) => ZIPPO.has(cc),
+            async lookup({ call }, code, cc) {
+                // Canada and UK are indexed by the first part only (FSA / outward code)
+                const q = cc === 'CA' ? code.replace(/\s+/g, '').slice(0, 3)
+                    : cc === 'GB' ? code.split(/\s+/)[0]
+                    : code;
+                const d = await call('lookup', { cc, code: q.toUpperCase() });
+                return (d?.places || []).map(p => ({
+                    postOffice: p['place name'], city: clean(p['place name'].replace(/\s*\(.*\)/, '')), state: p.state || '', stateCode: p['state abbreviation'] || '',
+                    postalCode: cc === 'CA' ? code.toUpperCase() : d['post code'], countryCode: cc,
+                    lat: num(p.latitude), lng: num(p.longitude)
+                }));
+            }
+        },
+        testInput: 'US zip (e.g. 10001)',
+        async test({ call, input }) {
+            const d = await call('lookup', { cc: 'us', code: clean(input.value) });
+            return { ok: true, message: (d?.places || []).map(p => `${p['place name']}, ${p['state abbreviation']}`).join(' · ') || 'No match' };
+        }
+    },
+
+    // Zipcodebase — paid global fallback (any country). Key: Integrations or ZIPCODEBASE_API_KEY.
+    zipcodebase: {
+        label: 'Zipcodebase (global postcodes, needs key)',
+        kinds: ['other'],
+        baseUrl: 'https://app.zipcodebase.com',
+        secrets: { api_key: 'ZIPCODEBASE_API_KEY' },
+        headers: ({ secrets }) => ({ apikey: secrets.api_key }),
+        endpoints: { search: { method: 'GET', path: '/api/v1/search', query: ({ params }) => ({ codes: params.code, country: params.cc || undefined }) } },
+        postal: {
+            priority: 90,
+            covers: (code) => !SA_SHORT.test(code),
+            async lookup({ call }, code, cc) {
+                const d = await call('search', { code, cc });
+                return (d?.results?.[code] || []).map(r => ({
+                    postOffice: r.city || r.province || code, city: r.city_en || r.city || r.county || '',
+                    state: r.state || r.state_en || r.province || '', postalCode: r.postal_code || code,
+                    countryCode: r.country_code || cc, lat: num(r.latitude), lng: num(r.longitude)
+                }));
+            }
+        },
+        testInput: 'Postcode',
+        async test({ call, input }) { const d = await call('search', { code: clean(input.value) }); return { ok: true, message: `${Object.values(d?.results || {}).flat().length} places` }; }
     },
 
     // -----------------------------------------------------------------

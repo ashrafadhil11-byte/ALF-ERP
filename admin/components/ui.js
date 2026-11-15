@@ -383,5 +383,46 @@ window.UI = (() => {
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
 
-    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems };
+    /**
+     * Postcode / ZIP / PIN / Saudi short-address lookup on an input. Calls /api/postal-lookup (providers in connectors.js).
+     *   UI.postalLookup(input, listEl, badgeEl, { country: () => 'GB', onPick: (place) => {...} })
+     */
+    function postalLookup(input, list, badge, { country, onPick }) {
+        let timer, seq = 0, found = [];
+        const hide = () => list.classList.add('hidden');
+        const setBadge = (t) => { if (badge) badge.textContent = t; };
+        input.addEventListener('input', () => {
+            clearTimeout(timer);
+            const code = input.value.trim(), cc = country();
+            if (code.length < 3 || !cc) { hide(); setBadge('Lookup'); return; }
+            if (cc === 'SA' && /^[a-z]/i.test(code)) input.value = input.value.toUpperCase();
+            timer = setTimeout(async () => {
+                const mine = ++seq;
+                setBadge('Searching…');
+                let j = {};
+                try { j = await api(`/api/postal-lookup?code=${encodeURIComponent(code)}&countryCode=${encodeURIComponent(cc)}`); } catch (e) { j = { errors: [e.message] }; }
+                if (mine !== seq) return; // a newer search is running
+                found = j.locations || [];
+                setBadge(found.length ? `${found.length} found` : 'No match');
+                const keyHint = (j.errors || []).find(e => /Missing api_key|HTTP 401|HTTP 403/i.test(e));
+                list.innerHTML = found.length ? found.map((l, i) => `
+                    <button type="button" data-i="${i}" class="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F8F8FA] text-left">
+                        <span class="min-w-0"><span class="block text-xs font-extrabold truncate">${esc([l.building, l.street, l.postOffice].filter(Boolean).join(' · ') || l.city)}</span>
+                        <span class="block text-[10px] text-gray-400 truncate">${esc([l.city, l.state].filter(Boolean).join(', '))}</span></span>
+                        <span class="pill-tag pill-coral font-mono flex-shrink-0">${esc(l.shortAddress || l.postalCode || '')}</span></button>`).join('')
+                    : `<p class="p-3 text-xs text-gray-400 text-center">${keyHint ? `No match. ${esc(keyHint)}` :`Nothing found for "${esc(code)}" — type the address manually.`}</p>`;
+                list.classList.remove('hidden');
+            }, 400);
+        });
+        list.addEventListener('click', (e) => {
+            const b = e.target.closest('button[data-i]');
+            if (!b) return;
+            hide();
+            onPick(found[+b.dataset.i]);
+        });
+        document.addEventListener('click', (e) => { if (!list.contains(e.target) && e.target !== input) hide(); });
+        input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+    }
+
+    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup };
 })();
