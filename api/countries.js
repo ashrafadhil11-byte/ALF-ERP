@@ -92,12 +92,12 @@ export default async function handler(req, res) {
     }
 
     const query = (req.query.q || '').trim();
-    const API_KEY = process.env.RESTCOUNTRIES_API_KEY || 'rc_live_123b103f9d2647f3a9b0a66d5cbf42de';
+    const API_KEY = process.env.RESTCOUNTRIES_API_KEY;
 
     let extractedList = [];
 
     // 1. Primary: Call api.restcountries.com/countries/v5 with Bearer Key
-    if (query) {
+    if (query && API_KEY) {
         try {
             const v5Res = await fetch(
                 `https://api.restcountries.com/countries/v5?q=${encodeURIComponent(query)}&pretty=1`,

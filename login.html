@@ -206,7 +206,7 @@
                     // Securely store data
                     localStorage.setItem('cargo_auth_token', token);
                     
-                    const userRole = user.user_metadata?.role || 'employee';
+                    const userRole = result.role || 'staff';
                     localStorage.setItem('cargo_user_role', userRole);
 
                     // Role-Based Redirection

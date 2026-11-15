@@ -850,7 +850,7 @@
                     } catch (e) {}
                 }
 
-                // 2. Try Backend /api/postal-lookup (Zipcodebase API: be0273c0-c868-11f1-a720-497e79275709)
+                // 2. Try Backend /api/postal-lookup (Zipcodebase key stays server-side)
                 if (locations.length === 0) {
                     try {
                         const res = await fetch(`/api/postal-lookup?code=${encodeURIComponent(code)}&countryCode=${encodeURIComponent(iso2)}`);
@@ -858,31 +858,6 @@
                             const data = await res.json();
                             if (Array.isArray(data.locations) && data.locations.length > 0) {
                                 locations = data.locations;
-                            }
-                        }
-                    } catch (e) {}
-                }
-
-                // 3. Direct Zipcodebase Fallback
-                if (locations.length === 0) {
-                    try {
-                        const zipUrl = new URL('https://app.zipcodebase.com/api/v1/search');
-                        zipUrl.searchParams.set('codes', code);
-                        if (iso2) zipUrl.searchParams.set('country', iso2);
-                        const zipRes = await fetch(zipUrl.toString(), {
-                            headers: { 'apikey': 'be0273c0-c868-11f1-a720-497e79275709' }
-                        });
-                        if (zipRes.ok) {
-                            const zipData = await zipRes.json();
-                            const arr = zipData?.results?.[code];
-                            if (Array.isArray(arr)) {
-                                locations = arr.map(item => ({
-                                    postOffice: item.city || item.province || code,
-                                    city: item.city_en || item.city || item.county || '',
-                                    state: item.state || item.state_en || item.province || '',
-                                    postalCode: item.postal_code || code,
-                                    countryCode: item.country_code || iso2
-                                }));
                             }
                         }
                     } catch (e) {}

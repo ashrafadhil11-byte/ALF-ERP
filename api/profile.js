@@ -1,3 +1,4 @@
+import { normalizeRole } from './_lib/auth.js';
 // File: api/profile.js
 export default async function handler(req, res) {
     const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
                     id: userId,
                     full_name: emp.full_name || meta.full_name || 'Muhammed Adhil',
                     username: emp.username || meta.username || 'admin',
-                    role: emp.role || meta.role || 'super_admin',
+                    role: normalizeRole(emp.role) || normalizeRole(authUser.app_metadata?.role) || 'staff',
                     branch: emp.branch || meta.branch || 'Global (All Branches)',
                     contact_number: emp.contact_number || meta.contact_number || 'Not Set',
                     recovery_email: emp.recovery_email || authUser.email || 'Not Set',

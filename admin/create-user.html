@@ -125,9 +125,10 @@
                             <select id="role" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-orange focus:border-transparent text-sm transition-all duration-200 appearance-none cursor-pointer">
                                 <option value="" disabled selected>Select a role...</option>
                                 <option value="super_admin">Super Admin</option>
-                                <option value="branch_admin">Branch Admin</option>
-                                <option value="employee">Employee</option>
-                                <option value="driver">Driver</option>
+                                <option value="head_office">Head Office</option>
+                                <option value="branch_manager">Branch Manager</option>
+                                <option value="staff">Staff</option>
+                                <option value="driver">Driver (Staff)</option>
                             </select>
                         </div>
 
@@ -233,7 +234,10 @@
             try {
                 const response = await fetch('/api/create-user', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('cargo_auth_token') || ''}`
+                    },
                     body: JSON.stringify(payload)
                 });
 

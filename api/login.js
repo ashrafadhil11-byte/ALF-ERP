@@ -1,9 +1,14 @@
+import { normalizeRole, serviceHeaders } from './_lib/auth.js';
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { username, password } = req.body;
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password are required.' });
+    }
 
     const SUPABASE_URL = process.env.SUPABASE_URL;
     const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -14,7 +19,7 @@ export default async function handler(req, res) {
 
         // 1. Look up the real email from the username
         if (!username.includes('@')) {
-            const lookupRes = await fetch(`${SUPABASE_URL}/rest/v1/employees?username=eq.${username}&select=recovery_email`, {
+            const lookupRes = await fetch(`${SUPABASE_URL}/rest/v1/employees?username=eq.${encodeURIComponent(username)}&select=recovery_email`, {
                 method: 'GET',
                 headers: {
                     'apikey': SUPABASE_SERVICE_KEY,
@@ -53,11 +58,18 @@ export default async function handler(req, res) {
             return res.status(response.status).json({ error: data.error_description || 'Invalid login credentials' });
         }
 
-        // 3. THE FIX: Pass the token and user directly from the raw Supabase response back to the frontend
+        // 3. Role from the employees table / app_metadata (never user_metadata, which users can edit)
+        const empRes = await fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${encodeURIComponent(data.user.id)}&select=role`, {
+            headers: serviceHeaders()
+        });
+        const empRows = empRes.ok ? await empRes.json() : [];
+        const role = normalizeRole(empRows[0]?.role) || normalizeRole(data.user.app_metadata?.role) || 'staff';
+
         return res.status(200).json({ 
             success: true, 
             access_token: data.access_token,
-            user: data.user 
+            user: data.user,
+            role
         });
 
     } catch (error) {

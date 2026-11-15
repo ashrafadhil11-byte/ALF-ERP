@@ -5,7 +5,7 @@ export default async function handler(req, res) {
     }
 
     const { code, countryCode, countryName, mode } = req.query;
-    const ZIPCODEBASE_KEY = process.env.ZIPCODEBASE_API_KEY || 'be0273c0-c868-11f1-a720-497e79275709';
+    const ZIPCODEBASE_KEY = process.env.ZIPCODEBASE_API_KEY;
 
     try {
         // =====================================================================

@@ -1,58 +1,15 @@
 // File: api/branches.js
-function verifyJwtFallback(authHeader) {
-    if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-    try {
-        const token = authHeader.replace('Bearer ', '').trim();
-        const parts = token.split('.');
-        if (parts.length !== 3) return null;
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
-        if (payload && (payload.sub || payload.email || payload.role)) {
-            return payload;
-        }
-    } catch (e) {}
-    return null;
-}
+import { requireSession, serviceHeaders, ADMIN_ROLES } from './_lib/auth.js';
 
 export default async function handler(req, res) {
     const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-    const DB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-        return res.status(401).json({ error: 'Missing authorization token' });
-    }
+    // Reading is for any signed-in employee; changing branches is admin only.
+    const session = await requireSession(req, res, req.method === 'GET' ? undefined : ADMIN_ROLES);
+    if (!session) return;
 
     try {
-        // 1. Verify User Session (with JWT decode fallback so valid logins never get a false 401)
-        let isAuthorized = false;
-
-        if (SUPABASE_URL && SUPABASE_ANON_KEY) {
-            try {
-                const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-                    headers: {
-                        'apikey': SUPABASE_ANON_KEY,
-                        'Authorization': authHeader
-                    }
-                });
-                if (userRes.ok) isAuthorized = true;
-            } catch (e) {}
-        }
-
-        if (!isAuthorized) {
-            const jwtPayload = verifyJwtFallback(authHeader);
-            if (jwtPayload) isAuthorized = true;
-        }
-
-        if (!isAuthorized) {
-            return res.status(401).json({ error: 'Unauthorized session. Please sign in again.' });
-        }
-
-        const dbHeaders = {
-            'Content-Type': 'application/json',
-            'apikey': DB_KEY,
-            'Authorization': process.env.SUPABASE_SERVICE_ROLE_KEY ? `Bearer ${DB_KEY}` : authHeader
-        };
+        const dbHeaders = serviceHeaders();
 
         // 2. GET: Fetch All Branches + Available Staff Managers
         if (req.method === 'GET') {
@@ -189,7 +146,7 @@ export default async function handler(req, res) {
             };
             if (status) updatePayload.status = status;
 
-            const updateRes = await fetch(`${SUPABASE_URL}/rest/v1/branches?id=eq.${id}`, {
+            const updateRes = await fetch(`${SUPABASE_URL}/rest/v1/branches?id=eq.${encodeURIComponent(id)}`, {
                 method: 'PATCH',
                 headers: { ...dbHeaders, 'Prefer': 'return=representation' },
                 body: JSON.stringify(updatePayload)
@@ -213,7 +170,7 @@ export default async function handler(req, res) {
                 return res.status(400).json({ error: 'Branch ID and target status are required.' });
             }
 
-            const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/branches?id=eq.${id}`, {
+            const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/branches?id=eq.${encodeURIComponent(id)}`, {
                 method: 'PATCH',
                 headers: { ...dbHeaders, 'Prefer': 'return=representation' },
                 body: JSON.stringify({ status })
