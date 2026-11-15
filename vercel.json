@@ -2,6 +2,19 @@
   "rewrites": [
     { "source": "/api/:route", "destination": "/api/router?__route=:route" }
   ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
+    }
+  ],
   "crons": [
     { "path": "/api/carrier-sync", "schedule": "0 3 * * *" }
   ]

@@ -1,0 +1,21 @@
+{
+  "name": "Al-Farha Cargo ERP",
+  "short_name": "ALF ERP",
+  "description": "Bookings, tracking, branches and staff for Al-Farha Cargo.",
+  "id": "/admin/super-dashboard.html",
+  "start_url": "/admin/super-dashboard.html?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ECECEF",
+  "theme_color": "#111827",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Shipments", "url": "/admin/shipments.html", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Scan & Update", "url": "/admin/status-update.html", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

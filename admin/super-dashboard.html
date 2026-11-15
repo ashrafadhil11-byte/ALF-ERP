@@ -2,7 +2,16 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
     <title>Dashboard - Al-Farha Cargo</title>
     
     <!-- STRICT AUTHENTICATION GATEKEEPER -->
@@ -173,7 +182,7 @@
                     </button>
 
                     <!-- Date & live time (compact, same height as the buttons) -->
-                    <div class="col-span-2 h-12 flex items-center justify-between sm:justify-start gap-3 bg-[#F8F8FA] pl-4 pr-1.5 rounded-full border border-gray-100 whitespace-nowrap">
+                    <div class="hidden sm:flex col-span-2 h-12 items-center justify-between sm:justify-start gap-3 bg-[#F8F8FA] pl-4 pr-1.5 rounded-full border border-gray-100 whitespace-nowrap">
                         <div class="text-right leading-none">
                             <p class="text-base font-extrabold text-gray-900 tracking-tight tabular-nums" id="currentTime">--:-- --</p>
                             <p class="text-[9px] font-bold text-coral-500 uppercase tracking-widest mt-0.5">Local time</p>

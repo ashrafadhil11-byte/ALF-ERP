@@ -76,6 +76,39 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 });
 
+// Phones / tablets: app-style bottom navigation (hidden on desktop, where the sidebar shows).
+document.addEventListener('DOMContentLoaded', () => {
+    if (!document.getElementById('sidebar-container') || document.getElementById('bottom-nav')) return;
+    const page = window.location.pathname.split('/').pop() || 'super-dashboard.html';
+    const ic = (d) => `<svg class="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+    const items = [
+        { href: 'super-dashboard.html', label: 'Home', d: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>' },
+        { href: 'shipments.html', label: 'Shipments', d: '<path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.3 7L12 12l8.7-5M12 22V12"/>' },
+        { href: 'status-update.html', label: 'Scan', d: '<path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M7 12h10"/>', primary: true },
+        { href: 'shipments.html?new=1', label: 'New', d: '<path d="M12 5v14M5 12h14"/>' },
+        { label: 'Menu', d: '<path d="M3 6h18M3 12h18M3 18h18"/>', menu: true }
+    ];
+    const nav = document.createElement('nav');
+    nav.id = 'bottom-nav';
+    nav.setAttribute('aria-label', 'Main');
+    nav.className = 'lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur border-t border-gray-100 shadow-[0_-10px_30px_-12px_rgba(0,0,0,0.12)]';
+    nav.style.paddingBottom = 'env(safe-area-inset-bottom, 0px)';
+    nav.innerHTML = `<div class="grid grid-cols-5 max-w-lg mx-auto h-16 items-center">${items.map(it => {
+        const active = it.href && it.href.split('?')[0] === page && !it.href.includes('?');
+        if (it.primary) {
+            return `<a href="${it.href}" class="flex flex-col items-center justify-center gap-0.5 -mt-6" aria-label="${it.label}">
+                <span class="w-14 h-14 rounded-full ${active ? 'bg-coral-500' : 'bg-[#111827]'} text-white flex items-center justify-center shadow-lg ring-4 ring-white">${ic(it.d)}</span>
+                <span class="text-[10px] font-extrabold ${active ? 'text-coral-500' : 'text-gray-500'}">${it.label}</span></a>`;
+        }
+        const cls = `flex flex-col items-center justify-center gap-1 h-full text-[10px] font-extrabold ${active ? 'text-coral-500' : 'text-gray-500'}`;
+        return it.menu
+            ? `<button type="button" onclick="toggleMobileNav(true)" class="${cls}">${ic(it.d)}${it.label}</button>`
+            : `<a href="${it.href}" class="${cls}" ${active ? 'aria-current="page"' : ''}>${ic(it.d)}${it.label}</a>`;
+    }).join('')}</div>`;
+    document.body.appendChild(nav);
+    document.body.classList.add('max-lg:pb-24'); // keep content clear of the bar
+});
+
 // Phones / tablets: the sidebar slides in as an overlay (menu button in the top bar).
 const MOBILE_OPEN = ['fixed', 'inset-0', 'z-[60]', 'p-3', 'bg-gray-900/40', 'backdrop-blur-sm'];
 window.toggleMobileNav = function (force) {
