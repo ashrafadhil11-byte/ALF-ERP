@@ -32,6 +32,7 @@
     </script>
 
     <!-- Modular Layout & Profile Components -->
+    <link href="components/ui.css" rel="stylesheet">
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
@@ -126,76 +127,65 @@
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
             
             <!-- ================================================================================= -->
-            <!-- LAYER 2: SUPER ADMIN PORTAL IDENTITY (LEFT) & WIDGETS + DATE/TIME (RIGHT)        -->
+            <!-- LAYER 2: PORTAL IDENTITY + BRANCH (LEFT) • WIDGET CONTROLS + DATE/TIME (RIGHT)    -->
+            <!-- One row on wide screens; two aligned rows below; every control is 48px tall.      -->
             <!-- ================================================================================= -->
-            <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-5">
-                
-                <!-- Left: Beautifully Aligned Super Admin Portal Workspace Bar -->
-                <div class="flex flex-wrap items-center gap-3.5">
-                    <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
-                        <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center font-extrabold text-xs tracking-tight shadow-sm">
+            <section class="flex flex-col min-[1400px]:flex-row min-[1400px]:items-center justify-between gap-3 pb-6 mb-6 border-b border-gray-100">
+
+                <!-- Left: portal, branch picker, live status -->
+                <div class="grid grid-cols-[1fr_auto] sm:flex sm:flex-nowrap items-center gap-2.5 min-w-0 flex-1">
+                    <div class="col-span-2 flex items-center gap-3 h-12 bg-[#F8F8FA] pl-1 pr-4 rounded-full border border-gray-200/70 shadow-sm min-w-0 max-w-full sm:max-w-[360px]">
+                        <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center font-extrabold text-xs tracking-tight shadow-sm flex-shrink-0">
                             AF
                         </div>
-                        <div>
+                        <div class="min-w-0">
                             <div class="flex items-center gap-2">
-                                <span id="portalTitle" class="text-xs font-extrabold text-gray-900 tracking-tight">Dashboard</span>
-                                <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
+                                <span id="portalTitle" class="text-xs font-extrabold text-gray-900 tracking-tight whitespace-nowrap">Dashboard</span>
+                                <span class="w-1.5 h-1.5 rounded-full bg-coral-500 flex-shrink-0"></span>
                             </div>
-                            <p id="portalScope" class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">
-                                Loading…
-                            </p>
+                            <p id="portalScope" class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5 truncate">Loading…</p>
                         </div>
                     </div>
 
                     <!-- Branch picker (admins only; filled from live data) -->
                     <select id="branchPicker" onchange="setDashboardBranch(this.value)" aria-label="Show branch"
-                            class="hidden bg-white border border-gray-200/80 rounded-full px-4 py-2 text-xs font-bold text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-coral-500 cursor-pointer">
-                    </select>
+                            class="hidden field pill !h-12 !py-0 sm:!w-auto min-w-0 sm:min-w-[150px] flex-shrink-0"></select>
 
-                    <!-- Cloud Sync Status Pill -->
-                    <span id="cloudSyncStatus" class="text-[10px] font-bold text-emerald-600 bg-emerald-50/80 px-3 py-1.5 rounded-full border border-emerald-100">
-                        Connecting…
-                    </span>
+                    <!-- Live / sync status -->
+                    <div class="h-12 flex items-center flex-shrink-0">
+                        <span id="cloudSyncStatus" class="text-[10px] font-bold text-emerald-600 bg-emerald-50/80 px-3 py-1.5 rounded-full border border-emerald-100 whitespace-nowrap">
+                            Connecting…
+                        </span>
+                    </div>
                 </div>
 
-                <!-- Right: Widget Controls + Today's Date & Live Time -->
-                <div class="flex flex-wrap items-center gap-3 self-start xl:self-center">
-                    
-                    <!-- Add / Remove Widgets Modal Trigger -->
-                    <button onclick="openWidgetModal()" class="bg-white hover:bg-gray-50 text-gray-800 px-4 py-3 rounded-full border border-gray-200/80 text-xs font-bold flex items-center gap-2 shadow-sm transition-all">
+                <!-- Right: widget controls + compact date/time -->
+                <div class="grid grid-cols-2 sm:flex sm:flex-nowrap items-center gap-2.5 flex-shrink-0">
+                    <button onclick="openWidgetModal()" class="h-12 justify-center bg-white hover:bg-gray-50 text-gray-800 px-4 rounded-full border border-gray-200/80 text-xs font-bold flex items-center gap-2 shadow-sm transition-all whitespace-nowrap">
                         <svg class="w-4 h-4 text-coral-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
                         <span>Widgets</span>
                         <span id="active-widget-count" class="bg-[#F8F8FA] text-gray-600 px-2 py-0.5 rounded-full text-[10px] border border-gray-100">8/8</span>
                     </button>
 
-                    <!-- Customize Mode Trigger -->
-                    <button id="editLayoutBtn" onclick="toggleEditLayoutMode()" class="bg-[#F8F8FA] hover:bg-gray-100 text-gray-800 px-4 py-3 rounded-full border border-gray-200/60 text-xs font-bold flex items-center gap-2 transition-all">
+                    <button id="editLayoutBtn" onclick="toggleEditLayoutMode()" class="h-12 justify-center bg-[#F8F8FA] hover:bg-gray-100 text-gray-800 px-4 rounded-full border border-gray-200/60 text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
                         <span>Customize</span>
                     </button>
 
-                    <!-- Date & Live Time Pill -->
-                    <div class="flex items-center gap-5 bg-[#F8F8FA] px-5 py-2.5 rounded-[2rem] border border-gray-100">
-                        <div class="text-right pr-5 border-r border-gray-200/80">
-                            <p class="text-lg lg:text-xl font-extrabold text-gray-900 tracking-tight tabular-nums leading-none" id="currentTime">
-                                --:-- --
-                            </p>
-                            <p class="text-[10px] font-bold text-coral-500 uppercase tracking-widest mt-1">
-                                Local Time
-                            </p>
+                    <!-- Date & live time (compact, same height as the buttons) -->
+                    <div class="col-span-2 h-12 flex items-center justify-between sm:justify-start gap-3 bg-[#F8F8FA] pl-4 pr-1.5 rounded-full border border-gray-100 whitespace-nowrap">
+                        <div class="text-right leading-none">
+                            <p class="text-base font-extrabold text-gray-900 tracking-tight tabular-nums" id="currentTime">--:-- --</p>
+                            <p class="text-[9px] font-bold text-coral-500 uppercase tracking-widest mt-0.5">Local time</p>
                         </div>
-
-                        <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-full bg-white border border-gray-200/80 flex items-center justify-center shadow-sm">
-                                <span class="text-base font-extrabold text-gray-900 tracking-tight leading-none" id="currentDay">--</span>
-                            </div>
-                            <div class="text-left pr-1">
-                                <p class="text-xs font-bold text-gray-900 leading-tight" id="currentDayName">---</p>
-                                <p class="text-xs font-medium text-gray-400 leading-tight mt-0.5" id="currentMonthYear">---</p>
+                        <div class="h-9 flex items-center gap-2 bg-white rounded-full pl-1 pr-3 border border-gray-200/80 shadow-sm">
+                            <span class="w-7 h-7 rounded-full bg-[#111827] text-white flex items-center justify-center text-[11px] font-extrabold" id="currentDay">--</span>
+                            <div class="leading-tight">
+                                <p class="text-[11px] font-bold text-gray-900" id="currentDayName">---</p>
+                                <p class="text-[10px] font-medium text-gray-400" id="currentMonthYear">---</p>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </section>
 
@@ -264,7 +254,7 @@
 
             document.getElementById('currentDay').textContent = String(now.getDate()).padStart(2, '0');
             document.getElementById('currentDayName').textContent = now.toLocaleDateString('en-US', { weekday: 'long' });
-            document.getElementById('currentMonthYear').textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            document.getElementById('currentMonthYear').textContent = now.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
             document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { 
                 hour: '2-digit', 
                 minute: '2-digit',

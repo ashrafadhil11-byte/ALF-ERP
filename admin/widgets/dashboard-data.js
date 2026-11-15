@@ -36,9 +36,9 @@ window.dashUI = {
     // Card shell used by every widget (same look as the original ERP widgets).
     card: (title, body, { badge = '', dark = false, pad = 'p-6' } = {}) => `
         <div class="h-full ${dark ? 'bg-[#111827] text-white' : 'bg-white'} rounded-[2rem] ${pad} border ${dark ? 'border-gray-800' : 'border-gray-100/80'} flex flex-col gap-3 overflow-hidden">
-            <div class="flex justify-between items-center gap-2 flex-shrink-0">
+            <div class="flex flex-wrap justify-between items-center gap-x-2 gap-y-1.5 flex-shrink-0">
                 <div class="flex items-center gap-2 min-w-0">
-                    <span class="font-extrabold ${dark ? 'text-white' : 'text-gray-900'} tracking-wider text-xs uppercase truncate">${title}</span>
+                    <span class="font-extrabold ${dark ? 'text-white' : 'text-gray-900'} tracking-wider text-xs uppercase whitespace-nowrap">${title}</span>
                     <span class="w-2 h-2 rounded-full bg-coral-500 flex-shrink-0"></span>
                 </div>
                 ${badge ? `<span class="text-[10px] font-semibold ${dark ? 'text-gray-300 bg-gray-800 border-gray-700' : 'text-gray-600 bg-[#F8F8FA] border-gray-100'} px-2.5 py-1 rounded-full border flex-shrink-0">${badge}</span>` : ''}
