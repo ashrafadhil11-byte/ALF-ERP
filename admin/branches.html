@@ -198,10 +198,7 @@
                     <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Contact</legend>
                     <div>
                         <label class="ui-label" for="b_phone">Phone <span class="req">*</span></label>
-                        <div class="flex gap-2">
-                            <span id="b_dial" class="field soft !w-20 text-center flex-shrink-0">+</span>
-                            <input id="b_phone" class="field" type="tel" placeholder="9XXXXXXX">
-                        </div>
+                        <input id="b_phone" class="field" placeholder="Phone number">
                     </div>
                     <div><label class="ui-label" for="b_manager">Branch manager</label><select id="b_manager" class="field"></select></div>
                 </fieldset>
@@ -366,9 +363,10 @@
         };
 
         // ----- branch form -----
+        // Phone has its own country code; it follows the branch country until someone picks a code.
+        var branchPh = UI.phoneField($('b_phone'), { country: 'OM' });
         function setCountry(c) {
-            if (c) $('b_dial').textContent = c.d;
-            else $('b_dial').textContent = '+';
+            if (c) branchPh.setCountry(c.c, { soft: true });
             composeAddress();
         }
         function composeAddress() {
@@ -408,8 +406,8 @@
             const street = (b.address || '').split(',')[0];
             $('b_street').value = editing ? street : '';
             const c = findCountry(b.country || 'Oman');
-            const dial = c ? c.d : '';
-            $('b_phone').value = (b.phone_number || '').replace(dial, '').trim();
+            branchPh.reset(c ? c.c : 'OM');
+            if (b.phone_number) branchPh.setValue(b.phone_number, c ? c.c : 'OM');
             $('b_manager').innerHTML = '<option value="">Unassigned</option>' + managers.map(m => `<option value="${esc(m.id)}">${esc(m.full_name || m.username)}</option>`).join('');
             $('b_manager').value = b.manager_id || '';
             $('b_currency').value = b.currency || 'OMR';
@@ -488,7 +486,8 @@
         $('branchForm').onsubmit = async (e) => {
             e.preventDefault();
             const c = findCountry($('b_country').value);
-            const need = [['b_name', 'Branch name'], ['b_code', 'Branch code'], ['b_digit', 'AWB digit'], ['b_city', 'City'], ['b_phone', 'Phone']].find(([id]) => !$(id).value.trim());
+            const need = [['b_name', 'Branch name'], ['b_code', 'Branch code'], ['b_digit', 'AWB digit'], ['b_city', 'City'], ['b_phone', 'Phone']].find(([id]) => !$(id).value.trim())
+                || (!branchPh.valid ? ['b_phone', 'a valid phone number'] : null);
             if (need) { toast(false, `${need[1]} is required.`); return $(need[0]).focus(); }
             if (!c) { toast(false, 'Choose a country from the list.'); return $('b_country').focus(); }
             if (!$('digitWarn').classList.contains('hidden')) return toast(false, $('digitWarn').textContent);
@@ -498,7 +497,7 @@
                 branchName: $('b_name').value.trim(), branchCode: $('b_code').value.trim(), bookingCode: $('b_digit').value.trim(),
                 country: c.n, postalCode: $('b_postal').value.trim(), postOffice: $('b_po').value.trim(), state: $('b_state').value.trim(),
                 location: $('b_city').value.trim(), address: $('b_address').textContent === '—' ? $('b_city').value.trim() : $('b_address').textContent,
-                phoneNumber: `${c.d} ${$('b_phone').value.trim()}`, managerId: mgr ? mgr.id : null, managerName: mgr ? (mgr.full_name || mgr.username) : 'Unassigned',
+                phoneNumber: branchPh.value, managerId: mgr ? mgr.id : null, managerName: mgr ? (mgr.full_name || mgr.username) : 'Unassigned',
                 currency: $('b_currency').value, taxName: $('b_taxName').value.trim(), taxRate: $('b_taxRate').value, isHub: $('b_hub').checked,
                 status: editing?.status
             };

@@ -424,5 +424,124 @@ window.UI = (() => {
         input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
     }
 
-    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup };
+    // ---------- Phone numbers with their own country code ----------
+    // The phone's country is independent of the address (an Oman shipper can have an Indian mobile).
+    const DIAL_PREF = { '+1': 'US', '+44': 'GB', '+7': 'RU', '+61': 'AU', '+39': 'IT', '+47': 'NO', '+358': 'FI', '+212': 'MA', '+262': 'RE', '+590': 'GP', '+599': 'CW', '+290': 'SH' };
+    const flagUrl = (cc) => `https://flagcdn.com/w40/${String(cc).toLowerCase()}.png`;
+
+    /** '+91 98765 43210' / '0091…' → { cc: 'IN', dial: '+91', national: '9876543210' }; no prefix → { cc: null, national } */
+    function splitPhone(full, prefer) {
+        const s = String(full || '').trim().replace(/^00/, '+');
+        if (!s.startsWith('+')) return { cc: null, dial: null, national: s.replace(/[^\d]/g, '') };
+        const digits = s.replace(/[^\d]/g, ''), C = window.ALF_COUNTRIES || [];
+        for (let n = 4; n >= 1; n--) {
+            const dial = '+' + digits.slice(0, n), hits = C.filter(c => c.d === dial);
+            if (hits.length) return { cc: (hits.find(c => c.c === prefer) || hits.find(c => c.c === DIAL_PREF[dial]) || hits[0]).c, dial, national: digits.slice(n) };
+        }
+        return { cc: null, dial: null, national: digits };
+    }
+
+    /**
+     * Turns a tel input into [flag +code ▾][number].
+     *   const ph = UI.phoneField(input, { country: 'OM' });
+     *   ph.value → '+91 9876543210' ('' when empty) · ph.valid · ph.setValue('+968 9123…') · ph.setCountry('IN', { soft: true })
+     * soft = only if the user hasn't picked a code themselves (used to follow the branch / destination country).
+     */
+    function phoneField(input, { country = 'OM', onChange = () => {} } = {}) {
+        const C = window.ALF_COUNTRIES || [];
+        let cc = country, touched = false;
+        const wrap = document.createElement('div');
+        wrap.className = 'relative flex gap-2';
+        input.parentNode.insertBefore(wrap, input);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'field soft !w-auto flex items-center gap-1.5 !px-3 flex-shrink-0';
+        btn.setAttribute('aria-haspopup', 'listbox');
+        btn.innerHTML = `<img alt="" class="w-[22px] h-4 object-cover rounded-[3px] border border-gray-200"><span class="text-xs font-extrabold tabular-nums"></span>
+            <svg class="w-3 h-3 text-[#E86D58]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 9l-7 7-7-7"/></svg>`;
+        wrap.appendChild(btn);
+        wrap.appendChild(input);
+        input.type = 'tel'; input.inputMode = 'tel'; input.autocomplete = 'off';
+        const pop = document.createElement('div');
+        pop.className = 'hidden absolute z-40 left-0 top-full mt-1.5 w-72 max-w-[calc(100vw-2rem)] bg-white border border-gray-100 rounded-2xl shadow-xl p-1.5';
+        pop.innerHTML = `<input class="field !py-2 text-xs mb-1" placeholder="Search country or code" aria-label="Search country code">
+            <div role="listbox" class="max-h-60 overflow-y-auto custom-scrollbar"></div>`;
+        wrap.appendChild(pop);
+        const search = pop.querySelector('input'), list = pop.querySelector('[role=listbox]');
+        const dialOf = (c) => (C.find(x => x.c === c) || {}).d || '+';
+
+        function paint() {
+            const c = C.find(x => x.c === cc);
+            btn.querySelector('img').src = c ? flagUrl(cc) : '';
+            btn.querySelector('img').classList.toggle('hidden', !c);
+            btn.querySelector('span').textContent = dialOf(cc);
+            btn.title = c ? `${c.n} ${c.d}` : 'Choose country code';
+        }
+        function set(newCc, byUser) {
+            if (!newCc) return;
+            if (byUser) touched = true;
+            if (newCc !== cc) { cc = newCc; paint(); onChange(api_); }
+        }
+        function renderList() {
+            const q = search.value.trim().toLowerCase().replace(/^00/, '+');
+            const dq = '+' + q.replace(/\D/g, '');
+            const m = C.filter(c => !q || c.n.toLowerCase().includes(q) || c.c.toLowerCase() === q || (dq.length > 1 && c.d.startsWith(dq)))
+                // exact code first, the main country for shared codes (+1 US, +44 UK) on top
+                .map(c => [c.d === dq ? (DIAL_PREF[c.d] === c.c ? 0 : 1) : c.n.toLowerCase().startsWith(q) ? 1 : 2, c])
+                .sort((a, b) => a[0] - b[0]).map(([, c]) => c);
+            list.innerHTML = m.slice(0, 250).map(c => `<button type="button" role="option" data-cc="${c.c}" aria-selected="${c.c === cc}"
+                class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-[#F8F8FA] ${c.c === cc ? 'bg-[#FFF5F3]' : ''}">
+                <img src="${flagUrl(c.c)}" alt="" loading="lazy" class="w-[22px] h-4 object-cover rounded-[3px] border border-gray-200 flex-shrink-0">
+                <span class="flex-1 min-w-0 text-xs font-bold truncate">${esc(c.n)}</span><span class="text-[11px] font-extrabold text-gray-500 tabular-nums">${esc(c.d)}</span></button>`).join('')
+                || '<p class="p-3 text-xs text-gray-400 text-center">No match</p>';
+        }
+        const close = () => { pop.classList.add('hidden'); btn.setAttribute('aria-expanded', 'false'); };
+        btn.onclick = () => {
+            if (!pop.classList.contains('hidden')) return close();
+            search.value = ''; renderList(); pop.classList.remove('hidden'); btn.setAttribute('aria-expanded', 'true');
+            search.focus();
+            list.querySelector('[aria-selected=true]')?.scrollIntoView({ block: 'center' });
+        };
+        search.oninput = renderList;
+        search.onkeydown = (e) => {
+            if (e.key === 'Escape') { close(); btn.focus(); }
+            if (e.key === 'Enter') { e.preventDefault(); list.querySelector('[data-cc]')?.click(); }
+        };
+        list.onclick = (e) => { const b = e.target.closest('[data-cc]'); if (!b) return; set(b.dataset.cc, true); close(); input.focus(); };
+        document.addEventListener('click', (e) => { if (!wrap.contains(e.target)) close(); });
+
+        // Typing / pasting a number with +code or 00code switches the country and keeps only the local part
+        input.addEventListener('input', () => {
+            const v = input.value.trim();
+            if (/^(\+|00)\d{1,4}/.test(v)) {
+                const p = splitPhone(v, cc);
+                if (p.cc && (p.national.length >= 4 || v.includes(' '))) { set(p.cc, true); input.value = p.national; }
+            }
+            input.classList.remove('!border-[#E86D58]');
+        });
+        input.addEventListener('blur', () => input.classList.toggle('!border-[#E86D58]', Boolean(input.value.trim()) && !api_.valid));
+
+        const national = () => {
+            let n = input.value.replace(/\D/g, '');
+            if (cc !== 'IT') n = n.replace(/^0+/, ''); // drop trunk 0 (07911… → +44 7911…)
+            return n;
+        };
+        const api_ = {
+            get value() { const n = national(); return n ? `${dialOf(cc)} ${n}` : ''; },
+            get valid() { const n = national(); return !n || (n.length >= 6 && n.length <= 14); },
+            get country() { return cc; },
+            setCountry(newCc, { soft = false } = {}) { if (soft && touched) return; set(newCc, false); },
+            setValue(full, fallbackCc) {
+                const p = splitPhone(full, fallbackCc || cc);
+                touched = Boolean(p.cc);
+                if (p.cc) { cc = p.cc; paint(); } else if (fallbackCc) { cc = fallbackCc; paint(); }
+                input.value = p.national;
+            },
+            reset(newCc) { touched = false; input.value = ''; if (newCc) { cc = newCc; paint(); } }
+        };
+        paint();
+        return api_;
+    }
+
+    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup, phoneField, splitPhone };
 })();

@@ -23,6 +23,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="components/ui.css" rel="stylesheet">
+    <script src="components/countries.js"></script>
     <script src="components/ui.js"></script>
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
@@ -107,7 +108,7 @@
                     <div class="sm:col-span-2"><label class="ui-label" for="c_fullName">Full name <span class="req">*</span></label><input id="c_fullName" class="field" required placeholder="e.g. Muhammed Adhil"></div>
                     <div><label class="ui-label" for="c_dob">Date of birth</label><input id="c_dob" type="date" class="field"></div>
                     <div><label class="ui-label" for="c_omanId">Civil ID</label><input id="c_omanId" class="field" inputmode="numeric" pattern="\d*" placeholder="e.g. 12345678"></div>
-                    <div><label class="ui-label" for="c_contact">Contact number <span class="req">*</span></label><input id="c_contact" type="tel" class="field" required placeholder="+968 9XXXXXXX"></div>
+                    <div><label class="ui-label" for="c_contact">Contact number <span class="req">*</span></label><input id="c_contact" class="field" required placeholder="Mobile number"></div>
                     <div><label class="ui-label" for="c_email">Email <span class="req">*</span></label><input id="c_email" type="email" class="field" required placeholder="user@example.com"></div>
                 </fieldset>
                 <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -140,7 +141,7 @@
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
                 <div class="sm:col-span-2"><label class="ui-label" for="e_name">Full name</label><input id="e_name" class="field" required></div>
-                <div class="sm:col-span-2"><label class="ui-label" for="e_contact">Contact number</label><input id="e_contact" type="tel" class="field"></div>
+                <div class="sm:col-span-2"><label class="ui-label" for="e_contact">Contact number</label><input id="e_contact" class="field" placeholder="Mobile number"></div>
                 <div><label class="ui-label" for="e_role">Role</label><select id="e_role" class="field"></select></div>
                 <div><label class="ui-label" for="e_branch">Branch</label><select id="e_branch" class="field"></select></div>
                 <label class="sm:col-span-2 flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100 cursor-pointer">
@@ -244,8 +245,11 @@
             if (reqEl) reqEl.classList.toggle('hidden', global);
             $('roleHelp').textContent = ROLE_HELP[roleSel.value] || '';
         }
+        // Contact numbers keep their own country code (staff may hold a home-country number)
+        const cPh = UI.phoneField($('c_contact'), { country: 'OM' });
+        const ePh = UI.phoneField($('e_contact'), { country: 'OM' });
         window.openCreate = () => {
-            $('createForm').reset();
+            $('createForm').reset(); cPh.reset('OM');
             $('c_role').innerHTML = '<option value="">Choose role…</option>' + roleOptions(true);
             $('c_branch').innerHTML = '<option value="">Choose branch…</option>' + branches.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join('');
             $('roleHelp').textContent = 'Pick a role to see what it can do.';
@@ -258,10 +262,11 @@
             if (!e.target.checkValidity()) return e.target.reportValidity();
             const role = $('c_role').value;
             if (!role) return toast(false, 'Choose a role.');
+            if (!cPh.valid) return toast(false, 'Contact number looks wrong — check the country code and number.');
             const global = ['super_admin', 'head_office'].includes(role);
             if (!global && !$('c_branch').value) return toast(false, 'Choose a branch for this role.');
             const payload = {
-                fullName: $('c_fullName').value.trim(), dob: $('c_dob').value || null, contactNumber: $('c_contact').value.trim(),
+                fullName: $('c_fullName').value.trim(), dob: $('c_dob').value || null, contactNumber: cPh.value,
                 recoveryEmail: $('c_email').value.trim(), omanId: $('c_omanId').value.trim(), username: $('c_username').value.trim(),
                 role, branch: global ? null : $('c_branch').value, password: $('c_password').value
             };
@@ -283,7 +288,7 @@
             $('e_title').textContent = `Edit ${editing.full_name || 'user'}`;
             $('e_sub').textContent = `@${editing.username || '—'} • ${editing.recovery_email || ''}`;
             $('e_name').value = editing.full_name || '';
-            $('e_contact').value = editing.contact_number || '';
+            ePh.reset('OM'); if (editing.contact_number) ePh.setValue(editing.contact_number, 'OM');
             $('e_role').innerHTML = roleOptions(false);
             $('e_role').value = editing.role;
             $('e_role').disabled = editing.is_me;
@@ -296,7 +301,8 @@
         };
         $('editForm').onsubmit = async (e) => {
             e.preventDefault();
-            const body = { id: editing.id, full_name: $('e_name').value, contact_number: $('e_contact').value, branch: $('e_branch').value, is_driver: $('e_driver').checked };
+            if (!ePh.valid) return toast(false, 'Contact number looks wrong — check the country code and number.');
+            const body = { id: editing.id, full_name: $('e_name').value, contact_number: ePh.value, branch: $('e_branch').value, is_driver: $('e_driver').checked };
             if (!editing.is_me) body.role = $('e_role').value;
             const roleChanged = body.role && body.role !== editing.role;
             if (roleChanged && !await UI.confirm({ title: 'Change role?', message: `${esc(editing.full_name)}: <b>${esc(ROLES[editing.role] || editing.role)}</b> → <b>${esc(ROLES[body.role])}</b>. Their access changes at their next page load.`, confirmText: 'Change role' })) return;

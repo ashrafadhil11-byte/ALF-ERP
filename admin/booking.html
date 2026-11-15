@@ -92,7 +92,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label class="ui-label" for="senderPhone">Mobile <span class="req">*</span></label>
-                                <div class="flex gap-2"><span id="senderDial" class="field soft !w-20 text-center flex-shrink-0">+968</span><input id="senderPhone" class="field" type="tel" inputmode="tel" placeholder="9XXXXXXX"></div>
+                                <input id="senderPhone" class="field" placeholder="Mobile number">
                             </div>
                             <div><label class="ui-label" for="senderName">Full name <span class="req">*</span></label><input id="senderName" class="field" placeholder="As on ID"></div>
                             <div><label class="ui-label" for="senderId">Civil ID / passport</label><input id="senderId" class="field" placeholder="Optional"></div>
@@ -106,11 +106,11 @@
                             <div class="sm:col-span-2"><label class="ui-label" for="rcvName">Full name <span class="req">*</span></label><input id="rcvName" class="field"></div>
                             <div>
                                 <label class="ui-label" for="rcvPhone">Mobile <span class="req">*</span></label>
-                                <div class="flex gap-2"><span id="rcvDial" class="field soft !w-20 text-center flex-shrink-0">+</span><input id="rcvPhone" class="field" type="tel" inputmode="tel"></div>
+                                <input id="rcvPhone" class="field" placeholder="Mobile number">
                             </div>
                             <div>
                                 <label class="ui-label" for="rcvWhatsapp">WhatsApp</label>
-                                <input id="rcvWhatsapp" class="field" type="tel" inputmode="tel" placeholder="Same as mobile">
+                                <input id="rcvWhatsapp" class="field" placeholder="Same as mobile">
                             </div>
                             <div><label class="ui-label" for="rcvHouse">House / building</label><input id="rcvHouse" class="field"></div>
                             <div><label class="ui-label" for="rcvStreet">Street</label><input id="rcvStreet" class="field"></div>
@@ -260,7 +260,7 @@
             $('totActual').textContent = `${actual} kg`; $('totVol').textContent = `${vol} kg`; $('totCharge').textContent = `${charge} kg`;
             const c = dest(), t = cargo(), b = branch();
             $('pvD').textContent = destCode(c); $('pvB').textContent = b.booking_code || 'B'; $('pvC').textContent = t ? t.code : 'C';
-            if (c) $('rcvDial').textContent = c.d;
+            if (c) { rcvPh?.setCountry(c.c, { soft: true }); waPh?.setCountry(c.c, { soft: true }); }
             $('sumRoute').textContent = `${b.location || '—'} → ${$('rcvCity').value || (c ? c.n : '—')}`;
             $('sumCargo').textContent = t ? `${t.code} · ${t.name}` : '—';
             $('sumBoxes').textContent = boxes.length;
@@ -268,12 +268,17 @@
             $('sumAmount').textContent = $('amount').value ? `${cur()} ${num($('amount').value).toFixed(3)}` : '—';
             $('curLabel').textContent = `(${cur()})`;
             const bc = COUNTRIES.find(x => x.n === b.country);
-            if (bc) $('senderDial').textContent = bc.d;
+            if (bc) senderPh?.setCountry(bc.c, { soft: true });
             $('pinBadge').classList.toggle('hidden', !c);
             const sa = c && c.c === 'SA';
             $('rcvPinLabel').textContent = !c ? 'Postal / ZIP code' : c.c === 'IN' ? 'PIN code' : c.c === 'US' ? 'ZIP code' : sa ? 'Short address or postal code' : 'Postcode / postal code';
             $('rcvPin').placeholder = sa ? 'e.g. RAAA2919' : c && c.c === 'GB' ? 'e.g. SW1A 1AA' : c && c.c === 'CA' ? 'e.g. M5V 3L9' : '';
         }
+        // Phone numbers carry their own country code (an Oman shipper may have an Indian mobile).
+        // They follow the branch / destination country until the user picks a code.
+        var senderPh = UI.phoneField($('senderPhone'), { country: 'OM' });
+        var rcvPh = UI.phoneField($('rcvPhone'), { country: 'IN' });
+        var waPh = UI.phoneField($('rcvWhatsapp'), { country: 'IN' });
         ['destCountry', 'rcvCity', 'amount', 'branch'].forEach(id => $(id).addEventListener('input', refresh));
         // Destination country → receiver state → district / city (any value can also be typed)
         let rcvState = null;
@@ -316,7 +321,6 @@
         });
 
         // ---------- submit ----------
-        const phone = (dialId, v) => { const s = String(v || '').trim(); return !s ? '' : s.startsWith('+') ? s : `${$(dialId).textContent} ${s}`; };
         $('bookingForm').onsubmit = async (e) => {
             e.preventDefault();
             const c = dest(), t = cargo(), b = branch(), boxes = readBoxes();
@@ -324,7 +328,8 @@
                 [!b.branch_code, 'branch', 'Choose the booking branch.'], [!c, 'destCountry', 'Choose the destination country from the list.'],
                 [!t, 'cargoOptions', 'Choose a cargo type.'], [!$('senderPhone').value.trim(), 'senderPhone', 'Sender mobile is required.'],
                 [!$('senderName').value.trim(), 'senderName', 'Sender name is required.'], [!$('rcvName').value.trim(), 'rcvName', 'Receiver name is required.'],
-                [!$('rcvPhone').value.trim(), 'rcvPhone', 'Receiver mobile is required.'], [!$('rcvCity').value.trim(), 'rcvCity', 'Receiver district / city is required.'],
+                [!$('rcvPhone').value.trim(), 'rcvPhone', 'Receiver mobile is required.'],
+                [!senderPh.valid, 'senderPhone', 'Sender mobile looks wrong — check the country code and number.'], [!rcvPh.valid, 'rcvPhone', 'Receiver mobile looks wrong — check the country code and number.'], [!waPh.valid, 'rcvWhatsapp', 'WhatsApp number looks wrong.'], [!$('rcvCity').value.trim(), 'rcvCity', 'Receiver district / city is required.'],
                 [!boxes.some(x => x.weight > 0), 'boxRows', 'Enter the weight of at least one box.']
             ].find(([bad]) => bad);
             if (need) { toast(false, need[2]); $(need[1])?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
@@ -333,9 +338,9 @@
             const charge = Math.max(actual, round2(boxes.reduce((s, x) => s + x.vol, 0)));
             const address = ['rcvHouse', 'rcvStreet', 'rcvLandmark', 'rcvPo', 'rcvCity', 'rcvState', 'rcvPin'].map(id => $(id).value.trim()).filter(Boolean).join(', ');
             const fields = {
-                shipper: $('senderName').value, shipper_phone: phone('senderDial', $('senderPhone').value), shipper_id_no: $('senderId').value,
-                consignee: $('rcvName').value, consignee_phone: phone('rcvDial', $('rcvPhone').value),
-                receiver_whatsapp: phone('rcvDial', $('rcvWhatsapp').value || $('rcvPhone').value),
+                shipper: $('senderName').value, shipper_phone: senderPh.value, shipper_id_no: $('senderId').value,
+                consignee: $('rcvName').value, consignee_phone: rcvPh.value,
+                receiver_whatsapp: waPh.value || rcvPh.value,
                 consignee_address: address, dest_city: $('rcvCity').value, dest_country: c.n, dest_country_code: c.c,
                 origin_city: b.location || '', origin_country: b.country || '',
                 cargo_type_code: t.code, package_type: $('packageType').value, intake_mode: intake,
