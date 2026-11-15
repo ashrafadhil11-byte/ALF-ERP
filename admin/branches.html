@@ -12,1463 +12,588 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
     <script src="/pwa.js" defer></script>
-    <title>Branch Network & AWB Architecture - Al-Farha Cargo</title>
-    
-    <!-- STRICT AUTHENTICATION GATEKEEPER -->
+    <title>Branch Network - Al-Farha Cargo</title>
     <script>
         (function checkAuth() {
-            const token = localStorage.getItem('cargo_auth_token');
             const role = localStorage.getItem('cargo_user_role');
-            if (!token) window.location.replace('../login.html');
-            if (role !== 'super_admin' && role !== 'head_office') window.location.replace('super-dashboard.html');
+            if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');
+            else if (role !== 'super_admin' && role !== 'head_office') window.location.replace('super-dashboard.html');
         })();
     </script>
-
-    <!-- Tailwind CSS & Fonts -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Reusable Admin Components -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/countries.js"></script>
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
-
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { 
-                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-                        mono: ['"JetBrains Mono"', 'monospace']
-                    },
-                    colors: {
-                        coral: { 
-                            50: '#FFF5F3',
-                            100: '#FFE8E3',
-                            200: '#FFD0C7',
-                            300: '#F7A99A',
-                            400: '#F08A76',
-                            500: '#E86D58', 
-                            600: '#D55C48' 
-                        }
-                    }
-                }
-            }
-        }
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
     </script>
     <style>
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
-
-        .field-card {
-            transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease;
-        }
-        .field-card:focus-within {
-            transform: translateY(-1px);
-            box-shadow: 0 12px 24px -10px rgba(232, 109, 88, 0.16);
-        }
-        .awb-token {
-            transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-        }
-        @keyframes pulsePop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.08); }
-            100% { transform: scale(1); }
-        }
-        .animate-pop {
-            animation: pulsePop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-        }
+        .tab-btn[aria-selected="true"] { background: #111827; color: #fff; }
+        .ref-token { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; border-radius: .6rem; padding: .3rem .55rem; }
+        .flag { width: 22px; height: 16px; object-fit: cover; border-radius: 3px; border: 1px solid #E5E7EB; flex-shrink: 0; }
     </style>
 </head>
-<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900 selection:bg-coral-500 selection:text-white">
-
-    <!-- Modular Sidebar -->
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
     <div id="sidebar-container" class="hidden lg:block z-20"></div>
 
-    <!-- Main Outer Container -->
-    <main class="flex-1 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-6 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
-        
-        <!-- LAYER 1: Topbar (Greeting on Left, Animated Search & Profile on Right) -->
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
         <div id="topbar-container"></div>
 
-        <!-- Scrollable Body -->
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            
-            <!-- LAYER 2: Super Admin Portal Bar (Left) & Live Date/Time (Right) -->
-            <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-5">
-                
-                <div class="flex flex-wrap items-center gap-3.5">
-                    <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
-                        <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center font-extrabold text-xs tracking-tight shadow-sm">
-                            AF
-                        </div>
-                        <div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs font-extrabold text-gray-900 tracking-tight">Super Admin Portal</span>
-                                <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
-                            </div>
-                            <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">
-                                Branch Network • Smart Postal Lookup & 6-Char Codes
-                            </p>
-                        </div>
+            <!-- Header -->
+            <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center"><span data-icon="building"></span></div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Branch Network</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Branches • Destination codes • Cargo types</p>
                     </div>
-
-                    <span id="branchCountBadge" class="text-[10px] font-extrabold text-coral-600 bg-coral-50 px-3.5 py-1.5 rounded-full border border-coral-100">
-                        Loading Network...
-                    </span>
                 </div>
-
-                <!-- Right: Live Date & Time Pill -->
-                <div class="flex items-center gap-5 bg-[#F8F8FA] px-5 py-2.5 rounded-[2rem] border border-gray-100 self-start xl:self-center">
-                    <div class="text-right pr-5 border-r border-gray-200/80">
-                        <p class="text-lg lg:text-xl font-extrabold text-gray-900 tracking-tight tabular-nums leading-none" id="currentTime">
-                            --:-- --
-                        </p>
-                        <p class="text-[10px] font-bold text-coral-500 uppercase tracking-widest mt-1">
-                            Local Time
-                        </p>
+                <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <div class="seg w-full sm:w-auto" role="tablist" aria-label="Sections">
+                        <button type="button" class="tab-btn flex-1 sm:flex-none" role="tab" data-tab="branches" aria-selected="true">Branches</button>
+                        <button type="button" class="tab-btn flex-1 sm:flex-none" role="tab" data-tab="destinations" aria-selected="false">Destination codes</button>
+                        <button type="button" class="tab-btn flex-1 sm:flex-none" role="tab" data-tab="cargo" aria-selected="false">Cargo types</button>
                     </div>
+                    <button type="button" id="addBtn" class="btn btn-coral" onclick="primaryAction()"><span data-icon="plus"></span><span id="addBtnLabel">Add branch</span></button>
+                </div>
+            </section>
 
-                    <div class="flex items-center gap-3">
-                        <div class="w-11 h-11 rounded-full bg-white border border-gray-200/80 flex items-center justify-center shadow-sm">
-                            <span class="text-base font-extrabold text-gray-900 tracking-tight leading-none" id="currentDay">--</span>
+            <!-- ============ BRANCHES ============ -->
+            <section data-panel="branches">
+                <div id="stats" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"></div>
+                <div class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
+                    <div class="flex flex-col lg:flex-row gap-3 lg:items-center justify-between mb-4">
+                        <div class="flex items-center gap-2"><span class="font-extrabold text-xs uppercase tracking-wider">Branches</span><span id="branchCount" class="pill-tag pill-gray">…</span></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex gap-2">
+                            <input id="branchSearch" type="search" placeholder="Search name, code, city…" class="field pill lg:!w-64 !py-2.5">
+                            <select id="statusFilter" class="field pill lg:!w-40 !py-2.5" aria-label="Filter by status">
+                                <option value="active">Active</option><option value="dismissed">Dismissed</option><option value="">All</option>
+                            </select>
                         </div>
-                        <div class="text-left pr-1">
-                            <p class="text-xs font-bold text-gray-900 leading-tight" id="currentDayName">---</p>
-                            <p class="text-xs font-medium text-gray-400 leading-tight mt-0.5" id="currentMonthYear">---</p>
+                    </div>
+                    <div id="branchGrid" class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4"><p class="text-xs text-gray-400">Loading…</p></div>
+                </div>
+            </section>
+
+            <!-- ============ DESTINATION CODES ============ -->
+            <section data-panel="destinations" class="hidden">
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+                    <div class="xl:col-span-2 bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2"><span class="font-extrabold text-xs uppercase tracking-wider">Frequent destinations</span><span id="destCount" class="pill-tag pill-gray">…</span></div>
+                        </div>
+                        <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-x-auto custom-scrollbar max-lg:bg-transparent max-lg:border-0">
+                            <table class="rtable w-full text-xs">
+                                <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                                    <th class="p-3 pl-4 font-extrabold">Code</th><th class="p-3 font-extrabold">Country</th><th class="p-3 font-extrabold">Example reference</th><th class="p-3 font-extrabold">Status</th><th class="p-3 w-12"></th>
+                                </tr></thead>
+                                <tbody id="destRows" class="divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="space-y-5">
+                        <div class="rounded-[2rem] bg-[#111827] text-white p-6">
+                            <p class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Reference rule</p>
+                            <div class="flex flex-wrap items-center gap-1.5 mt-3 text-lg">
+                                <span class="ref-token bg-emerald-500/20 text-emerald-300">D</span>
+                                <span class="ref-token bg-coral-500 text-white">B</span>
+                                <span class="ref-token bg-sky-500/20 text-sky-300">C</span>
+                                <span class="ref-token bg-white/10">000001</span>
+                            </div>
+                            <ul class="mt-4 space-y-2 text-xs text-gray-300 leading-relaxed">
+                                <li><b class="text-white">D</b> destination — the number below, or the country's 2-letter code if it isn't listed</li>
+                                <li><b class="text-white">B</b> branch AWB digit (set per branch)</li>
+                                <li><b class="text-white">C</b> cargo type code</li>
+                                <li><b class="text-white">000001</b> runs per branch + destination and never resets. All 2-letter countries share one series per branch.</li>
+                            </ul>
+                        </div>
+                        <div class="rounded-[2rem] bg-[#F8F8FA] p-5 text-xs text-gray-500 leading-relaxed">
+                            Changing a code only affects <b>new</b> bookings. Removing a country makes it use its 2-letter code (shared series).
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- MAIN BENTO WORKSPACE -->
-            <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
-                <div class="grid grid-cols-12 gap-6 items-start">
-                    
-                    <!-- =================================================================== -->
-                    <!-- LEFT COLUMN (5 Cols): CREATE / EDIT BRANCH FORM & AWB SIMULATOR     -->
-                    <!-- =================================================================== -->
-                    <div id="branchFormCard" class="col-span-12 xl:col-span-5 bg-white rounded-[2rem] p-6 lg:p-7 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.03)] border border-gray-100/90 transition-all duration-300">
-                        
-                        <!-- Dynamic Form Header -->
-                        <div class="flex items-center justify-between pb-5 mb-5 border-b border-gray-100">
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <span id="formModeBadge" class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-coral-50 text-coral-600 border border-coral-100">
-                                        New Registration
-                                    </span>
-                                    <span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>
-                                </div>
-                                <h2 id="formHeaderTitle" class="text-lg font-extrabold text-gray-900 mt-1">Create New Branch</h2>
-                                <p id="formHeaderSubtitle" class="text-xs text-gray-400 mt-0.5">Search country, lookup postal/pincode, & assign AWB digit.</p>
-                            </div>
-
-                            <button type="button" id="cancelEditBtn" onclick="exitEditMode()" 
-                                    class="hidden items-center gap-1.5 px-3.5 py-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-extrabold transition-colors">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                Cancel Edit
-                            </button>
-                        </div>
-
-                        <!-- Alert Notification Banner -->
-                        <div id="branchAlertBox" class="hidden p-4 rounded-2xl text-xs font-bold mb-5 border transition-all"></div>
-
-                        <form id="branchForm" class="space-y-5">
-                            <input type="hidden" id="editingBranchId" value="">
-
-                            <!-- ================================================================= -->
-                            <!-- SECTION 1: IDENTITY & 6-CHAR CODES                                -->
-                            <!-- ================================================================= -->
-                            <div class="bg-[#F8F8FA] p-4 rounded-[1.5rem] border border-gray-100 space-y-3.5">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">01 • Branch Identity & Codes</span>
-                                    <span class="text-[10px] font-bold text-gray-500">6-Char Standard</span>
-                                </div>
-
-                                <!-- Branch Name -->
-                                <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                    <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1">Branch Name *</label>
-                                    <input type="text" id="branchName" required placeholder="e.g. Al-Farha Payangadi Hub / Salalah HQ"
-                                           oninput="handleBranchNameInput()"
-                                           class="w-full bg-transparent border-none p-0 text-xs font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
-                                </div>
-
-                                <!-- 6-Digit Branch Code & Unique Booking Code -->
-                                <div class="grid grid-cols-12 gap-3">
-                                    <div class="col-span-7 field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                        <div class="flex items-center justify-between mb-1">
-                                            <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Branch Code (6-Char) *</label>
-                                            <span id="branchCodeCounter" class="text-[9px] font-mono font-bold text-coral-500">0/6</span>
-                                        </div>
-                                        <input type="text" id="branchCode" required maxlength="6" placeholder="e.g. ALFSLL"
-                                               oninput="handleBranchCodeInput(this)"
-                                               class="w-full bg-transparent border-none p-0 text-sm font-mono font-extrabold uppercase tracking-widest text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
-                                        <p class="text-[9px] text-gray-400 mt-1">Format: <b class="text-gray-600">ALFSLL</b>, <b class="text-gray-600">ALFSNY</b></p>
-                                    </div>
-
-                                    <div class="col-span-5 field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                        <div class="flex items-center justify-between mb-1">
-                                            <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Booking Code *</label>
-                                            <span class="text-[9px] font-extrabold text-coral-600 bg-coral-50 px-1.5 py-0.5 rounded">AWB Digit</span>
-                                        </div>
-                                        <input type="text" id="bookingCode" required maxlength="2" value="2" placeholder="e.g. 2"
-                                               oninput="handleBookingCodeInput(this)"
-                                               class="w-full bg-transparent border-none p-0 text-sm font-mono font-extrabold uppercase tracking-widest text-coral-600 placeholder-gray-300 focus:outline-none focus:ring-0">
-                                        <p class="text-[9px] text-gray-400 mt-1">Branch ID in AWB (<b class="text-gray-600">1–9</b>)</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- ================================================================= -->
-                            <!-- INTERACTIVE SMART BOOKING ID / AWB ARCHITECTURE SIMULATOR         -->
-                            <!-- ================================================================= -->
-                            <div class="bg-[#111827] text-white p-5 rounded-[1.75rem] shadow-lg relative overflow-hidden">
-                                <div class="absolute -right-8 -top-8 w-28 h-28 rounded-full bg-coral-500/15 blur-xl pointer-events-none"></div>
-
-                                <div class="flex items-center justify-between mb-3">
-                                    <div>
-                                        <span class="text-[10px] font-extrabold uppercase tracking-widest text-coral-400">Smart AWB Architecture Preview</span>
-                                        <p class="text-[11px] text-gray-400 mt-0.5">Live simulation of `312100001` & `DE2100002` structure</p>
-                                    </div>
-                                    <span class="text-[10px] font-mono font-bold bg-white/10 px-2.5 py-1 rounded-full text-gray-300">
-                                        Live AWB
-                                    </span>
-                                </div>
-
-                                <div id="awbPreviewBadge" class="bg-gray-900/90 border border-gray-700/80 rounded-2xl p-3.5 mb-3.5 flex items-center justify-between gap-2">
-                                    <div class="flex items-center gap-1 sm:gap-1.5 font-mono text-base sm:text-lg font-extrabold tracking-wider">
-                                        <span id="segDest" class="awb-token px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" title="Destination Country Code">3</span>
-                                        <span class="text-gray-600 text-xs">•</span>
-                                        <span id="segCargo" class="awb-token px-2 py-1 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-500/30" title="Cargo Mode Code">1</span>
-                                        <span class="text-gray-600 text-xs">•</span>
-                                        <span id="segBranch" class="awb-token px-2.5 py-1 rounded-lg bg-coral-500 text-white shadow-sm" title="Unique Branch Booking Code">2</span>
-                                        <span class="text-gray-600 text-xs">•</span>
-                                        <span id="segSeq" class="awb-token px-2 py-1 rounded-lg bg-white/10 text-white" title="Sequential Booking Number">100001</span>
-                                    </div>
-
-                                    <div class="text-right">
-                                        <span class="text-[9px] font-bold text-gray-400 uppercase block">Booking ID</span>
-                                        <span id="combinedAwbString" class="text-xs sm:text-sm font-mono font-extrabold text-white tracking-wider">312100001</span>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-2.5 text-[10px]">
-                                    <div class="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                                        <span class="text-gray-400 font-bold uppercase block mb-1.5">1. Destination Code</span>
-                                        <select id="simDestinationSelect" onchange="updateSmartAwbSimulator()" 
-                                                class="w-full bg-gray-800 text-white font-bold text-[11px] rounded-lg px-2 py-1.5 border border-gray-700 focus:outline-none focus:border-coral-500 cursor-pointer">
-                                            <optgroup label="Frequent Destinations (1–9)">
-                                                <option value="1">1 — India (Kerala / South)</option>
-                                                <option value="2">2 — United Arab Emirates</option>
-                                                <option value="3" selected>3 — India (All Sector)</option>
-                                                <option value="4">4 — Saudi Arabia</option>
-                                                <option value="5">5 — Pakistan</option>
-                                                <option value="6">6 — Bangladesh</option>
-                                                <option value="7">7 — Sri Lanka</option>
-                                                <option value="8">8 — Philippines</option>
-                                                <option value="9">9 — Egypt</option>
-                                            </optgroup>
-                                            <optgroup label="Unassigned (2-Letter Alpha ISO)">
-                                                <option value="DE">DE — Germany (Alpha-2)</option>
-                                                <option value="GB">GB — United Kingdom (Alpha-2)</option>
-                                                <option value="CA">CA — Canada (Alpha-2)</option>
-                                                <option value="US">US — United States (Alpha-2)</option>
-                                            </optgroup>
-                                        </select>
-                                    </div>
-
-                                    <div class="bg-white/5 rounded-xl p-2.5 border border-white/10">
-                                        <span class="text-gray-400 font-bold uppercase block mb-1.5">2. Cargo Mode Code</span>
-                                        <div class="grid grid-cols-3 gap-1">
-                                            <button type="button" onclick="setSimCargoType('1')" id="simCargoBtn1"
-                                                    class="py-1.5 rounded-lg font-extrabold text-[10px] bg-sky-500 text-white transition-all">
-                                                1 Air
-                                            </button>
-                                            <button type="button" onclick="setSimCargoType('2')" id="simCargoBtn2"
-                                                    class="py-1.5 rounded-lg font-bold text-[10px] bg-gray-800 text-gray-300 hover:bg-gray-700 transition-all">
-                                                2 Sea
-                                            </button>
-                                            <button type="button" onclick="setSimCargoType('3')" id="simCargoBtn3"
-                                                    class="py-1.5 rounded-lg font-bold text-[10px] bg-gray-800 text-gray-300 hover:bg-gray-700 transition-all">
-                                                3 Road
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- ================================================================= -->
-                            <!-- SECTION 2: SEARCHABLE COUNTRY, POSTAL CODE & CITY ENGINE          -->
-                            <!-- ================================================================= -->
-                            <div class="bg-[#F8F8FA] p-4 rounded-[1.5rem] border border-gray-100 space-y-3.5">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">02 • Country, Postal Code & Location</span>
-                                    <span id="countryIsoTag" class="text-[10px] font-mono font-bold text-gray-500">Select Country First</span>
-                                </div>
-
-                                <!-- ROW A: Searchable Country Combobox + Postal/ZIP Code Lookup -->
-                                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                                    
-                                    <!-- 1. Searchable Country Dropdown (No Preset) -->
-                                    <div class="sm:col-span-7 relative" id="countryComboboxContainer">
-                                        <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                            <div class="flex items-center justify-between mb-1">
-                                                <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Country (Searchable) *</label>
-                                                <span id="selectedCountryIsoBadge" class="text-[9px] font-mono font-bold text-coral-600">REST API</span>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                <span id="countryFlagPreview" class="select-none flex-shrink-0 flex items-center"><svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg></span>
-                                                <input type="text" id="countrySearchInput" required autocomplete="off"
-                                                       placeholder="Type e.g. Sau, Ind, Oma..."
-                                                       onfocus="openCountryListDropdown()"
-                                                       oninput="filterCountryListDropdown(this.value)"
-                                                       class="w-full bg-transparent border-none p-0 text-xs font-extrabold text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0">
-                                                <button type="button" onclick="toggleCountryListDropdown()" class="text-gray-400 hover:text-gray-700 flex-shrink-0">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path></svg>
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <!-- Searchable Country Dropdown Menu -->
-                                        <div id="countryListDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto custom-scrollbar p-1.5">
-                                            <!-- Populated dynamically from REST API -->
-                                        </div>
-                                    </div>
-
-                                    <!-- 2. Postal Code / Pincode Input -->
-                                    <div class="sm:col-span-5 relative" id="postalComboboxContainer">
-                                        <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                            <div class="flex items-center justify-between mb-1">
-                                                <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Postal / PIN Code</label>
-                                                <span id="postalLookupBadge" class="text-[9px] font-bold text-emerald-600">Auto-Fill</span>
-                                            </div>
-                                            <div class="flex items-center gap-1.5">
-                                                <input type="text" id="postalCodeInput" autocomplete="off"
-                                                       placeholder="e.g. 670561 / 10005"
-                                                       oninput="handlePostalCodeLookup(this.value)"
-                                                       onfocus="if(this.value.trim().length >= 3) handlePostalCodeLookup(this.value)"
-                                                       class="w-full bg-transparent border-none p-0 text-xs font-mono font-extrabold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
-                                                <button type="button" onclick="handlePostalCodeLookup(document.getElementById('postalCodeInput').value)" 
-                                                        title="Lookup Post Offices"
-                                                        class="w-6 h-6 rounded-lg bg-coral-50 text-coral-600 hover:bg-coral-500 hover:text-white flex items-center justify-center transition-colors flex-shrink-0">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <!-- Post Offices / Localities Dropdown for Entered Pincode -->
-                                        <div id="postalOfficesDropdown" class="hidden absolute right-0 left-0 sm:-left-32 top-full mt-1.5 z-50 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto custom-scrollbar p-1.5">
-                                            <!-- Lists all Post Offices in that Pincode (e.g. 670561 -> Payangadi, Madayi, etc.) -->
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- ROW B: Selected Post Office / Locality + Concurrent City Dropdown + State -->
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    <!-- Post Office / Sub-Locality -->
-                                    <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                        <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1">Post Office / Area</label>
-                                        <input type="text" id="postOfficeInput" placeholder="e.g. Payangadi"
-                                               oninput="composeFullBranchAddress()"
-                                               class="w-full bg-transparent border-none p-0 text-xs font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
-                                    </div>
-
-                                    <!-- Searchable Concurrent City Dropdown -->
-                                    <div class="relative" id="cityComboboxContainer">
-                                        <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                            <div class="flex items-center justify-between mb-1">
-                                                <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">City / District *</label>
-                                                <span id="cityCountHint" class="text-[9px] font-bold text-gray-400">List</span>
-                                            </div>
-                                            <div class="flex items-center gap-1">
-                                                <input type="text" id="branchLocation" required autocomplete="off"
-                                                       placeholder="Select or type city..."
-                                                       onfocus="openCityListDropdown()"
-                                                       oninput="filterCityListDropdown(this.value)"
-                                                       class="w-full bg-transparent border-none p-0 text-xs font-extrabold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
-                                                <button type="button" onclick="toggleCityListDropdown()" class="text-gray-400 hover:text-gray-700 flex-shrink-0">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path></svg>
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <!-- Concurrent Cities Dropdown Menu -->
-                                        <div id="cityListDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 z-50 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-52 overflow-y-auto custom-scrollbar p-1.5">
-                                        </div>
-                                    </div>
-
-                                    <!-- State / Governorate / Province -->
-                                    <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                        <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1">State / Province</label>
-                                        <input type="text" id="stateInput" placeholder="e.g. Kerala / Dhofar"
-                                               oninput="composeFullBranchAddress()"
-                                               class="w-full bg-transparent border-none p-0 text-xs font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
-                                    </div>
-                                </div>
-
-                                <!-- Street / Building Input -->
-                                <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                    <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1">Street / Building / Landmark</label>
-                                    <input type="text" id="streetLine" placeholder="e.g. Main Road, Near Bus Stand, Ground Floor"
-                                           oninput="composeFullBranchAddress()"
-                                           class="w-full bg-transparent border-none p-0 text-xs font-semibold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
-                                </div>
-
-                                <!-- Auto-Composed Full Official Address -->
-                                <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                    <div class="flex items-center justify-between mb-1">
-                                        <label class="text-[10px] font-extrabold text-gray-400 uppercase tracking-wider">Formatted Official Address *</label>
-                                        <span id="officialCountryLabel" class="text-[9px] font-bold text-gray-400">Auto-Populated</span>
-                                    </div>
-                                    <textarea id="branchAddress" rows="2" required placeholder="Select country & postal code or city above to auto-build address..."
-                                              class="w-full bg-transparent border-none p-0 text-xs font-semibold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0 resize-none"></textarea>
-                                </div>
-
-                                <!-- Phone Number (With Respective Country Dial Code) & Assigned Manager -->
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                        <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Branch Phone *</label>
-                                        <div class="flex items-center gap-2">
-                                            <span id="phoneDialCodeBadge" class="px-2.5 py-1 rounded-lg bg-[#111827] text-white font-mono text-[11px] font-extrabold flex-shrink-0 select-none">
-                                                +--
-                                            </span>
-                                            <input type="tel" id="phoneLocalNumber" required placeholder="Enter phone number"
-                                                   class="w-full bg-transparent border-none p-0 text-xs font-mono font-extrabold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-0">
-                                        </div>
-                                    </div>
-
-                                    <div class="field-card bg-white rounded-2xl p-3 border border-gray-200/70 focus-within:border-coral-500">
-                                        <label class="block text-[10px] font-extrabold text-gray-400 uppercase tracking-wider mb-1.5">Assigned Manager</label>
-                                        <select id="assignedManager" class="w-full bg-transparent border-none p-0 text-xs font-bold text-gray-900 focus:outline-none focus:ring-0 cursor-pointer">
-                                            <option value="">-- Unassigned --</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Submit / Save Action Button -->
-                            <button type="submit" id="submitBranchBtn"
-                                    class="w-full bg-coral-500 hover:bg-coral-600 active:scale-[0.99] text-white font-extrabold text-xs py-4 rounded-2xl shadow-[0_12px_25px_-6px_rgba(232,109,88,0.55)] transition-all flex items-center justify-center gap-2">
-                                <span id="submitBranchBtnText">Create Branch & Activate AWB Code</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- =================================================================== -->
-                    <!-- RIGHT COLUMN (7 Cols): ACTIVE & DISMISSED BRANCHES DIRECTORY        -->
-                    <!-- =================================================================== -->
-                    <div class="col-span-12 xl:col-span-7 flex flex-col gap-5">
-                        
-                        <div class="bg-white rounded-[2rem] p-5 lg:p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border border-gray-100/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div>
-                                <h3 class="text-base font-extrabold text-gray-900">Branch Network Directory</h3>
-                                <p class="text-xs text-gray-400 mt-0.5">Click <b>Edit Details</b> to modify or <b>Dismiss</b> to close a branch</p>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-2">
-                                <div class="flex bg-[#F8F8FA] p-1 rounded-full border border-gray-200/60">
-                                    <button type="button" onclick="setBranchStatusFilter('ALL')" id="filterTabALL" class="px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#111827] text-white transition-all">All</button>
-                                    <button type="button" onclick="setBranchStatusFilter('ACTIVE')" id="filterTabACTIVE" class="px-3 py-1 rounded-full text-[11px] font-bold text-gray-500 hover:text-gray-900 transition-all">Active</button>
-                                    <button type="button" onclick="setBranchStatusFilter('DISMISSED')" id="filterTabDISMISSED" class="px-3 py-1 rounded-full text-[11px] font-bold text-gray-500 hover:text-gray-900 transition-all">Dismissed</button>
-                                </div>
-
-                                <div class="relative flex items-center bg-[#F8F8FA] rounded-full px-3.5 py-2 border border-gray-200/60 w-full sm:w-52">
-                                    <svg class="w-3.5 h-3.5 text-gray-400 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                                    <input type="text" id="branchSearchBox" oninput="renderBranchCards()" placeholder="Search ALFSLL, city..." class="bg-transparent border-none focus:outline-none text-xs text-gray-800 w-full placeholder-gray-400">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="branchesListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <!-- Injected dynamically via JS -->
-                        </div>
-
-                    </div>
-
+            <!-- ============ CARGO TYPES ============ -->
+            <section data-panel="cargo" class="hidden">
+                <div class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
+                    <div class="flex items-center gap-2 mb-4"><span class="font-extrabold text-xs uppercase tracking-wider">Cargo types</span><span id="cargoCount" class="pill-tag pill-gray">…</span></div>
+                    <div id="cargoGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"></div>
+                    <p class="text-[11px] text-gray-400 mt-4">Cargo types can't be deleted (old references use them) — deactivate to hide them from the booking form.</p>
                 </div>
             </section>
-            
         </div>
     </main>
 
-    <!-- DISMISS / CLOSE BRANCH CONFIRMATION MODAL -->
-    <div id="dismissBranchModal" class="hidden fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm items-center justify-center p-4">
-        <div class="bg-white rounded-[2.25rem] max-w-md w-full p-6 lg:p-7 shadow-2xl border border-gray-100">
-            <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+    <!-- BRANCH FORM -->
+    <div id="branchModal" class="ui-modal">
+        <form id="branchForm" class="panel max-w-3xl" novalidate autocomplete="off">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div>
+                    <h3 id="branchFormTitle" class="text-lg font-extrabold">Add branch</h3>
+                    <p class="text-xs text-gray-400 mt-0.5">Identity, location, contact and finance settings.</p>
+                </div>
+                <button type="button" onclick="UI.closeModal('branchModal')" aria-label="Close" class="icon-btn bg-[#F8F8FA]"><span data-icon="x"></span></button>
             </div>
-            <h3 id="dismissModalTitle" class="text-lg font-extrabold text-gray-900">Dismiss & Close Branch?</h3>
-            <p class="text-xs text-gray-500 mt-1.5 leading-relaxed">
-                This will mark the branch as <b>Closed / Dismissed</b> and pause new AWB bookings under its code. Historical shipments remain intact.
-            </p>
-            <div class="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-gray-100">
-                <button type="button" onclick="closeDismissModal()" class="px-4 py-2.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition-colors">
-                    Cancel
-                </button>
-                <button type="button" id="confirmDismissBtn" class="px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold transition-colors shadow-sm">
-                    Confirm Dismiss Branch
-                </button>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar my-5 pr-1 space-y-6">
+                <!-- Identity -->
+                <fieldset class="grid grid-cols-1 sm:grid-cols-6 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Identity</legend>
+                    <div class="sm:col-span-3"><label class="ui-label" for="b_name">Branch name <span class="req">*</span></label><input id="b_name" class="field" placeholder="e.g. Al-Farha Cargo Salalah"></div>
+                    <div class="sm:col-span-2"><label class="ui-label" for="b_code">Branch code <span class="req">*</span></label><input id="b_code" class="field uppercase font-mono" maxlength="6" placeholder="ALFSLL"></div>
+                    <div class="sm:col-span-1"><label class="ui-label" for="b_digit">AWB digit <span class="req">*</span></label><input id="b_digit" class="field font-mono text-center" maxlength="2" placeholder="1"></div>
+                </fieldset>
+
+                <!-- Live reference preview -->
+                <div class="rounded-[1.5rem] bg-[#111827] text-white p-4 sm:p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Booking reference preview</p>
+                            <div class="flex flex-wrap items-center gap-1.5 mt-2 text-base sm:text-lg">
+                                <span id="pvD" class="ref-token bg-emerald-500/20 text-emerald-300">3</span>
+                                <span id="pvB" class="ref-token bg-coral-500 text-white">1</span>
+                                <span id="pvC" class="ref-token bg-sky-500/20 text-sky-300">1</span>
+                                <span class="ref-token bg-white/10">000001</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 w-full sm:w-auto">
+                            <select id="pvDest" class="field !bg-gray-800 !border-gray-700 !text-white !py-2 !text-xs" aria-label="Example destination"></select>
+                            <select id="pvCargo" class="field !bg-gray-800 !border-gray-700 !text-white !py-2 !text-xs" aria-label="Example cargo type"></select>
+                        </div>
+                    </div>
+                    <p id="digitWarn" class="hidden mt-3 text-[11px] font-bold text-coral-300"></p>
+                </div>
+
+                <!-- Location -->
+                <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Location</legend>
+                    <div>
+                        <label class="ui-label" for="b_country">Country <span class="req">*</span></label>
+                        <div class="relative">
+                            <img id="b_flag" class="flag absolute left-3 top-1/2 -translate-y-1/2 hidden" alt="">
+                            <input id="b_country" class="field" list="countryList" placeholder="Type to search…">
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <label class="ui-label" for="b_postal">Postal / PIN code</label>
+                        <div class="relative">
+                            <input id="b_postal" class="field !pr-24" placeholder="e.g. 211 or 670561">
+                            <span id="postalBadge" class="absolute right-3 top-1/2 -translate-y-1/2 pill-tag pill-gray">Lookup</span>
+                        </div>
+                        <div id="postalList" class="hidden absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-100 rounded-2xl shadow-xl p-1.5 max-h-60 overflow-y-auto custom-scrollbar"></div>
+                    </div>
+                    <div><label class="ui-label" for="b_po">Post office / area</label><input id="b_po" class="field" placeholder="Locality"></div>
+                    <div><label class="ui-label" for="b_city">City <span class="req">*</span></label><input id="b_city" class="field" placeholder="e.g. Salalah"></div>
+                    <div><label class="ui-label" for="b_state">State / governorate</label><input id="b_state" class="field" placeholder="e.g. Dhofar"></div>
+                    <div><label class="ui-label" for="b_street">Street / building</label><input id="b_street" class="field" placeholder="Building, street"></div>
+                    <div class="sm:col-span-2"><label class="ui-label">Full address (auto)</label>
+                        <p id="b_address" class="field soft !font-medium text-gray-600 min-h-[46px]">—</p></div>
+                </fieldset>
+
+                <!-- Contact -->
+                <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Contact</legend>
+                    <div>
+                        <label class="ui-label" for="b_phone">Phone <span class="req">*</span></label>
+                        <div class="flex gap-2">
+                            <span id="b_dial" class="field soft !w-20 text-center flex-shrink-0">+</span>
+                            <input id="b_phone" class="field" type="tel" placeholder="9XXXXXXX">
+                        </div>
+                    </div>
+                    <div><label class="ui-label" for="b_manager">Branch manager</label><select id="b_manager" class="field"></select></div>
+                </fieldset>
+
+                <!-- Finance -->
+                <fieldset class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Finance</legend>
+                    <div><label class="ui-label" for="b_currency">Currency</label>
+                        <select id="b_currency" class="field"><option>OMR</option><option>AED</option><option>SAR</option><option>QAR</option><option>KWD</option><option>BHD</option><option>INR</option><option>NPR</option><option>LKR</option><option>PKR</option><option>BDT</option><option>PHP</option><option>EGP</option><option>USD</option></select></div>
+                    <div><label class="ui-label" for="b_taxName">Tax name</label><input id="b_taxName" class="field" placeholder="VAT"></div>
+                    <div><label class="ui-label" for="b_taxRate">Tax rate %</label><input id="b_taxRate" class="field" type="number" min="0" max="100" step="0.01" placeholder="5"></div>
+                    <div><label class="ui-label">Hub</label>
+                        <label class="field flex items-center gap-2 cursor-pointer"><input id="b_hub" type="checkbox" class="w-4 h-4"><span class="text-xs font-bold">Hub branch</span></label></div>
+                </fieldset>
             </div>
-        </div>
+
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('branchModal')">Cancel</button>
+                <button id="branchSave" class="btn btn-coral">Save branch</button>
+            </div>
+        </form>
+    </div>
+    <datalist id="countryList"></datalist>
+
+    <!-- DESTINATION CODE FORM -->
+    <div id="destModal" class="ui-modal">
+        <form id="destForm" class="panel max-w-md">
+            <h3 id="destTitle" class="text-lg font-extrabold">Add destination code</h3>
+            <p class="text-xs text-gray-400 mt-1">Give a frequent country its own number in the reference.</p>
+            <div class="grid grid-cols-3 gap-3 mt-5">
+                <div class="col-span-2"><label class="ui-label" for="d_country">Country</label><input id="d_country" class="field" list="countryList" placeholder="Type to search…"></div>
+                <div><label class="ui-label" for="d_code">Code</label><input id="d_code" class="field font-mono text-center" inputmode="numeric" maxlength="2" placeholder="e.g. 1"></div>
+            </div>
+            <label class="flex items-center gap-2 mt-4 cursor-pointer"><input id="d_active" type="checkbox" class="w-4 h-4" checked><span class="text-xs font-bold">Active</span></label>
+            <div class="flex justify-end gap-2 mt-6">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('destModal')">Cancel</button>
+                <button class="btn btn-dark">Save</button>
+            </div>
+        </form>
     </div>
 
-    <!-- Complete Interactive Country, Postal, City & AWB Script -->
+    <!-- CARGO TYPE FORM -->
+    <div id="cargoModal" class="ui-modal">
+        <form id="cargoForm" class="panel max-w-md">
+            <h3 id="cargoTitle" class="text-lg font-extrabold">Add cargo type</h3>
+            <div class="grid grid-cols-3 gap-3 mt-5">
+                <div><label class="ui-label" for="c_code">Code</label><input id="c_code" class="field font-mono text-center uppercase" maxlength="2" placeholder="4"></div>
+                <div class="col-span-2"><label class="ui-label" for="c_name">Name</label><input id="c_name" class="field" placeholder="e.g. Air Express"></div>
+                <div class="col-span-3"><label class="ui-label" for="c_desc">Description</label><input id="c_desc" class="field" placeholder="Optional"></div>
+                <div><label class="ui-label" for="c_sort">Order</label><input id="c_sort" class="field" type="number" placeholder="40"></div>
+            </div>
+            <label class="flex items-center gap-2 mt-4 cursor-pointer"><input id="c_active" type="checkbox" class="w-4 h-4" checked><span class="text-xs font-bold">Active (shown in booking form)</span></label>
+            <div class="flex justify-end gap-2 mt-6">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('cargoModal')">Cancel</button>
+                <button class="btn btn-dark">Save</button>
+            </div>
+        </form>
+    </div>
+
     <script>
-        let allCountriesData = [];
-        let selectedCountryObj = null; // No country preset
-        let currentCountryCities = [];
-        let allBranchesList = [];
-        let branchStatusFilter = 'ALL';
-        let simCargoMode = '1';
-        let countrySearchDebounce = null;
-        let postalSearchTimer = null;
-        let pendingDismissBranch = null;
-
-        const REGIONAL_CITIES_MAP = {
-            OM: ['Salalah', 'Sanaiya (Salalah Industrial)', 'Muscat', 'Seeb', 'Sohar', 'Nizwa', 'Sur', 'Barka', 'Ibri', 'Duqm', 'Khasab'],
-            SA: ['Riyadh', 'Jeddah', 'Dammam', 'Al Khobar', 'Mecca', 'Medina', 'Jubail', 'Tabuk', 'Abha'],
-            AE: ['Dubai', 'Sharjah', 'Abu Dhabi', 'Ajman', 'Ras Al Khaimah', 'Fujairah', 'Al Ain'],
-            QA: ['Doha', 'Al Wakrah', 'Al Khor', 'Al Rayyan', 'Lusail'],
-            KW: ['Kuwait City', 'Farwaniya', 'Hawalli', 'Ahmadi', 'Salmiya', 'Jahra'],
-            BH: ['Manama', 'Muharraq', 'Riffa', 'Sitra', 'Isa Town'],
-            IN: ['Kozhikode', 'Kochi', 'Kannur', 'Payangadi', 'Thiruvananthapuram', 'Thrissur', 'Malappuram', 'Kasaragod', 'Mangaluru', 'Bengaluru', 'Chennai', 'Mumbai', 'Delhi'],
-            PK: ['Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'Sialkot', 'Faisalabad', 'Peshawar'],
-            BD: ['Dhaka', 'Chittagong', 'Sylhet', 'Khulna', 'Rajshahi'],
-            LK: ['Colombo', 'Kandy', 'Galle', 'Negombo', 'Jaffna'],
-            PH: ['Manila', 'Quezon City', 'Cebu City', 'Davao City', 'Makati'],
-            EG: ['Cairo', 'Alexandria', 'Giza', 'Port Said', 'Suez'],
-            DE: ['Frankfurt', 'Berlin', 'Hamburg', 'Munich', 'Cologne'],
-            GB: ['London', 'Manchester', 'Birmingham', 'Glasgow', 'Liverpool'],
-            US: ['New York', 'Houston', 'Chicago', 'Los Angeles', 'Miami'],
-            CA: ['Toronto', 'Vancouver', 'Montreal', 'Calgary', 'Ottawa']
+        const { api, esc, toast, openModal, closeModal, icon: I } = UI;
+        const $ = (id) => document.getElementById(id);
+        const COUNTRIES = window.ALF_COUNTRIES || [];
+        const byCode = Object.fromEntries(COUNTRIES.map(c => [c.c, c]));
+        const flag = (cc) => cc ? `https://flagcdn.com/w40/${cc.toLowerCase()}.png` : '';
+        const findCountry = (text) => {
+            const t = String(text || '').trim().toLowerCase();
+            return COUNTRIES.find(c => c.n.toLowerCase() === t || c.c.toLowerCase() === t) || null;
         };
+        // Common Al-Farha city → branch code suggestions (kept from the old page)
+        const CITY_CODE_MAP = { SALALAH: 'ALFSLL', SANAIYA: 'ALFSNY', SANNAYYA: 'ALFSNY', MUSCAT: 'ALFMCT', SEEB: 'ALFSEB', SOHAR: 'ALFSHR', NIZWA: 'ALFNZW',
+            THUMRAIT: 'ALFTMT', DUQM: 'ALFDQM', PAYANGADI: 'ALFPYD', KANNUR: 'ALFKNR', KOZHIKODE: 'ALFCCJ', KOCHI: 'ALFCOK', RIYADH: 'ALFRUH', JEDDAH: 'ALFJED', DUBAI: 'ALFDXB' };
 
-        // 1. Live Clock
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('currentDay').textContent = String(now.getDate()).padStart(2, '0');
-            document.getElementById('currentDayName').textContent = now.toLocaleDateString('en-US', { weekday: 'long' });
-            document.getElementById('currentMonthYear').textContent = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-            document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { 
-                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
-            });
+        let branches = [], managers = [], destinations = [], cargoTypes = [], tab = 'branches', editing = null;
+
+        $('countryList').innerHTML = COUNTRIES.map(c => `<option value="${esc(c.n)}">${esc(c.c)} · ${esc(c.d)}</option>`).join('');
+
+        // ---------- tabs ----------
+        const TAB_LABEL = { branches: 'Add branch', destinations: 'Add destination code', cargo: 'Add cargo type' };
+        function setTab(t) {
+            tab = t;
+            document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+            document.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== t));
+            $('addBtnLabel').textContent = TAB_LABEL[t];
+            try { localStorage.setItem('alf_branch_tab', t); } catch (e) {}
         }
-        updateClock();
-        setInterval(updateClock, 1000);
+        document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+        window.primaryAction = () => (tab === 'branches' ? openBranch() : tab === 'destinations' ? openDest() : openCargo());
 
-        // =====================================================================
-        // 2. FETCH & LIST ALL COUNTRIES FROM REST API (Triple-Fallback Engine)
-        // =====================================================================
-        function normalizeClientCountry(item) {
-            if (!item || typeof item !== 'object') return null;
-            const name =
-                (typeof item.name === 'string' ? item.name : item?.name?.common) ||
-                item?.common_name ||
-                '';
-            if (!name) return null;
-
-            const officialName =
-                (typeof item.name === 'object' ? item?.name?.official : null) ||
-                item?.officialName ||
-                item?.official_name ||
-                name;
-
-            const cca2 = String(item?.cca2 || item?.alpha2Code || item?.iso2 || '').toUpperCase();
-            let dialCode = item?.dialCode || '+';
-            if (!item?.dialCode && item?.idd?.root) {
-                const suffixes = Array.isArray(item.idd.suffixes) ? item.idd.suffixes : [];
-                const suffix = (item.idd.root === '+1' || suffixes.length > 1) ? '' : (suffixes[0] || '');
-                dialCode = `${item.idd.root}${suffix}`;
-            } else if (!item?.dialCode && Array.isArray(item?.callingCodes) && item.callingCodes[0]) {
-                dialCode = `+${String(item.callingCodes[0]).replace(/^\+/, '')}`;
-            }
-
-            const capital = Array.isArray(item?.capital) ? item.capital[0] : (item?.capital || '');
-            const regionalCities = REGIONAL_CITIES_MAP[cca2] || [];
-            const itemCities = Array.isArray(item?.cities) ? item.cities : [];
-            const mergedCities = [...new Set([...regionalCities, ...itemCities, capital].filter(Boolean))];
-
-            return {
-                name,
-                officialName,
-                cca2,
-                dialCode,
-                capital,
-                flag: item?.flag || item?.flags?.svg || item?.flags?.png || (cca2 ? `https://flagcdn.com/${cca2.toLowerCase()}.svg` : ''),
-                cities: mergedCities
-            };
-        }
-
-        async function loadAllCountries() {
-            const badge = document.getElementById('selectedCountryIsoBadge');
-            if (badge) badge.textContent = 'Loading...';
-
-            // Attempt 1: Direct Public REST Countries v3.1 API (Fastest & Never 500s)
+        // ---------- data ----------
+        async function loadAll() {
             try {
-                const directRes = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,idd,capital,flags');
-                if (directRes.ok) {
-                    const raw = await directRes.json();
-                    if (Array.isArray(raw) && raw.length > 0) {
-                        allCountriesData = raw
-                            .map(normalizeClientCountry)
-                            .filter(Boolean)
-                            .sort((a, b) => a.name.localeCompare(b.name));
-                        if (badge) badge.textContent = `${allCountriesData.length} Countries`;
-                        return;
-                    }
-                }
-            } catch (e) {}
-
-            // Attempt 2: Backend /api/countries
-            try {
-                const res = await fetch('/api/countries');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data.countries) && data.countries.length > 0) {
-                        allCountriesData = data.countries.map(normalizeClientCountry).filter(Boolean);
-                        if (badge) badge.textContent = `${allCountriesData.length} Countries`;
-                        return;
-                    }
-                }
-            } catch (e) {}
-
-            if (badge) badge.textContent = 'REST API';
+                const [b, c] = await Promise.all([api('/api/branches'), api('/api/codes')]);
+                branches = b.branches || []; managers = b.managers || [];
+                destinations = c.destinations || []; cargoTypes = c.cargo_types || [];
+                renderBranches(); renderDest(); renderCargo();
+            } catch (e) { toast(false, e.message); }
         }
 
-        window.openCountryListDropdown = async function() {
-            if (allCountriesData.length === 0) {
-                await loadAllCountries();
-            }
-            const currentVal = document.getElementById('countrySearchInput').value;
-            renderCountryDropdownItems(allCountriesData, currentVal);
-            document.getElementById('countryListDropdown').classList.remove('hidden');
-        };
+        // ---------- branches ----------
+        const isDismissed = (b) => (b.status || '') === 'Dismissed';
+        function renderBranches() {
+            const active = branches.filter(b => !isDismissed(b));
+            const tile = (label, n, dark) => `<div class="${dark ? 'bg-[#111827] text-white' : 'bg-[#F8F8FA] border border-gray-100'} rounded-[1.5rem] p-4">
+                <p class="text-[10px] font-extrabold uppercase text-gray-400">${label}</p><p class="text-2xl font-extrabold mt-1">${n}</p></div>`;
+            $('stats').innerHTML = tile('Active branches', active.length, true) + tile('Hubs', active.filter(b => b.is_hub).length)
+                + tile('Countries', new Set(active.map(b => b.country)).size) + tile('Dismissed', branches.length - active.length);
 
-        window.toggleCountryListDropdown = function() {
-            const menu = document.getElementById('countryListDropdown');
-            if (menu.classList.contains('hidden')) {
-                openCountryListDropdown();
-            } else {
-                menu.classList.add('hidden');
-            }
-        };
-
-        // Live Search: Filters immediately from allCountriesData AND queries REST API for `?q=...`
-        window.filterCountryListDropdown = function(query) {
-            const q = (query || '').trim();
-            renderCountryDropdownItems(allCountriesData, q);
-
-            clearTimeout(countrySearchDebounce);
-            if (q.length >= 2) {
-                countrySearchDebounce = setTimeout(async () => {
-                    try {
-                        const res = await fetch(`/api/countries?q=${encodeURIComponent(q)}`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (Array.isArray(data.countries) && data.countries.length > 0) {
-                                data.countries.map(normalizeClientCountry).filter(Boolean).forEach(apiCountry => {
-                                    if (!allCountriesData.some(c => c.cca2 === apiCountry.cca2)) {
-                                        allCountriesData.push(apiCountry);
-                                    }
-                                });
-                                renderCountryDropdownItems(allCountriesData, q);
-                            }
-                        }
-                    } catch (e) {}
-                }, 220);
-            }
-        };
-
-        function renderCountryDropdownItems(sourceList, query = '') {
-            const menu = document.getElementById('countryListDropdown');
-            const q = (query || '').toLowerCase().trim();
-
-            const matches = sourceList.filter(c =>
-                !q ||
-                c.name.toLowerCase().startsWith(q) ||
-                c.name.toLowerCase().includes(q) ||
-                (c.officialName || '').toLowerCase().includes(q) ||
-                (c.cca2 || '').toLowerCase().includes(q) ||
-                (c.dialCode || '').includes(q)
-            ).sort((a, b) => {
-                // Prioritize countries starting with the typed letters (e.g. "Sau" -> Saudi Arabia first)
-                const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1;
-                const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1;
-                return aStarts - bStarts || a.name.localeCompare(b.name);
-            });
-
-            if (matches.length === 0) {
-                menu.innerHTML = `<div class="p-3 text-center text-xs text-gray-400">No country matching "${query}"</div>`;
-            } else {
-                menu.innerHTML = matches.slice(0, 100).map((c, idx) => `
-                    <button type="button"
-                            onclick="selectCountryByCode('${c.cca2}')"
-                            class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#FFF5F3] text-left transition-colors group">
-                        <div class="flex items-center gap-2.5 min-w-0">
-                            ${c.flag ? `<img src="${c.flag}" class="w-5 h-3.5 object-cover rounded-sm border border-gray-200 flex-shrink-0">` : '<svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>'}
-                            <div class="truncate">
-                                <p class="text-xs font-extrabold text-gray-900 group-hover:text-coral-600 truncate">${c.name}</p>
-                                <p class="text-[10px] text-gray-400 truncate">${c.officialName}</p>
-                            </div>
-                        </div>
-                        <span class="text-[10px] font-mono font-extrabold text-coral-600 bg-coral-50 px-2 py-0.5 rounded-full ml-2 flex-shrink-0">
-                            ${c.dialCode} • ${c.cca2}
-                        </span>
-                    </button>
-                `).join('');
-            }
-            menu.classList.remove('hidden');
-        }
-
-        window.selectCountryByCode = function(cca2) {
-            const found = allCountriesData.find(c => c.cca2 === cca2);
-            if (found) {
-                selectCountryItem(found, true);
-            }
-        };
-
-        window.selectCountryItem = async function(countryObj, clearFields = true) {
-            selectedCountryObj = countryObj;
-
-            document.getElementById('countrySearchInput').value = countryObj.name;
-            document.getElementById('selectedCountryIsoBadge').textContent = `${countryObj.cca2} • ${countryObj.dialCode}`;
-            document.getElementById('countryIsoTag').textContent = `${countryObj.name} (${countryObj.cca2}) • ${countryObj.dialCode}`;
-            document.getElementById('phoneDialCodeBadge').textContent = countryObj.dialCode || '+';
-            document.getElementById('officialCountryLabel').textContent = countryObj.officialName || countryObj.name;
-            document.getElementById('countryFlagPreview').innerHTML = countryObj.flag
-                ? `<img src="${countryObj.flag}" class="w-5 h-3.5 object-cover rounded-sm border border-gray-200">`
-                : '<svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>';
-
-            document.getElementById('countryListDropdown').classList.add('hidden');
-
-            if (clearFields) {
-                document.getElementById('postalCodeInput').value = '';
-                document.getElementById('postOfficeInput').value = '';
-                document.getElementById('branchLocation').value = '';
-                document.getElementById('stateInput').value = '';
-            }
-
-            // Load Concurrent Cities for Selected Country
-            currentCountryCities = Array.isArray(countryObj.cities) ? [...countryObj.cities] : [];
-            document.getElementById('cityCountHint').textContent = 'Loading...';
-
-            try {
-                const directCitiesRes = await fetch('https://countriesnow.space/api/v0.1/countries/cities', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ country: countryObj.name })
-                });
-                if (directCitiesRes.ok) {
-                    const directCitiesJson = await directCitiesRes.json();
-                    if (Array.isArray(directCitiesJson?.data) && directCitiesJson.data.length > 0) {
-                        currentCountryCities = [...new Set([...currentCountryCities, ...directCitiesJson.data])];
-                    }
-                }
-            } catch (e) {}
-
-            document.getElementById('cityCountHint').textContent = `${currentCountryCities.length} Cities`;
-            composeFullBranchAddress();
-        };
-
-        // =====================================================================
-        // 3. CONCURRENT CITY SEARCHABLE DROPDOWN
-        // =====================================================================
-        window.openCityListDropdown = function() {
-            filterCityListDropdown(document.getElementById('branchLocation').value);
-            document.getElementById('cityListDropdown').classList.remove('hidden');
-        };
-
-        window.toggleCityListDropdown = function() {
-            const menu = document.getElementById('cityListDropdown');
-            if (menu.classList.contains('hidden')) {
-                openCityListDropdown();
-            } else {
-                menu.classList.add('hidden');
-            }
-        };
-
-        window.filterCityListDropdown = function(query) {
-            const menu = document.getElementById('cityListDropdown');
-            const q = (query || '').toLowerCase().trim();
-            const matches = currentCountryCities.filter(city => city.toLowerCase().includes(q));
-
-            if (matches.length === 0) {
-                menu.innerHTML = `<div class="p-2.5 text-center text-[11px] text-gray-400">${selectedCountryObj ? `Using custom city "${query}"` : 'Select a country first or type city'}</div>`;
-            } else {
-                menu.innerHTML = matches.slice(0, 100).map(city => `
-                    <button type="button"
-                            onclick="selectCityFromDropdown('${city.replace(/'/g, "\\'")}')"
-                            class="w-full text-left px-3 py-2 rounded-xl hover:bg-[#FFF5F3] hover:text-coral-600 text-xs font-bold text-gray-800 transition-colors">
-                        ${city}
-                    </button>
-                `).join('');
-            }
-            menu.classList.remove('hidden');
-            autoGenerateSixCharBranchCode();
-            composeFullBranchAddress();
-        };
-
-        window.selectCityFromDropdown = function(cityName) {
-            document.getElementById('branchLocation').value = cityName;
-            document.getElementById('cityListDropdown').classList.add('hidden');
-            autoGenerateSixCharBranchCode();
-            composeFullBranchAddress();
-        };
-
-        // =====================================================================
-        // 4. POSTAL CODE / PINCODE -> POST OFFICES DROPDOWN (e.g. 670561)
-        // =====================================================================
-        window.handlePostalCodeLookup = function(rawCode) {
-            clearTimeout(postalSearchTimer);
-            const code = (rawCode || '').trim();
-            const dropdown = document.getElementById('postalOfficesDropdown');
-            const badge = document.getElementById('postalLookupBadge');
-
-            if (code.length < 3) {
-                dropdown.classList.add('hidden');
-                badge.textContent = 'Auto-Fill';
-                composeFullBranchAddress();
-                return;
-            }
-
-            badge.textContent = 'Searching...';
-
-            postalSearchTimer = setTimeout(async () => {
-                let locations = [];
-                const iso2 = selectedCountryObj?.cca2 || '';
-
-                // 1. Direct India Post Pincode Lookup for 6-Digit Pincodes (e.g. 670561 -> Payangadi, Madayi, etc.)
-                if ((iso2 === 'IN' || !iso2) && /^\d{6}$/.test(code)) {
-                    try {
-                        const inRes = await fetch(`https://api.postalpincode.in/pincode/${code}`);
-                        if (inRes.ok) {
-                            const inJson = await inRes.json();
-                            const postOffices = inJson?.[0]?.PostOffice;
-                            if (Array.isArray(postOffices)) {
-                                locations = postOffices.map(po => ({
-                                    postOffice: po.Name,
-                                    city: po.District || po.Block || '',
-                                    state: po.State || '',
-                                    postalCode: code,
-                                    countryCode: 'IN'
-                                }));
-                            }
-                        }
-                    } catch (e) {}
-                }
-
-                // 2. Try Backend /api/postal-lookup (Zipcodebase key stays server-side)
-                if (locations.length === 0) {
-                    try {
-                        const res = await fetch(`/api/postal-lookup?code=${encodeURIComponent(code)}&countryCode=${encodeURIComponent(iso2)}`);
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (Array.isArray(data.locations) && data.locations.length > 0) {
-                                locations = data.locations;
-                            }
-                        }
-                    } catch (e) {}
-                }
-
-                if (locations.length > 0) {
-                    badge.textContent = `${locations.length} Found`;
-                    window.latestPostalLocations = locations;
-                    renderPostalOfficesDropdown(locations);
-                } else {
-                    badge.textContent = 'No Match';
-                    dropdown.innerHTML = `<div class="p-3 text-center text-xs text-gray-400">No post offices found for "${code}"</div>`;
-                    dropdown.classList.remove('hidden');
-                }
-            }, 260);
-        };
-
-        function renderPostalOfficesDropdown(locations) {
-            const dropdown = document.getElementById('postalOfficesDropdown');
-            dropdown.innerHTML = `
-                <div class="px-3 py-1.5 text-[10px] font-extrabold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                    Select Post Office / Locality (${locations.length})
-                </div>
-            ` + locations.map((loc, index) => `
-                <button type="button"
-                        onclick="selectPostOfficeByIndex(${index})"
-                        class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#FFF5F3] text-left transition-colors group">
-                    <div class="min-w-0 pr-2">
-                        <p class="text-xs font-extrabold text-gray-900 group-hover:text-coral-600 truncate">${loc.postOffice}</p>
-                        <p class="text-[10px] font-medium text-gray-400 truncate">${loc.city}${loc.state ? `, ${loc.state}` : ''}</p>
-                    </div>
-                    <span class="text-[10px] font-mono font-bold text-coral-600 bg-coral-50 px-2 py-0.5 rounded-full flex-shrink-0">
-                        ${loc.postalCode}
-                    </span>
-                </button>
-            `).join('');
-            dropdown.classList.remove('hidden');
-        }
-
-        window.selectPostOfficeByIndex = function(idx) {
-            const loc = (window.latestPostalLocations || [])[idx];
-            if (!loc) return;
-
-            document.getElementById('postalCodeInput').value = loc.postalCode || '';
-            document.getElementById('postOfficeInput').value = loc.postOffice || '';
-            document.getElementById('branchLocation').value = loc.city || loc.postOffice || '';
-            document.getElementById('stateInput').value = loc.state || '';
-            document.getElementById('postalOfficesDropdown').classList.add('hidden');
-
-            // Auto-select country if not yet selected
-            if (!selectedCountryObj && loc.countryCode && allCountriesData.length > 0) {
-                const matchedCountry = allCountriesData.find(c => c.cca2 === loc.countryCode);
-                if (matchedCountry) {
-                    selectCountryItem(matchedCountry, false);
-                }
-            }
-
-            autoGenerateSixCharBranchCode();
-            composeFullBranchAddress();
-        };
-
-        document.addEventListener('click', (e) => {
-            const countryBox = document.getElementById('countryComboboxContainer');
-            const postalBox = document.getElementById('postalComboboxContainer');
-            const cityBox = document.getElementById('cityComboboxContainer');
-
-            if (countryBox && !countryBox.contains(e.target)) {
-                document.getElementById('countryListDropdown').classList.add('hidden');
-            }
-            if (postalBox && !postalBox.contains(e.target)) {
-                document.getElementById('postalOfficesDropdown').classList.add('hidden');
-            }
-            if (cityBox && !cityBox.contains(e.target)) {
-                document.getElementById('cityListDropdown').classList.add('hidden');
-            }
-        });
-
-        // =====================================================================
-        // 5. AUTO-GENERATE 6-CHAR BRANCH CODE & FULL OFFICIAL ADDRESS
-        // =====================================================================
-        const CITY_CODE_MAP = {
-            'SALALAH': 'ALFSLL',
-            'SANAIYA': 'ALFSNY',
-            'MUSCAT': 'ALFMCT',
-            'SEEB': 'ALFSEB',
-            'SOHAR': 'ALFSHR',
-            'NIZWA': 'ALFNZW',
-            'PAYANGADI': 'ALFPYD',
-            'PAZHAYANGADI': 'ALFPYD',
-            'MADAYI': 'ALFMDY',
-            'KANNUR': 'ALFKNR',
-            'KOZHIKODE': 'ALFCCJ',
-            'KOCHI': 'ALFCOK',
-            'RIYADH': 'ALFRUH',
-            'JEDDAH': 'ALFJED',
-            'DUBAI': 'ALFDXB'
-        };
-
-        function autoGenerateSixCharBranchCode() {
-            const branchCodeEl = document.getElementById('branchCode');
-            if (branchCodeEl.dataset.manualEdit === 'true') return;
-
-            const poUpper = document.getElementById('postOfficeInput').value.toUpperCase();
-            const locUpper = document.getElementById('branchLocation').value.toUpperCase();
-            const nameUpper = document.getElementById('branchName').value.toUpperCase();
-            const combined = `${poUpper} ${locUpper} ${nameUpper}`;
-
-            for (const [key, code] of Object.entries(CITY_CODE_MAP)) {
-                if (combined.includes(key)) {
-                    branchCodeEl.value = code;
-                    document.getElementById('branchCodeCounter').textContent = `${code.length}/6`;
-                    return;
-                }
-            }
-
-            const sourceWord = (poUpper || locUpper || nameUpper).replace(/[^A-Z]/g, '');
-            if (sourceWord.length >= 3) {
-                const code = `ALF${sourceWord.substring(0, 3)}`;
-                branchCodeEl.value = code;
-                document.getElementById('branchCodeCounter').textContent = `${code.length}/6`;
-            }
-        }
-
-        window.handleBranchNameInput = function() {
-            autoGenerateSixCharBranchCode();
-        };
-
-        window.handleBranchCodeInput = function(input) {
-            input.dataset.manualEdit = 'true';
-            input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6);
-            document.getElementById('branchCodeCounter').textContent = `${input.value.length}/6`;
-        };
-
-        window.handleBookingCodeInput = function(input) {
-            input.value = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 2);
-            updateSmartAwbSimulator();
-        };
-
-        window.composeFullBranchAddress = function() {
-            const street = document.getElementById('streetLine').value.trim();
-            const postOffice = document.getElementById('postOfficeInput').value.trim();
-            const city = document.getElementById('branchLocation').value.trim();
-            const state = document.getElementById('stateInput').value.trim();
-            const postal = document.getElementById('postalCodeInput').value.trim();
-            const country = selectedCountryObj?.officialName || document.getElementById('countrySearchInput').value.trim();
-
-            const stateWithPin = [state, postal].filter(Boolean).join(' - ');
-            const parts = [street, postOffice ? `${postOffice} P.O.` : '', city, stateWithPin, country].filter(Boolean);
-            document.getElementById('branchAddress').value = parts.join(', ');
-        };
-
-        // =====================================================================
-        // 6. SMART AWB SIMULATOR (312100001 / DE2100002)
-        // =====================================================================
-        window.setSimCargoType = function(modeCode) {
-            simCargoMode = String(modeCode);
-            ['1', '2', '3'].forEach(code => {
-                const btn = document.getElementById(`simCargoBtn${code}`);
-                btn.className = (code === simCargoMode)
-                    ? 'py-1.5 rounded-lg font-extrabold text-[10px] bg-sky-500 text-white transition-all shadow-sm'
-                    : 'py-1.5 rounded-lg font-bold text-[10px] bg-gray-800 text-gray-300 hover:bg-gray-700 transition-all';
-            });
-            updateSmartAwbSimulator();
-        };
-
-        window.updateSmartAwbSimulator = function() {
-            const destCode = document.getElementById('simDestinationSelect').value || '3';
-            const cargoCode = simCargoMode || '1';
-            const branchDigit = document.getElementById('bookingCode').value.trim() || '2';
-            const seqNum = destCode === 'DE' ? '100002' : '100001';
-
-            document.getElementById('segDest').textContent = destCode;
-            document.getElementById('segCargo').textContent = cargoCode;
-            document.getElementById('segBranch').textContent = branchDigit;
-            document.getElementById('segSeq').textContent = seqNum;
-
-            const combinedEl = document.getElementById('combinedAwbString');
-            combinedEl.textContent = `${destCode}${cargoCode}${branchDigit}${seqNum}`;
-            combinedEl.classList.remove('animate-pop');
-            void combinedEl.offsetWidth;
-            combinedEl.classList.add('animate-pop');
-        };
-
-        // =====================================================================
-        // 7. LOAD & RENDER BRANCHES + EDIT & DISMISS LIFECYCLE
-        // =====================================================================
-        const DEFAULT_BRANCHES = [
-            {
-                id: 'default-sll',
-                branch_name: 'Salalah Central Hub',
-                branch_code: 'ALFSLL',
-                booking_code: '1',
-                country: 'Oman',
-                postal_code: '211',
-                post_office: 'Salalah Central',
-                state: 'Dhofar',
-                location: 'Salalah',
-                address: '23rd July Street, Salalah Central P.O., Salalah, Dhofar - 211, Sultanate of Oman',
-                phone_number: '+968 93096535',
-                manager_name: 'Muhammed Adhil',
-                status: 'Optimal'
-            },
-            {
-                id: 'default-sny',
-                branch_name: 'Sanaiya Industrial Cargo',
-                branch_code: 'ALFSNY',
-                booking_code: '2',
-                country: 'Oman',
-                postal_code: '211',
-                post_office: 'Sanaiya Industrial',
-                state: 'Dhofar',
-                location: 'Salalah',
-                address: 'Plot 14, Sanaiya Industrial Area, Salalah, Dhofar - 211, Sultanate of Oman',
-                phone_number: '+968 93096535',
-                manager_name: 'Muhammed Adhil',
-                status: 'Optimal'
-            }
-        ];
-
-        async function loadBranchesAndManagers() {
-            const token = localStorage.getItem('cargo_auth_token');
-            try {
-                const res = await fetch('/api/branches', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    const managerSelect = document.getElementById('assignedManager');
-                    if (data.managers && Array.isArray(data.managers)) {
-                        managerSelect.innerHTML = `<option value="">-- Unassigned --</option>` +
-                            data.managers.map(m => `
-                                <option value="${m.id}" data-name="${m.full_name}">
-                                    ${m.full_name} (@${m.username || 'staff'})
-                                </option>
-                            `).join('');
-                    }
-                    allBranchesList = (data.branches && data.branches.length > 0) ? data.branches : DEFAULT_BRANCHES;
-                } else {
-                    allBranchesList = DEFAULT_BRANCHES;
-                }
-            } catch (e) {
-                allBranchesList = DEFAULT_BRANCHES;
-            }
-
-            if (!document.getElementById('editingBranchId').value) {
-                const numericCodes = allBranchesList
-                    .map(b => parseInt(b.booking_code, 10))
-                    .filter(n => !isNaN(n));
-                const nextDigit = numericCodes.length > 0 ? Math.max(...numericCodes) + 1 : 1;
-                document.getElementById('bookingCode').value = String(nextDigit);
-                updateSmartAwbSimulator();
-            }
-
-            renderBranchCards();
-        }
-
-        window.setBranchStatusFilter = function(statusMode) {
-            branchStatusFilter = statusMode;
-            ['ALL', 'ACTIVE', 'DISMISSED'].forEach(tab => {
-                const btn = document.getElementById(`filterTab${tab}`);
-                btn.className = (tab === statusMode)
-                    ? 'px-3 py-1 rounded-full text-[11px] font-extrabold bg-[#111827] text-white transition-all'
-                    : 'px-3 py-1 rounded-full text-[11px] font-bold text-gray-500 hover:text-gray-900 transition-all';
-            });
-            renderBranchCards();
-        };
-
-        window.renderBranchCards = function() {
-            const container = document.getElementById('branchesListContainer');
-            const badge = document.getElementById('branchCountBadge');
-            const q = (document.getElementById('branchSearchBox')?.value || '').toLowerCase().trim();
-
-            const activeCount = allBranchesList.filter(b => (b.status || 'Optimal') !== 'Dismissed').length;
-            const dismissedCount = allBranchesList.length - activeCount;
-            if (badge) badge.textContent = `${activeCount} Active • ${dismissedCount} Dismissed`;
-
-            const filtered = allBranchesList.filter(b => {
-                const isDismissed = (b.status || '') === 'Dismissed';
-                if (branchStatusFilter === 'ACTIVE' && isDismissed) return false;
-                if (branchStatusFilter === 'DISMISSED' && !isDismissed) return false;
-                if (!q) return true;
-                return (
-                    (b.branch_name || '').toLowerCase().includes(q) ||
-                    (b.branch_code || '').toLowerCase().includes(q) ||
-                    String(b.booking_code || '').toLowerCase().includes(q) ||
-                    (b.location || '').toLowerCase().includes(q) ||
-                    (b.country || '').toLowerCase().includes(q) ||
-                    (b.postal_code || '').toLowerCase().includes(q)
-                );
-            });
-
-            if (filtered.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-2 bg-white rounded-[2rem] p-12 text-center border border-dashed border-gray-200">
-                        <p class="text-sm font-bold text-gray-900">No matching branches found</p>
-                        <p class="text-xs text-gray-400 mt-1">Try switching the filter tab or registering a new branch on the left.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            container.innerHTML = filtered.map((b, idx) => {
-                const isDismissed = (b.status || '') === 'Dismissed';
-                const bCodeDigit = b.booking_code || '1';
-
+            const q = $('branchSearch').value.trim().toLowerCase(), f = $('statusFilter').value;
+            const list = branches.filter(b => (!f || (f === 'dismissed') === isDismissed(b)) &&
+                (!q || [b.branch_name, b.branch_code, b.location, b.country, b.manager_name].some(v => String(v || '').toLowerCase().includes(q))));
+            $('branchCount').textContent = list.length;
+            $('branchGrid').innerHTML = list.length ? list.map(b => {
+                const cc = (findCountry(b.country) || {}).c;
                 return `
-                    <div class="bg-white rounded-[2rem] p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] border ${isDismissed ? 'border-gray-200/70 opacity-65 bg-gray-50/50' : 'border-gray-100/80 hover:border-gray-300'} flex flex-col justify-between transition-all duration-300">
-                        <div>
-                            <div class="flex items-start justify-between gap-2 mb-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="px-3 py-2 rounded-2xl ${isDismissed ? 'bg-gray-300 text-gray-700' : 'bg-[#111827] text-white'} font-mono text-xs font-extrabold tracking-widest shadow-sm">
-                                        ${b.branch_code}
-                                    </div>
-                                    <div>
-                                        <h4 class="text-sm font-extrabold text-gray-900 leading-tight">${b.branch_name}</h4>
-                                        <p class="text-[11px] font-semibold text-gray-400 mt-0.5">
-                                            ${b.location}${b.state ? `, ${b.state}` : ''} • ${b.country}
-                                        </p>
-                                    </div>
+                <article class="bg-white rounded-[1.75rem] border border-gray-100 p-5 flex flex-col gap-4 ${isDismissed(b) ? 'opacity-60' : ''}">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <span class="w-11 h-11 rounded-2xl ${b.is_hub ? 'bg-coral-500' : 'bg-[#111827]'} text-white flex items-center justify-center flex-shrink-0">${I(b.is_hub ? 'warehouse' : 'building', 'w-5 h-5')}</span>
+                            <div class="min-w-0">
+                                <p class="text-sm font-extrabold truncate">${esc(b.branch_name)}</p>
+                                <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                    <span class="pill-tag pill-dark font-mono">${esc(b.branch_code)}</span>
+                                    <span class="pill-tag pill-coral" title="AWB digit">AWB ${esc(b.booking_code || '—')}</span>
+                                    ${b.is_hub ? '<span class="pill-tag pill-amber">Hub</span>' : ''}
                                 </div>
-
-                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
-                                    isDismissed
-                                    ? 'bg-red-50 text-red-600 border-red-100'
-                                    : 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                                }">
-                                    <span class="w-1.5 h-1.5 rounded-full ${isDismissed ? 'bg-red-500' : 'bg-emerald-500'}"></span>
-                                    ${isDismissed ? 'Dismissed' : 'Active'}
-                                </span>
-                            </div>
-
-                            <div class="bg-[#F8F8FA] rounded-2xl p-3.5 border border-gray-100 mb-4">
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider">Unique Booking Branch Code</span>
-                                    <span class="px-2 py-0.5 rounded-md bg-coral-500 text-white font-mono text-xs font-extrabold">
-                                        Digit: ${bCodeDigit}
-                                    </span>
-                                </div>
-                                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200/60 text-[10px]">
-                                    <div>
-                                        <span class="text-gray-400 font-semibold block">Frequent Dest (Air):</span>
-                                        <span class="font-mono font-extrabold text-gray-900">31<span class="text-coral-600 underline">${bCodeDigit}</span>100001</span>
-                                    </div>
-                                    <div class="text-right">
-                                        <span class="text-gray-400 font-semibold block">Alpha-2 Dest (Sea):</span>
-                                        <span class="font-mono font-extrabold text-gray-900">DE2<span class="text-coral-600 underline">${bCodeDigit}</span>100002</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="flex items-start gap-2 text-xs text-gray-600 mb-4">
-                                <svg class="w-4 h-4 text-coral-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                                <p class="text-[11px] font-medium text-gray-500 leading-relaxed">${b.address}</p>
                             </div>
                         </div>
-
-                        <div class="pt-3.5 border-t border-gray-100 space-y-3">
-                            <div class="flex items-center justify-between text-xs">
-                                <div>
-                                    <span class="text-[9px] font-bold text-gray-400 uppercase block">Assigned Manager</span>
-                                    <span class="text-[11px] font-extrabold text-gray-900">${b.manager_name || 'Unassigned'}</span>
-                                </div>
-                                <div class="text-right">
-                                    <span class="text-[9px] font-bold text-gray-400 uppercase block">Branch Phone</span>
-                                    <span class="text-[11px] font-mono font-bold text-gray-700">${b.phone_number}</span>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center gap-2 pt-2 border-t border-gray-50">
-                                <button type="button" onclick="enterEditBranchByCode('${b.branch_code}')"
-                                        class="flex-1 py-2 px-3 rounded-xl bg-[#F8F8FA] hover:bg-gray-900 hover:text-white text-gray-800 text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 border border-gray-200/60">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                    Edit Details
-                                </button>
-
-                                ${isDismissed ? `
-                                    <button type="button" onclick="reactivateBranchByCode('${b.branch_code}')"
-                                            class="py-2 px-3.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white text-[11px] font-extrabold transition-all border border-emerald-100">
-                                        Reactivate
-                                    </button>
-                                ` : `
-                                    <button type="button" onclick="openDismissModalByCode('${b.branch_code}')"
-                                            class="py-2 px-3.5 rounded-xl bg-red-50 hover:bg-red-600 text-red-600 hover:text-white text-[11px] font-extrabold transition-all border border-red-100">
-                                        Dismiss
-                                    </button>
-                                `}
-                            </div>
-                        </div>
+                        <div data-menu-root><button type="button" class="icon-btn" aria-label="Actions for ${esc(b.branch_name)}" onclick="branchMenu(this, '${esc(b.branch_code)}')">${I('more', 'w-5 h-5')}</button></div>
                     </div>
-                `;
-            }).join('');
+                    <div class="space-y-2 text-xs">
+                        <p class="flex items-start gap-2 text-gray-600">${cc ? `<img class="flag mt-0.5" src="${flag(cc)}" alt="">` : I('pin', 'w-4 h-4 text-gray-400')}<span>${esc([b.location, b.state, b.country].filter(Boolean).join(', ') || '—')}</span></p>
+                        <p class="flex items-center gap-2 text-gray-600">${I('phone', 'w-4 h-4 text-gray-400')}${esc(b.phone_number || '—')}</p>
+                        <p class="flex items-center gap-2 text-gray-600">${I('user', 'w-4 h-4 text-gray-400')}${esc(b.manager_name || 'Unassigned')}</p>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 mt-auto pt-3 border-t border-gray-100 text-center">
+                        <div><p class="sd-label">Currency</p><p class="text-xs font-extrabold mt-0.5">${esc(b.currency || 'OMR')}</p></div>
+                        <div><p class="sd-label">${esc(b.tax_name || 'VAT')}</p><p class="text-xs font-extrabold mt-0.5">${esc(b.tax_rate ?? 5)}%</p></div>
+                        <div><p class="sd-label">Status</p><p class="text-xs font-extrabold mt-0.5 ${isDismissed(b) ? 'text-gray-500' : 'text-emerald-600'}">${isDismissed(b) ? 'Dismissed' : 'Active'}</p></div>
+                    </div>
+                </article>`;
+            }).join('') : '<p class="text-xs text-gray-400 col-span-full text-center py-8">No branches match.</p>';
+        }
+        $('branchSearch').oninput = renderBranches;
+        $('statusFilter').onchange = renderBranches;
+
+        window.branchMenu = (btn, code) => {
+            const b = branches.find(x => x.branch_code === code);
+            UI.menu(btn, `
+                <button type="button" onclick="openBranch('${esc(code)}')">${I('edit')} Edit branch</button>
+                <hr>
+                ${isDismissed(b) ? `<button type="button" onclick="setBranchStatus('${esc(code)}', 'Optimal')">${I('checkCircle')} Reactivate</button>`
+                    : `<button type="button" class="danger" onclick="setBranchStatus('${esc(code)}', 'Dismissed')">${I('ban')} Dismiss branch</button>`}`);
         };
 
-        window.enterEditBranchByCode = async function(branchCode) {
-            const branch = allBranchesList.find(b => b.branch_code === branchCode);
-            if (!branch) return;
-
-            document.getElementById('editingBranchId').value = branch.id;
-            document.getElementById('formModeBadge').textContent = `Editing • ${branch.branch_code}`;
-            document.getElementById('formModeBadge').className = 'text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200';
-            document.getElementById('formHeaderTitle').textContent = `Edit ${branch.branch_name}`;
-            document.getElementById('formHeaderSubtitle').textContent = 'Modify country, postal code, 6-char branch code or manager.';
-            document.getElementById('submitBranchBtnText').textContent = 'Save Branch Changes';
-
-            const cancelBtn = document.getElementById('cancelEditBtn');
-            cancelBtn.classList.remove('hidden');
-            cancelBtn.classList.add('inline-flex');
-
-            document.getElementById('branchName').value = branch.branch_name || '';
-            const bCodeEl = document.getElementById('branchCode');
-            bCodeEl.value = branch.branch_code || '';
-            bCodeEl.dataset.manualEdit = 'true';
-            document.getElementById('branchCodeCounter').textContent = `${bCodeEl.value.length}/6`;
-            document.getElementById('bookingCode').value = branch.booking_code || '';
-
-            const foundCountry = allCountriesData.find(c => c.name.toLowerCase() === String(branch.country || '').toLowerCase());
-            if (foundCountry) {
-                await selectCountryItem(foundCountry, false);
-            } else {
-                document.getElementById('countrySearchInput').value = branch.country || '';
-            }
-
-            document.getElementById('postalCodeInput').value = branch.postal_code || '';
-            document.getElementById('postOfficeInput').value = branch.post_office || '';
-            document.getElementById('branchLocation').value = branch.location || '';
-            document.getElementById('stateInput').value = branch.state || '';
-            document.getElementById('branchAddress').value = branch.address || '';
-
-            const rawPhone = String(branch.phone_number || '').trim();
-            const dial = selectedCountryObj?.dialCode || '';
-            const cleanLocal = (dial && rawPhone.startsWith(dial))
-                ? rawPhone.slice(dial.length).trim()
-                : rawPhone.replace(/^\+\d+\s*/, '');
-            document.getElementById('phoneLocalNumber').value = cleanLocal;
-
-            document.getElementById('assignedManager').value = branch.manager_id || '';
-            updateSmartAwbSimulator();
-
-            const formCard = document.getElementById('branchFormCard');
-            formCard.classList.add('ring-4', 'ring-coral-500/20');
-            formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            setTimeout(() => formCard.classList.remove('ring-4', 'ring-coral-500/20'), 1400);
+        window.setBranchStatus = async (code, status) => {
+            const b = branches.find(x => x.branch_code === code);
+            const dismiss = status === 'Dismissed';
+            if (!await UI.confirm(dismiss
+                ? { title: `Dismiss ${b.branch_name}?`, message: 'It disappears from booking and transfer choices. Its history stays, and you can reactivate it any time.', confirmText: 'Dismiss', danger: true }
+                : { title: `Reactivate ${b.branch_name}?`, message: 'It becomes available again for bookings and transfers.', confirmText: 'Reactivate' })) return;
+            try { await api('/api/branches', { method: 'PATCH', body: { id: b.id, status } }); toast(true, dismiss ? 'Branch dismissed.' : 'Branch reactivated.'); loadAll(); }
+            catch (e) { toast(false, e.message); }
         };
 
-        window.exitEditMode = function() {
-            document.getElementById('editingBranchId').value = '';
-            document.getElementById('branchForm').reset();
-            delete document.getElementById('branchCode').dataset.manualEdit;
+        // ----- branch form -----
+        function setCountry(c) {
+            $('b_flag').classList.toggle('hidden', !c);
+            $('b_country').classList.toggle('!pl-11', Boolean(c));
+            if (c) { $('b_flag').src = flag(c.c); $('b_dial').textContent = c.d; }
+            else $('b_dial').textContent = '+';
+            composeAddress();
+        }
+        function composeAddress() {
+            const parts = [$('b_street').value, $('b_po').value, $('b_city').value, $('b_state').value, $('b_postal').value, $('b_country').value].map(v => v.trim()).filter(Boolean);
+            $('b_address').textContent = parts.join(', ') || '—';
+        }
+        function suggestCode() {
+            if ($('b_code').dataset.manual === '1') return;
+            const words = `${$('b_po').value} ${$('b_city').value} ${$('b_name').value}`.toUpperCase();
+            const hit = Object.entries(CITY_CODE_MAP).find(([k]) => words.includes(k));
+            const src = ($('b_city').value || $('b_po').value || $('b_name').value.replace(/al[- ]?farha|cargo/gi, '')).toUpperCase().replace(/[^A-Z]/g, '');
+            $('b_code').value = hit ? hit[1] : (src.length >= 3 ? `ALF${src.slice(0, 3)}` : $('b_code').value);
+        }
+        function nextFreeDigit() {
+            const used = new Set(branches.filter(b => !editing || b.id !== editing.id).map(b => String(b.booking_code)));
+            for (let i = 1; i < 100; i++) if (!used.has(String(i))) return String(i);
+            return '';
+        }
+        function refreshPreview() {
+            const dest = $('pvDest').value || '3', cargo = $('pvCargo').value || '1', digit = $('b_digit').value.trim() || '?';
+            $('pvD').textContent = dest; $('pvB').textContent = digit; $('pvC').textContent = cargo;
+            const clash = branches.find(b => (!editing || b.id !== editing.id) && String(b.booking_code) === digit);
+            $('digitWarn').classList.toggle('hidden', !clash);
+            if (clash) $('digitWarn').textContent = `AWB digit ${digit} is already used by ${clash.branch_name}. Each branch needs its own digit.`;
+        }
 
-            selectedCountryObj = null;
-            currentCountryCities = [];
-            document.getElementById('countryFlagPreview').innerHTML = '<svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>';
-            document.getElementById('selectedCountryIsoBadge').textContent = `${allCountriesData.length || 250} Countries`;
-            document.getElementById('countryIsoTag').textContent = 'Select Country First';
-            document.getElementById('phoneDialCodeBadge').textContent = '+--';
-            document.getElementById('branchCodeCounter').textContent = '0/6';
-
-            document.getElementById('formModeBadge').textContent = 'New Registration';
-            document.getElementById('formModeBadge').className = 'text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-coral-50 text-coral-600 border border-coral-100';
-            document.getElementById('formHeaderTitle').textContent = 'Create New Branch';
-            document.getElementById('formHeaderSubtitle').textContent = 'Search country, lookup postal/pincode, & assign AWB digit.';
-            document.getElementById('submitBranchBtnText').textContent = 'Create Branch & Activate AWB Code';
-
-            const cancelBtn = document.getElementById('cancelEditBtn');
-            cancelBtn.classList.add('hidden');
-            cancelBtn.classList.remove('inline-flex');
-
-            loadBranchesAndManagers();
+        window.openBranch = (code) => {
+            editing = code ? branches.find(b => b.branch_code === code) : null;
+            const b = editing || {};
+            $('branchFormTitle').textContent = editing ? `Edit ${b.branch_name}` : 'Add branch';
+            $('b_name').value = b.branch_name || '';
+            $('b_code').value = b.branch_code || '';
+            $('b_code').dataset.manual = editing ? '1' : '';
+            $('b_digit').value = b.booking_code || nextFreeDigit();
+            $('b_country').value = b.country || 'Oman';
+            $('b_postal').value = b.postal_code || '';
+            $('b_po').value = b.post_office || '';
+            $('b_city').value = b.location || '';
+            $('b_state').value = b.state || '';
+            const street = (b.address || '').split(',')[0];
+            $('b_street').value = editing ? street : '';
+            const c = findCountry($('b_country').value);
+            const dial = c ? c.d : '';
+            $('b_phone').value = (b.phone_number || '').replace(dial, '').trim();
+            $('b_manager').innerHTML = '<option value="">Unassigned</option>' + managers.map(m => `<option value="${esc(m.id)}">${esc(m.full_name || m.username)}</option>`).join('');
+            $('b_manager').value = b.manager_id || '';
+            $('b_currency').value = b.currency || 'OMR';
+            $('b_taxName').value = b.tax_name || 'VAT';
+            $('b_taxRate').value = b.tax_rate ?? 5;
+            $('b_hub').checked = Boolean(b.is_hub);
+            $('pvDest').innerHTML = destinations.filter(d => d.active).map(d => `<option value="${esc(d.code)}">${esc(d.code)} · ${esc(d.country_name)}</option>`).join('')
+                + '<option value="DE">DE · any other country</option>';
+            $('pvCargo').innerHTML = cargoTypes.filter(t => t.active).map(t => `<option value="${esc(t.code)}">${esc(t.code)} · ${esc(t.name)}</option>`).join('');
+            if (destinations.some(d => d.code === '3' && d.active)) $('pvDest').value = '3';
+            setCountry(c);
+            refreshPreview();
+            openModal('branchModal'); $('b_name').focus();
         };
 
-        window.openDismissModalByCode = function(branchCode) {
-            const branch = allBranchesList.find(b => b.branch_code === branchCode);
-            if (!branch) return;
-            pendingDismissBranch = branch;
-            document.getElementById('dismissModalTitle').textContent = `Dismiss ${branch.branch_name} (${branch.branch_code})?`;
-            const modal = document.getElementById('dismissBranchModal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        };
+        ['b_name', 'b_city', 'b_po'].forEach(id => $(id).addEventListener('input', () => { suggestCode(); composeAddress(); }));
+        ['b_street', 'b_state', 'b_postal'].forEach(id => $(id).addEventListener('input', composeAddress));
+        $('b_code').addEventListener('input', (e) => { e.target.dataset.manual = '1'; e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6); });
+        $('b_digit').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 2); refreshPreview(); });
+        $('pvDest').onchange = refreshPreview; $('pvCargo').onchange = refreshPreview;
+        $('b_country').addEventListener('change', () => setCountry(findCountry($('b_country').value)));
 
-        window.reactivateBranchByCode = async function(branchCode) {
-            const branch = allBranchesList.find(b => b.branch_code === branchCode);
-            if (!branch) return;
-            await toggleBranchDismissStatus(branch, 'Optimal');
-        };
-
-        window.closeDismissModal = function() {
-            pendingDismissBranch = null;
-            const modal = document.getElementById('dismissBranchModal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        };
-
-        document.getElementById('confirmDismissBtn').addEventListener('click', async () => {
-            if (!pendingDismissBranch) return;
-            await toggleBranchDismissStatus(pendingDismissBranch, 'Dismissed');
-            closeDismissModal();
-        });
-
-        window.toggleBranchDismissStatus = async function(branch, targetStatus = 'Optimal') {
-            const token = localStorage.getItem('cargo_auth_token');
-            const alertBox = document.getElementById('branchAlertBox');
-
-            try {
-                const res = await fetch('/api/branches', {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ id: branch.id, status: targetStatus })
-                });
-
-                if (res.ok) {
-                    alertBox.className = 'p-4 rounded-2xl text-xs font-bold mb-5 border bg-emerald-50 text-emerald-700 border-emerald-100 block';
-                    alertBox.innerHTML = targetStatus === 'Dismissed'
-                        ? `Branch <b>${branch.branch_name} (${branch.branch_code})</b> has been dismissed and closed.`
-                        : `Branch <b>${branch.branch_name} (${branch.branch_code})</b> has been reactivated!`;
-                    await loadBranchesAndManagers();
-                } else {
-                    branch.status = targetStatus;
-                    renderBranchCards();
+        // Postal / PIN lookup: India Post directly, others through the server (key stays server-side)
+        let postalTimer;
+        $('b_postal').addEventListener('input', () => {
+            clearTimeout(postalTimer);
+            const code = $('b_postal').value.trim(), list = $('postalList');
+            if (code.length < 3) { list.classList.add('hidden'); $('postalBadge').textContent = 'Lookup'; return; }
+            $('postalBadge').textContent = 'Searching…';
+            postalTimer = setTimeout(async () => {
+                const cc = (findCountry($('b_country').value) || {}).c || '';
+                let found = [];
+                if ((cc === 'IN' || !cc) && /^\d{6}$/.test(code)) {
+                    try {
+                        const j = await fetch(`https://api.postalpincode.in/pincode/${code}`).then(r => r.json());
+                        found = (j?.[0]?.PostOffice || []).map(p => ({ postOffice: p.Name, city: p.District || p.Block || '', state: p.State || '', postalCode: code }));
+                    } catch (e) {}
                 }
-            } catch (e) {
-                branch.status = targetStatus;
-                renderBranchCards();
-            }
+                if (!found.length) {
+                    try { found = (await fetch(`/api/postal-lookup?code=${encodeURIComponent(code)}&countryCode=${encodeURIComponent(cc)}`).then(r => r.json())).locations || []; } catch (e) {}
+                }
+                $('postalBadge').textContent = found.length ? `${found.length} found` : 'No match';
+                window._postal = found;
+                list.innerHTML = found.length ? found.map((l, i) => `
+                    <button type="button" onclick="pickPostal(${i})" class="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F8F8FA] text-left">
+                        <span class="min-w-0"><span class="block text-xs font-extrabold truncate">${esc(l.postOffice)}</span><span class="block text-[10px] text-gray-400 truncate">${esc([l.city, l.state].filter(Boolean).join(', '))}</span></span>
+                        <span class="pill-tag pill-coral font-mono">${esc(l.postalCode)}</span></button>`).join('')
+                    : `<p class="p-3 text-xs text-gray-400 text-center">No areas found for "${esc(code)}"</p>`;
+                list.classList.remove('hidden');
+            }, 300);
+        });
+        window.pickPostal = (i) => {
+            const l = window._postal[i];
+            $('b_postal').value = l.postalCode || $('b_postal').value;
+            $('b_po').value = l.postOffice || '';
+            $('b_city').value = l.city || l.postOffice || '';
+            $('b_state').value = l.state || '';
+            $('postalList').classList.add('hidden');
+            suggestCode(); composeAddress();
+        };
+        document.addEventListener('click', (e) => { if (!e.target.closest('#postalList') && e.target.id !== 'b_postal') $('postalList').classList.add('hidden'); });
+
+        $('branchForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const c = findCountry($('b_country').value);
+            const need = [['b_name', 'Branch name'], ['b_code', 'Branch code'], ['b_digit', 'AWB digit'], ['b_city', 'City'], ['b_phone', 'Phone']].find(([id]) => !$(id).value.trim());
+            if (need) { toast(false, `${need[1]} is required.`); return $(need[0]).focus(); }
+            if (!c) { toast(false, 'Choose a country from the list.'); return $('b_country').focus(); }
+            if (!$('digitWarn').classList.contains('hidden')) return toast(false, $('digitWarn').textContent);
+            const mgr = managers.find(m => m.id === $('b_manager').value);
+            const body = {
+                id: editing?.id,
+                branchName: $('b_name').value.trim(), branchCode: $('b_code').value.trim(), bookingCode: $('b_digit').value.trim(),
+                country: c.n, postalCode: $('b_postal').value.trim(), postOffice: $('b_po').value.trim(), state: $('b_state').value.trim(),
+                location: $('b_city').value.trim(), address: $('b_address').textContent === '—' ? $('b_city').value.trim() : $('b_address').textContent,
+                phoneNumber: `${c.d} ${$('b_phone').value.trim()}`, managerId: mgr ? mgr.id : null, managerName: mgr ? (mgr.full_name || mgr.username) : 'Unassigned',
+                currency: $('b_currency').value, taxName: $('b_taxName').value.trim(), taxRate: $('b_taxRate').value, isHub: $('b_hub').checked,
+                status: editing?.status
+            };
+            if (!await UI.confirm({ title: editing ? `Save changes to ${body.branchName}?` : 'Create this branch?',
+                message: `<b>${esc(body.branchName)}</b> · ${esc(body.branchCode)} · AWB digit <b>${esc(body.bookingCode)}</b><br>${esc(body.location)}, ${esc(body.country)} · ${esc(body.currency)}`,
+                confirmText: editing ? 'Save changes' : 'Create branch' })) return;
+            $('branchSave').disabled = true;
+            try {
+                await api('/api/branches', { method: editing ? 'PUT' : 'POST', body });
+                toast(true, editing ? 'Branch updated.' : 'Branch created.');
+                closeModal('branchModal'); loadAll();
+            } catch (err) { toast(false, err.message); }
+            $('branchSave').disabled = false;
         };
 
-        // 8. Form Submit (Create or Edit)
-        document.getElementById('branchForm').addEventListener('submit', async (e) => {
+        // ---------- destination codes ----------
+        function renderDest() {
+            $('destCount').textContent = destinations.length;
+            const digit = (branches.find(b => !isDismissed(b)) || {}).booking_code || '1';
+            const cargo = (cargoTypes.find(t => t.active) || {}).code || '1';
+            $('destRows').innerHTML = destinations.length ? destinations.map(d => `
+                <tr class="${d.active ? '' : 'opacity-60'}">
+                    <td class="cell-main p-3 pl-4" data-label="Code"><span class="ref-token bg-emerald-50 text-emerald-700 text-sm">${esc(d.code)}</span></td>
+                    <td class="p-3" data-label="Country"><span class="flex items-center gap-2 font-bold"><img class="flag" src="${flag(d.country_code)}" alt="">${esc(d.country_name)}</span></td>
+                    <td class="p-3 font-mono font-bold text-gray-500" data-label="Example">${esc(d.code)}${esc(digit)}${esc(cargo)}000001</td>
+                    <td class="p-3" data-label="Status"><span class="pill-tag ${d.active ? 'pill-green' : 'pill-gray'}">${d.active ? 'Active' : 'Inactive'}</span></td>
+                    <td class="cell-menu p-3" data-menu-root><button type="button" class="icon-btn" aria-label="Actions for ${esc(d.country_name)}" onclick="destMenu(this, '${esc(d.country_code)}')">${I('more', 'w-5 h-5')}</button></td>
+                </tr>`).join('') : '<tr><td colspan="5" class="cell-empty p-8 text-center text-gray-400">No frequent destinations — every country uses its 2-letter code.</td></tr>';
+        }
+        window.destMenu = (btn, cc) => UI.menu(btn, `
+            <button type="button" onclick="openDest('${esc(cc)}')">${I('edit')} Edit code</button><hr>
+            <button type="button" class="danger" onclick="deleteDest('${esc(cc)}')">${I('trash')} Remove</button>`);
+        let destEditing = null;
+        window.openDest = (cc) => {
+            destEditing = cc ? destinations.find(d => d.country_code === cc) : null;
+            $('destTitle').textContent = destEditing ? `Edit ${destEditing.country_name}` : 'Add destination code';
+            $('d_country').value = destEditing ? (byCode[cc]?.n || destEditing.country_name) : '';
+            $('d_country').disabled = Boolean(destEditing);
+            const used = new Set(destinations.map(d => d.code));
+            let free = ''; for (let i = 1; i < 100; i++) if (!used.has(String(i))) { free = String(i); break; }
+            $('d_code').value = destEditing ? destEditing.code : free;
+            $('d_active').checked = destEditing ? destEditing.active : true;
+            openModal('destModal'); (destEditing ? $('d_code') : $('d_country')).focus();
+        };
+        $('destForm').onsubmit = async (e) => {
             e.preventDefault();
-            const editingId = document.getElementById('editingBranchId').value;
-            const alertBox = document.getElementById('branchAlertBox');
-            const submitBtn = document.getElementById('submitBranchBtn');
-            const btnText = document.getElementById('submitBranchBtnText');
-
-            const managerSelect = document.getElementById('assignedManager');
-            const selectedOpt = managerSelect.options[managerSelect.selectedIndex];
-            const managerId = managerSelect.value || null;
-            const managerName = managerId ? (selectedOpt.getAttribute('data-name') || 'Assigned') : 'Unassigned';
-
-            const dialCode = document.getElementById('phoneDialCodeBadge').textContent.trim();
-            const localPhone = document.getElementById('phoneLocalNumber').value.trim();
-
-            const payload = {
-                id: editingId || undefined,
-                branchName: document.getElementById('branchName').value.trim(),
-                branchCode: document.getElementById('branchCode').value.trim().toUpperCase(),
-                bookingCode: document.getElementById('bookingCode').value.trim().toUpperCase(),
-                country: document.getElementById('countrySearchInput').value.trim(),
-                postalCode: document.getElementById('postalCodeInput').value.trim(),
-                postOffice: document.getElementById('postOfficeInput').value.trim(),
-                state: document.getElementById('stateInput').value.trim(),
-                location: document.getElementById('branchLocation').value.trim(),
-                address: document.getElementById('branchAddress').value.trim(),
-                phoneNumber: `${dialCode !== '+--' ? dialCode : ''} ${localPhone}`.trim(),
-                managerId,
-                managerName
-            };
-
-            submitBtn.disabled = true;
-            btnText.textContent = editingId ? 'Updating Branch...' : 'Registering Branch...';
-            alertBox.classList.add('hidden');
-
+            const c = destEditing ? byCode[destEditing.country_code] || { c: destEditing.country_code, n: destEditing.country_name } : findCountry($('d_country').value);
+            if (!c) return toast(false, 'Choose a country from the list.');
             try {
-                const token = localStorage.getItem('cargo_auth_token');
-                const res = await fetch('/api/branches', {
-                    method: editingId ? 'PUT' : 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(payload)
-                });
+                await api('/api/codes', { method: 'POST', body: { type: 'destination', country_code: c.c, country_name: c.n, code: $('d_code').value.trim(), active: $('d_active').checked } });
+                toast(true, `${c.n} → code ${$('d_code').value.trim()}`); closeModal('destModal'); loadAll();
+            } catch (err) { toast(false, err.message); }
+        };
+        window.deleteDest = async (cc) => {
+            const d = destinations.find(x => x.country_code === cc);
+            if (!await UI.confirm({ title: `Remove code ${d.code} (${d.country_name})?`, message: `New ${esc(d.country_name)} bookings will use <b>${esc(cc)}</b> and the shared 2-letter series. Existing references don't change.`, confirmText: 'Remove', danger: true })) return;
+            try { await api(`/api/codes?type=destination&key=${encodeURIComponent(cc)}`, { method: 'DELETE' }); toast(true, 'Removed.'); loadAll(); }
+            catch (e) { toast(false, e.message); }
+        };
 
-                const result = await res.json();
-                if (!res.ok) throw new Error(result.error || 'Failed to save branch');
+        // ---------- cargo types ----------
+        function renderCargo() {
+            $('cargoCount').textContent = cargoTypes.length;
+            const ICON = (n) => /air/i.test(n) ? 'plane' : /sea|ocean/i.test(n) ? 'ship' : /road|land|truck/i.test(n) ? 'truck' : 'box';
+            $('cargoGrid').innerHTML = cargoTypes.map(t => `
+                <article class="bg-white rounded-[1.75rem] border border-gray-100 p-5 flex items-center gap-4 ${t.active ? '' : 'opacity-60'}">
+                    <span class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center flex-shrink-0">${I(ICON(t.name), 'w-6 h-6')}</span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2"><span class="ref-token bg-sky-50 text-sky-700 text-xs">${esc(t.code)}</span><p class="text-sm font-extrabold truncate">${esc(t.name)}</p></div>
+                        <p class="text-[11px] text-gray-400 mt-1 truncate">${esc(t.description || (t.active ? 'Active' : 'Inactive'))}</p>
+                    </div>
+                    <button type="button" class="icon-btn" aria-label="Edit ${esc(t.name)}" onclick="openCargo('${esc(t.code)}')">${I('edit')}</button>
+                </article>`).join('') || '<p class="text-xs text-gray-400">No cargo types.</p>';
+        }
+        let cargoEditing = null;
+        window.openCargo = (code) => {
+            cargoEditing = code ? cargoTypes.find(t => t.code === code) : null;
+            $('cargoTitle').textContent = cargoEditing ? `Edit ${cargoEditing.name}` : 'Add cargo type';
+            $('c_code').value = cargoEditing?.code || ''; $('c_code').disabled = Boolean(cargoEditing);
+            $('c_name').value = cargoEditing?.name || ''; $('c_desc').value = cargoEditing?.description || '';
+            $('c_sort').value = cargoEditing?.sort ?? (cargoTypes.length + 1) * 10; $('c_active').checked = cargoEditing ? cargoEditing.active : true;
+            openModal('cargoModal'); (cargoEditing ? $('c_name') : $('c_code')).focus();
+        };
+        $('cargoForm').onsubmit = async (e) => {
+            e.preventDefault();
+            try {
+                await api('/api/codes', { method: 'POST', body: { type: 'cargo', code: $('c_code').value.trim(), name: $('c_name').value.trim(), description: $('c_desc').value.trim(), sort: $('c_sort').value, active: $('c_active').checked } });
+                toast(true, 'Cargo type saved.'); closeModal('cargoModal'); loadAll();
+            } catch (err) { toast(false, err.message); }
+        };
 
-                alertBox.className = 'p-4 rounded-2xl text-xs font-bold mb-5 border bg-emerald-50 text-emerald-700 border-emerald-100 block';
-                alertBox.innerHTML = editingId
-                    ? `Branch <b>${payload.branchName} (${payload.branchCode})</b> updated!`
-                    : `Branch <b>${payload.branchName} (${payload.branchCode})</b> created with AWB Digit <b>${payload.bookingCode}</b>!`;
-
-                exitEditMode();
-            } catch (err) {
-                alertBox.className = 'p-4 rounded-2xl text-xs font-bold mb-5 border bg-red-50 text-red-600 border-red-100 block';
-                alertBox.textContent = err.message;
-            } finally {
-                submitBtn.disabled = false;
-                btnText.textContent = document.getElementById('editingBranchId').value
-                    ? 'Save Branch Changes'
-                    : 'Create Branch & Activate AWB Code';
-            }
-        });
-
-        document.addEventListener('DOMContentLoaded', async () => {
-            await loadAllCountries();
-            await loadBranchesAndManagers();
-            updateSmartAwbSimulator();
-        });
+        // ---------- init ----------
+        let saved = 'branches'; try { saved = localStorage.getItem('alf_branch_tab') || 'branches'; } catch (e) {}
+        setTab(['branches', 'destinations', 'cargo'].includes(saved) ? saved : 'branches');
+        loadAll();
     </script>
 </body>
 </html>

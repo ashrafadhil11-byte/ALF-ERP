@@ -109,13 +109,27 @@ export default async function handler(req, res) {
 
         // ---------------- CREATE ONE (manual, or reviewed Al-Farha order) ----------------
         if (req.method === 'POST' && body.action === 'create') {
-            const awb = cleanOrderNo(body.awb);
-            if (!awb || awb.length > 40) throw new UserError('Booking ID / AWB is required (max 40 characters).');
             const { fields, errors } = cleanFields(body.fields || {});
             if (errors.length) throw new UserError(errors.join(' '));
             if (!fields.shipper || !fields.consignee) throw new UserError('Shipper and consignee are required.');
             const branch = await loadBranch(body.branch);
             const fromApi = body.source === 'alfarhaonline';
+
+            // Full booking form: reference D B C NNNNNN generated in the database (imports keep their own number).
+            let awb = cleanOrderNo(body.awb);
+            if (body.auto_ref && !fromApi) {
+                if (!fields.dest_country_code) throw new UserError('Choose the destination country.');
+                if (!fields.cargo_type_code) throw new UserError('Choose the cargo type.');
+                const r = await fetch(`${rest}/rpc/next_booking_ref`, {
+                    method: 'POST',
+                    headers: serviceHeaders(),
+                    body: JSON.stringify({ p_branch_code: branch.branch_code, p_country_code: fields.dest_country_code, p_cargo_code: fields.cargo_type_code })
+                });
+                const out = await r.json();
+                if (!r.ok) throw new UserError(out.message || 'Could not create the booking reference.');
+                awb = out;
+            }
+            if (!awb || awb.length > 40) throw new UserError('Booking ID / AWB is required (max 40 characters).');
             const ref = fromApi ? cleanOrderNo(body.external_ref) || awb : null;
             const dup = await existing(awb, ref);
             if (dup) throw new UserError(`Shipment ${dup.awb} already exists — open it to edit instead.`, 409);
@@ -189,7 +203,8 @@ export default async function handler(req, res) {
             if ('consignee' in fields && !fields.consignee) throw new UserError('Consignee cannot be empty.');
             if (isAdmin && body.branch_code && body.branch_code !== b.branch_code) fields.branch_code = (await loadBranch(body.branch_code)).branch_code;
 
-            const changed = Object.keys(fields).filter(k => String(fields[k] ?? '') !== String(b[k] ?? ''));
+            const norm = (v) => (v != null && typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''));
+            const changed = Object.keys(fields).filter(k => norm(fields[k]) !== norm(b[k]));
             if (!changed.length) return res.status(200).json({ success: true, changed: [] });
             const patch = Object.fromEntries(changed.map(k => [k, fields[k]]));
             patch.updated_at = new Date().toISOString();
@@ -197,7 +212,8 @@ export default async function handler(req, res) {
             if (!r.ok) throw new UserError('Could not save changes.');
 
             const label = (k) => k.replace(/_/g, ' ');
-            const remark = changed.map(k => `${label(k)}: ${b[k] ?? '—'} → ${fields[k] ?? '—'}`).join('; ').slice(0, 900);
+            const show = (v) => (v == null ? "—" : typeof v === "object" ? `${Array.isArray(v) ? v.length + " box(es)" : "updated"}` : v);
+            const remark = changed.map(k => `${label(k)}: ${show(b[k])} → ${show(fields[k])}`).join("; ").slice(0, 900);
             await fetch(`${rest}/tracking_events`, {
                 method: 'POST',
                 headers: { ...serviceHeaders(), Prefer: 'return=minimal' },

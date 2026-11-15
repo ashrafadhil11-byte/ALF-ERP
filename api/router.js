@@ -3,6 +3,7 @@
 // To add an endpoint: create api/_routes/<name>.js, import it below, add it to ROUTES.
 import bookings from './_routes/bookings.js';
 import branches from './_routes/branches.js';
+import codes from './_routes/codes.js';
 import carrierSync from './_routes/carrier-sync.js';
 import countries from './_routes/countries.js';
 import createUser from './_routes/create-user.js';
@@ -18,6 +19,7 @@ import users from './_routes/users.js';
 const ROUTES = {
     bookings,
     branches,
+    codes,
     'carrier-sync': carrierSync,
     countries,
     'create-user': createUser,

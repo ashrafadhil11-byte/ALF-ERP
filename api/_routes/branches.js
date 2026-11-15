@@ -1,6 +1,19 @@
 // File: api/branches.js
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 
+// Optional branch settings (currency / tax / hub) — only sent fields are saved.
+function financeFields(body = {}) {
+    const out = {};
+    if (body.currency) out.currency = String(body.currency).trim().toUpperCase().slice(0, 3);
+    if (body.taxName !== undefined) out.tax_name = String(body.taxName || '').trim().slice(0, 20) || 'VAT';
+    if (body.taxRate !== undefined && body.taxRate !== '') {
+        const r = parseFloat(body.taxRate);
+        if (Number.isFinite(r) && r >= 0 && r <= 100) out.tax_rate = r;
+    }
+    if (body.isHub !== undefined) out.is_hub = Boolean(body.isHub);
+    return out;
+}
+
 export default async function handler(req, res) {
     const SUPABASE_URL = process.env.SUPABASE_URL;
 
@@ -61,7 +74,8 @@ export default async function handler(req, res) {
                 phone_number: phoneNumber.trim(),
                 manager_id: managerId || null,
                 manager_name: managerName || 'Unassigned',
-                status: 'Optimal'
+                status: 'Optimal',
+                ...financeFields(req.body)
             };
 
             let insertRes = await fetch(`${SUPABASE_URL}/rest/v1/branches`, {
@@ -142,8 +156,12 @@ export default async function handler(req, res) {
                 address: address.trim(),
                 phone_number: phoneNumber.trim(),
                 manager_id: managerId || null,
-                manager_name: managerName || 'Unassigned'
+                manager_name: managerName || 'Unassigned',
+                ...financeFields(req.body)
             };
+            if (postalCode !== undefined) updatePayload.postal_code = String(postalCode || '').trim();
+            if (postOffice !== undefined) updatePayload.post_office = String(postOffice || '').trim();
+            if (state !== undefined) updatePayload.state = String(state || '').trim();
             if (status) updatePayload.status = status;
 
             const updateRes = await fetch(`${SUPABASE_URL}/rest/v1/branches?id=eq.${encodeURIComponent(id)}`, {

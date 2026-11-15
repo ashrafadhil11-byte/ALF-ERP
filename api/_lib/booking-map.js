@@ -10,7 +10,10 @@ export function cleanOrderNo(v) {
 export const EDITABLE_FIELDS = {
     shipper: 'text', shipper_phone: 'text', consignee: 'text', consignee_phone: 'text', consignee_address: 'text',
     origin_city: 'text', origin_country: 'text', dest_city: 'text', dest_country: 'text', package_type: 'text',
-    weight: 'number', pieces: 'int', declared_value: 'number', amount: 'number', intake_mode: 'intake'
+    weight: 'number', pieces: 'int', declared_value: 'number', amount: 'number', intake_mode: 'intake',
+    // full booking form (Phase A)
+    dest_country_code: 'iso2', cargo_type_code: 'cargo', receiver_whatsapp: 'text', shipper_id_no: 'text',
+    contents: 'text', notes: 'text', payment_method: 'text', chargeable_weight: 'number', boxes: 'boxes'
 };
 const properCase = (s) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 const PROPER = ['shipper', 'consignee', 'origin_city', 'origin_country', 'dest_city', 'dest_country'];
@@ -30,6 +33,23 @@ export function cleanFields(input = {}) {
             fields[k] = s ? (PROPER.includes(k) ? properCase(s) : s) : null;
         } else if (type === 'intake') {
             fields[k] = s === 'pickup' ? 'pickup' : 'drop_off';
+        } else if (type === 'iso2') {
+            if (s && !/^[A-Za-z]{2}$/.test(s)) errors.push('Destination country must be a 2-letter code.');
+            else fields[k] = s ? s.toUpperCase() : null;
+        } else if (type === 'cargo') {
+            if (s && !/^[0-9A-Za-z]{1,2}$/.test(s)) errors.push('Invalid cargo type.');
+            else fields[k] = s ? s.toUpperCase() : null;
+        } else if (type === 'boxes') {
+            const list = Array.isArray(raw) ? raw : [];
+            if (list.length > 100) { errors.push('At most 100 boxes.'); continue; }
+            const boxes = [];
+            for (const b of list) {
+                const n = (v) => { const x = parseFloat(v); return Number.isFinite(x) && x >= 0 && x < 1e5 ? x : null; };
+                const box = { weight: n(b && b.weight), l: n(b && b.l), w: n(b && b.w), h: n(b && b.h) };
+                box.vol = box.l && box.w && box.h ? Math.round((box.l * box.w * box.h) / 5000 * 100) / 100 : null; // cm³ / 5000
+                boxes.push(box);
+            }
+            fields[k] = boxes.length ? boxes : null;
         } else {
             if (!s) { fields[k] = null; continue; }
             const n = type === 'int' ? parseInt(s, 10) : parseFloat(s);
