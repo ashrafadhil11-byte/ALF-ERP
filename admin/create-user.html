@@ -32,8 +32,8 @@
         <div id="topbar-container"></div>
 
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            <section class="flex flex-wrap items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-3">
-                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
+            <section class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
                     <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                     </div>
@@ -42,38 +42,38 @@
                         <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Accounts • Roles • Branch access</p>
                     </div>
                 </div>
-                <button type="button" class="btn btn-coral" onclick="openCreate()">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                <button type="button" class="btn btn-coral w-full sm:w-auto" onclick="openCreate()">
+                    <span data-icon="plus"></span>
                     Add User
                 </button>
             </section>
 
             <!-- Stats -->
-            <section id="stats" class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5"></section>
+            <section id="stats" class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5 [&>*:last-child]:col-span-2 md:[&>*:last-child]:col-span-1"></section>
 
             <!-- List -->
             <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
-                <div class="flex flex-wrap gap-2 items-center justify-between mb-4">
+                <div class="flex flex-col xl:flex-row gap-3 xl:items-center justify-between mb-4">
                     <div class="flex items-center gap-2"><span class="font-extrabold text-xs uppercase tracking-wider">Team</span><span id="listCount" class="pill-tag pill-gray">…</span></div>
-                    <div class="flex flex-wrap gap-2">
-                        <input id="search" type="search" placeholder="Search name, username, email…" class="field pill !w-60 !py-2.5">
-                        <select id="roleFilter" class="field pill !w-44 !py-2.5" aria-label="Filter by role">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:flex gap-2">
+                        <input id="search" type="search" placeholder="Search name, username, email…" class="field pill xl:!w-60 !py-2.5">
+                        <select id="roleFilter" class="field pill xl:!w-44 !py-2.5" aria-label="Filter by role">
                             <option value="">All roles</option><option value="super_admin">Super Admin</option><option value="head_office">Head Office</option>
                             <option value="branch_manager">Branch Manager</option><option value="staff">Staff</option><option value="driver">Drivers</option>
                         </select>
-                        <select id="branchFilter" class="field pill !w-44 !py-2.5" aria-label="Filter by branch"><option value="">All branches</option></select>
-                        <select id="activeFilter" class="field pill !w-36 !py-2.5" aria-label="Filter by status">
+                        <select id="branchFilter" class="field pill xl:!w-44 !py-2.5" aria-label="Filter by branch"><option value="">All branches</option></select>
+                        <select id="activeFilter" class="field pill xl:!w-36 !py-2.5" aria-label="Filter by status">
                             <option value="">All</option><option value="1" selected>Active</option><option value="0">Inactive</option>
                         </select>
                     </div>
                 </div>
-                <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-x-auto custom-scrollbar">
-                    <table class="w-full text-xs min-w-[760px]">
+                <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-x-auto custom-scrollbar max-lg:bg-transparent max-lg:border-0">
+                    <table class="rtable w-full text-xs min-w-[760px]">
                         <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
                             <th class="p-3 pl-4 font-extrabold">Name</th><th class="p-3 font-extrabold">Role</th><th class="p-3 font-extrabold">Branch</th>
                             <th class="p-3 font-extrabold">Contact</th><th class="p-3 font-extrabold">Last sign-in</th><th class="p-3 font-extrabold">Status</th><th class="p-3 w-12"></th>
                         </tr></thead>
-                        <tbody id="rows" class="divide-y divide-gray-100"><tr><td colspan="7" class="p-8 text-center text-gray-400">Loading…</td></tr></tbody>
+                        <tbody id="rows" class="divide-y divide-gray-100"><tr><td colspan="7" class="cell-empty p-8 text-center text-gray-400">Loading…</td></tr></tbody>
                     </table>
                 </div>
             </section>
@@ -89,7 +89,7 @@
                     <p class="text-xs text-gray-400 mt-0.5">They receive a verification email, then sign in with their username or email.</p>
                 </div>
                 <button type="button" onclick="UI.closeModal('createModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    <span data-icon="x"></span>
                 </button>
             </div>
             <div class="flex-1 overflow-y-auto custom-scrollbar my-5 pr-1 space-y-5">
@@ -126,7 +126,7 @@
                     <p id="e_sub" class="text-xs text-gray-400 mt-0.5"></p>
                 </div>
                 <button type="button" onclick="UI.closeModal('editModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    <span data-icon="x"></span>
                 </button>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5">
@@ -190,22 +190,22 @@
             $('listCount').textContent = list.length;
             $('rows').innerHTML = list.length ? list.map(u => `
                 <tr class="hover:bg-[#F8F8FA] ${u.active ? '' : 'opacity-60'}">
-                    <td class="p-3 pl-4">
+                    <td class="cell-main p-3 pl-4">
                         <div class="flex items-center gap-3">
                             <span class="w-9 h-9 rounded-full ${u.active ? 'bg-coral-50 text-coral-600' : 'bg-gray-100 text-gray-400'} flex items-center justify-center font-extrabold text-[11px] flex-shrink-0">${esc(initials(u.full_name))}</span>
                             <div class="min-w-0"><p class="font-extrabold truncate">${esc(u.full_name || '—')}${u.is_me ? ' <span class="pill-tag pill-gray">You</span>' : ''}</p>
                             <p class="text-[10px] text-gray-400 truncate">@${esc(u.username || '—')} • ${esc(u.recovery_email || '')}</p></div>
                         </div>
                     </td>
-                    <td class="p-3"><span class="pill-tag ${ROLE_PILL[u.role] || 'pill-gray'}">${esc(ROLES[u.role] || u.role || 'No role')}</span>${u.is_driver ? ' <span class="pill-tag pill-gray">Driver</span>' : ''}</td>
-                    <td class="p-3 font-bold">${esc(['super_admin', 'head_office'].includes(u.role) && !u.branch ? 'All branches' : branchName(u.branch))}</td>
-                    <td class="p-3 text-gray-500">${esc(u.contact_number || '—')}</td>
-                    <td class="p-3 text-gray-500">${ago(u.last_sign_in_at)}${u.email_confirmed ? '' : ' <span class="pill-tag pill-amber">Email not verified</span>'}</td>
-                    <td class="p-3"><span class="pill-tag ${u.active ? 'pill-green' : 'pill-gray'}">${u.active ? 'Active' : 'Inactive'}</span></td>
-                    <td class="p-3 relative" data-menu-root>
-                        <button type="button" onclick="userMenu(this, '${u.id}')" aria-label="Actions for ${esc(u.full_name)}" class="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-500 font-extrabold">⋯</button>
+                    <td class="p-3" data-label="Role"><span class="pill-tag ${ROLE_PILL[u.role] || 'pill-gray'}">${esc(ROLES[u.role] || u.role || 'No role')}</span>${u.is_driver ? ' <span class="pill-tag pill-gray">Driver</span>' : ''}</td>
+                    <td class="p-3 font-bold" data-label="Branch">${esc(['super_admin', 'head_office'].includes(u.role) && !u.branch ? 'All branches' : branchName(u.branch))}</td>
+                    <td class="p-3 text-gray-500" data-label="Contact">${esc(u.contact_number || '—')}</td>
+                    <td class="p-3 text-gray-500" data-label="Last sign-in">${ago(u.last_sign_in_at)}${u.email_confirmed ? '' : ' <span class="pill-tag pill-amber">Email not verified</span>'}</td>
+                    <td class="p-3" data-label="Status"><span class="pill-tag ${u.active ? 'pill-green' : 'pill-gray'}">${u.active ? 'Active' : 'Inactive'}</span></td>
+                    <td class="cell-menu p-3 relative" data-menu-root>
+                        <button type="button" onclick="userMenu(this, '${u.id}')" aria-label="Actions for ${esc(u.full_name)}" class="icon-btn">${UI.icon('more', 'w-5 h-5')}</button>
                     </td>
-                </tr>`).join('') : '<tr><td colspan="7" class="p-8 text-center text-gray-400">No users match.</td></tr>';
+                </tr>`).join('') : '<tr><td colspan="7" class="cell-empty p-8 text-center text-gray-400">No users match.</td></tr>';
         }
 
         async function load() {
@@ -220,12 +220,11 @@
             document.querySelectorAll('.row-menu').forEach(m => m.remove());
             const u = users.find(x => x.id === id);
             const locked = u.role === 'super_admin' && myRole !== 'super_admin';
-            btn.insertAdjacentHTML('afterend', `<div class="row-menu" role="menu">
+            UI.menu(btn, `
                 ${locked ? '<p class="px-3 py-2 text-[11px] text-gray-400">Only a Super Admin can change this account.</p>' : `
-                <button type="button" onclick="openEdit('${id}')">✏️ Edit user</button>
-                <button type="button" onclick="resetPassword('${id}')">🔑 Send password reset</button>
-                ${u.is_me ? '' : `<hr><button type="button" class="${u.active ? 'danger' : ''}" onclick="toggleActive('${id}')">${u.active ? '⛔ Deactivate' : '✅ Reactivate'}</button>`}`}
-            </div>`);
+                <button type="button" onclick="openEdit('${id}')">${UI.icon('edit')} Edit user</button>
+                <button type="button" onclick="resetPassword('${id}')">${UI.icon('key')} Send password reset</button>
+                ${u.is_me ? '' : `<hr><button type="button" class="${u.active ? 'danger' : ''}" onclick="toggleActive('${id}')">${u.active ? UI.icon('userX') + ' Deactivate' : UI.icon('userCheck') + ' Reactivate'}</button>`}`}`);
         };
 
         // ---------- add ----------

@@ -36,7 +36,7 @@ window.registerCargoWidget({
         }).join('');
         const excList = exc.length
             ? exc.map(e => `<div class="flex justify-between text-xs"><span class="font-bold text-gray-700 truncate">${ui.esc(e.label)}</span><span class="font-extrabold text-coral-600">${ui.num(e.count)}</span></div>`).join('')
-            : '<p class="text-xs text-gray-400">No exceptions 🎉</p>';
+            : '<p class="text-xs text-gray-400">No exceptions — all on track.</p>';
         const wide = size === '3x2' || size === '4x2';
 
         return ui.card('Shipment Pipeline', `

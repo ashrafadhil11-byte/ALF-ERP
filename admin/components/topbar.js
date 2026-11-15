@@ -33,13 +33,19 @@ document.addEventListener('DOMContentLoaded', () => {
     <header class="flex flex-col sm:flex-row sm:items-center justify-between w-full mb-6 px-1 gap-4">
         
         <!-- Top-Left: Personalized Greeting & Full Name -->
-        <div class="text-left">
-            <p class="text-sm lg:text-base font-semibold text-gray-400 tracking-tight leading-snug" id="topbarGreeting">
-                ${getGreetingText()}
-            </p>
-            <h1 class="text-2xl lg:text-[32px] font-extrabold text-gray-900 tracking-tight leading-tight mt-0.5" id="topbarUserFullName">
-                ${fullName}
-            </h1>
+        <div class="flex items-center gap-3 min-w-0">
+            <button type="button" onclick="toggleMobileNav()" aria-label="Open menu"
+                    class="lg:hidden w-11 h-11 rounded-full bg-[#F8F8FA] border border-gray-200/70 flex items-center justify-center text-gray-700 flex-shrink-0">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
+            <div class="text-left min-w-0">
+                <p class="text-sm lg:text-base font-semibold text-gray-400 tracking-tight leading-snug" id="topbarGreeting">
+                    ${getGreetingText()}
+                </p>
+                <h1 class="text-xl sm:text-2xl lg:text-[32px] font-extrabold text-gray-900 tracking-tight leading-tight mt-0.5 truncate" id="topbarUserFullName">
+                    ${fullName}
+                </h1>
+            </div>
         </div>
         
         <!-- Top-Right: Animated Collapsible Search + Quick Add + Clickable Profile -->

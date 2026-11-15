@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <p id="profModalDob" class="text-xs font-extrabold text-gray-900 mt-1">Loading...</p>
                         </div>
                         <span class="text-[10px] font-bold bg-white text-coral-600 px-3 py-1 rounded-full border border-coral-100 shadow-sm">
-                            🎉 Birthday Sync Active
+                            <svg class="w-3.5 h-3.5 inline -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-8a2 2 0 00-2-2H6a2 2 0 00-2 2v8M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1M2 21h20M7 8v3M12 8v3M17 8v3M7 4h.01M12 4h.01M17 4h.01"/></svg>Birthday Sync Active
                         </span>
                     </div>
                 </div>
@@ -215,7 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!res.ok) throw new Error(data.error || 'Failed to update password');
 
                 alertBox.className = 'p-3.5 rounded-2xl text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-100 block';
-                alertBox.textContent = '✓ Password updated! Your new credentials are now active.';
+                alertBox.textContent = 'Password updated. Your new credentials are now active.';
                 pwdForm.reset();
             } catch (err) {
                 alertBox.className = 'p-3.5 rounded-2xl text-xs font-bold border bg-red-50 text-red-600 border-red-100 block';

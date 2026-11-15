@@ -26,8 +26,8 @@
         <div id="topbar-container"></div>
 
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            <section class="flex flex-wrap items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-3">
-                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
+            <section class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
                     <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                     </div>
@@ -36,7 +36,7 @@
                         <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Scan AWBs • pick a milestone • update in one go</p>
                     </div>
                 </div>
-                <a href="shipments.html" class="btn btn-light">← Shipments</a>
+                <a href="shipments.html" class="btn btn-light self-start sm:self-auto"><span data-icon="arrowLeft"></span>Shipments</a>
             </section>
 
             <section class="grid grid-cols-1 xl:grid-cols-5 gap-5">
@@ -46,7 +46,7 @@
                         <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-[#111827] text-white text-[11px] font-extrabold flex items-center justify-center">1</span><span class="font-extrabold text-xs uppercase tracking-wider">Scan shipments</span></div>
                         <span id="batchCount" class="pill-tag pill-dark">0 in batch</span>
                     </div>
-                    <form id="scanForm" class="flex gap-2">
+                    <form id="scanForm" class="flex flex-col sm:flex-row gap-2">
                         <input id="scanInput" class="field scan" placeholder="Scan or type AWB, press Enter" autocomplete="off" aria-label="AWB">
                         <button class="btn btn-dark">Add</button>
                     </form>
@@ -58,7 +58,7 @@
                         </div>
                     </details>
                     <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
-                        <table class="w-full text-xs">
+                        <table class="rtable w-full text-xs">
                             <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
                                 <th class="p-3 pl-4 font-extrabold">AWB</th><th class="p-3 font-extrabold">Consignee</th><th class="p-3 font-extrabold">Current status</th><th class="p-3 w-10"></th>
                             </tr></thead>
@@ -111,11 +111,11 @@
             $('batchCount').textContent = `${ok.length} in batch`;
             $('batchRows').innerHTML = batch.length ? batch.map((b, i) => `
                 <tr class="${b.error ? 'bg-[#FFF5F3]' : ''}">
-                    <td class="p-3 pl-4 font-extrabold"><a class="hover:text-coral-500" href="shipments.html?awb=${encodeURIComponent(b.awb)}">${esc(b.awb)}</a></td>
-                    <td class="p-3 truncate max-w-[180px]">${b.error ? `<span class="text-coral-600 font-bold">${esc(b.error)}</span>` : esc(b.consignee || '—')}</td>
-                    <td class="p-3">${b.error ? '' : `<span class="pill-tag pill-coral">${esc(b.status || 'New')}</span>`}</td>
-                    <td class="p-3"><button type="button" onclick="removeAt(${i})" aria-label="Remove ${esc(b.awb)}" class="w-7 h-7 rounded-full hover:bg-white text-gray-400 hover:text-coral-600">×</button></td>
-                </tr>`).join('') : '<tr><td colspan="4" class="p-6 text-center text-gray-400">Scan AWBs to build the batch.</td></tr>';
+                    <td class="cell-main p-3 pl-4 font-extrabold"><a class="hover:text-coral-500" href="shipments.html?awb=${encodeURIComponent(b.awb)}">${esc(b.awb)}</a></td>
+                    <td class="p-3 truncate max-w-[180px]" data-label="Consignee">${b.error ? `<span class="text-coral-600 font-bold">${esc(b.error)}</span>` : esc(b.consignee || '—')}</td>
+                    <td class="p-3" data-label="Status">${b.error ? '' : `<span class="pill-tag pill-coral">${esc(b.status || 'New')}</span>`}</td>
+                    <td class="cell-menu p-3"><button type="button" onclick="removeAt(${i})" aria-label="Remove ${esc(b.awb)}" class="icon-btn !w-7 !h-7 hover:!text-coral-600">${UI.icon('x', 'w-3.5 h-3.5')}</button></td>
+                </tr>`).join('') : '<tr><td colspan="4" class="cell-empty p-6 text-center text-gray-400">Scan AWBs to build the batch.</td></tr>';
             const btn = $('updateBtn');
             btn.disabled = !ok.length || !$('statusSelect').value;
             btn.textContent = `Update ${ok.length} shipment${ok.length === 1 ? '' : 's'}`;

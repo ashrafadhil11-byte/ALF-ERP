@@ -76,6 +76,25 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 });
 
+// Phones / tablets: the sidebar slides in as an overlay (menu button in the top bar).
+const MOBILE_OPEN = ['fixed', 'inset-0', 'z-[60]', 'p-3', 'bg-gray-900/40', 'backdrop-blur-sm'];
+window.toggleMobileNav = function (force) {
+    const c = document.getElementById('sidebar-container');
+    if (!c) return;
+    const open = force ?? c.classList.contains('hidden');
+    c.classList.toggle('hidden', !open);
+    MOBILE_OPEN.forEach(cls => c.classList.toggle(cls, open));
+    document.body.style.overflow = open ? 'hidden' : '';
+};
+document.addEventListener('click', (e) => {
+    const c = document.getElementById('sidebar-container');
+    if (c && e.target === c && !c.classList.contains('hidden') && window.innerWidth < 1024) window.toggleMobileNav(false);
+});
+window.addEventListener('resize', () => {
+    const c = document.getElementById('sidebar-container');
+    if (window.innerWidth >= 1024 && c && c.classList.contains('fixed')) window.toggleMobileNav(false);
+});
+
 window.handleLogout = function() {
     localStorage.removeItem('cargo_auth_token');
     localStorage.removeItem('cargo_user_role');

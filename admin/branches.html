@@ -309,7 +309,7 @@
                                                 <span id="selectedCountryIsoBadge" class="text-[9px] font-mono font-bold text-coral-600">REST API</span>
                                             </div>
                                             <div class="flex items-center gap-2">
-                                                <span id="countryFlagPreview" class="text-sm select-none flex-shrink-0">🌍</span>
+                                                <span id="countryFlagPreview" class="select-none flex-shrink-0 flex items-center"><svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg></span>
                                                 <input type="text" id="countrySearchInput" required autocomplete="off"
                                                        placeholder="Type e.g. Sau, Ind, Oma..."
                                                        onfocus="openCountryListDropdown()"
@@ -698,7 +698,7 @@
                             onclick="selectCountryByCode('${c.cca2}')"
                             class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-[#FFF5F3] text-left transition-colors group">
                         <div class="flex items-center gap-2.5 min-w-0">
-                            ${c.flag ? `<img src="${c.flag}" class="w-5 h-3.5 object-cover rounded-sm border border-gray-200 flex-shrink-0">` : '<span>🌐</span>'}
+                            ${c.flag ? `<img src="${c.flag}" class="w-5 h-3.5 object-cover rounded-sm border border-gray-200 flex-shrink-0">` : '<svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>'}
                             <div class="truncate">
                                 <p class="text-xs font-extrabold text-gray-900 group-hover:text-coral-600 truncate">${c.name}</p>
                                 <p class="text-[10px] text-gray-400 truncate">${c.officialName}</p>
@@ -730,7 +730,7 @@
             document.getElementById('officialCountryLabel').textContent = countryObj.officialName || countryObj.name;
             document.getElementById('countryFlagPreview').innerHTML = countryObj.flag
                 ? `<img src="${countryObj.flag}" class="w-5 h-3.5 object-cover rounded-sm border border-gray-200">`
-                : '🌍';
+                : '<svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>';
 
             document.getElementById('countryListDropdown').classList.add('hidden');
 
@@ -1310,7 +1310,7 @@
 
             selectedCountryObj = null;
             currentCountryCities = [];
-            document.getElementById('countryFlagPreview').textContent = '🌍';
+            document.getElementById('countryFlagPreview').innerHTML = '<svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>';
             document.getElementById('selectedCountryIsoBadge').textContent = `${allCountriesData.length || 250} Countries`;
             document.getElementById('countryIsoTag').textContent = 'Select Country First';
             document.getElementById('phoneDialCodeBadge').textContent = '+--';
@@ -1440,8 +1440,8 @@
 
                 alertBox.className = 'p-4 rounded-2xl text-xs font-bold mb-5 border bg-emerald-50 text-emerald-700 border-emerald-100 block';
                 alertBox.innerHTML = editingId
-                    ? `✓ Branch <b>${payload.branchName} (${payload.branchCode})</b> updated!`
-                    : `✓ Branch <b>${payload.branchName} (${payload.branchCode})</b> created with AWB Digit <b>${payload.bookingCode}</b>!`;
+                    ? `Branch <b>${payload.branchName} (${payload.branchCode})</b> updated!`
+                    : `Branch <b>${payload.branchName} (${payload.branchCode})</b> created with AWB Digit <b>${payload.bookingCode}</b>!`;
 
                 exitEditMode();
             } catch (err) {
