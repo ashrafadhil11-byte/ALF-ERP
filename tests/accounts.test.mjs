@@ -146,3 +146,68 @@ test('booking create: invoice failure does not lose the booking', async () => {
     assert.equal(r.body.result, 'imported');
     assert.match(r.body.invoice_error, /above zero/);
 });
+
+import { quoteShipment, fitSize, cleanLines } from '../api/_lib/accounts.js';
+
+test('pricing: electronics priced on their own card, general boxes on the general card', () => {
+    const cards = [
+        { dest_country_code: 'IN', cargo_type_code: '*', commodity: '*', method: 'per_kg', rate: 1.8, currency: 'OMR' },
+        { dest_country_code: 'IN', cargo_type_code: '*', commodity: 'ELEC', method: 'per_kg', rate: 2.5, currency: 'OMR' }
+    ];
+    const q = quoteShipment(cards, { dest: 'IN', cargo: '1', boxes: [{ weight: 10, commodity: 'GEN' }, { weight: 4, commodity: 'ELEC' }, { weight: 2, commodity: 'GEN' }], commodityNames: { ELEC: 'Electronics' } });
+    assert.deepEqual(q.lines.map(l => [l.commodity, l.amount]), [['GEN', 21.6], ['ELEC', 10]]);
+    assert.equal(q.amount, 31.6);
+    assert.match(q.lines[1].description, /Electronics/);
+    // no electronics card → falls back to the general card
+    const g = quoteShipment([cards[0]], { dest: 'IN', boxes: [{ weight: 5, commodity: 'ELEC' }] });
+    assert.equal(g.amount, 9);
+    // nothing for the route
+    assert.deepEqual(quoteShipment([], { dest: 'IN', boxes: [{ weight: 5 }] }).missing, ['General']);
+});
+
+test('pricing: per CBM and by box size', () => {
+    const cbm = quoteShipment([{ dest_country_code: '*', cargo_type_code: '*', method: 'per_cbm', rate: 120, currency: 'OMR' }],
+        { dest: 'IN', boxes: [{ weight: 30, l: 100, w: 50, h: 50 }, { weight: 10, l: 50, w: 50, h: 40 }] });
+    assert.equal(cbm.amount, 120 * 0.35);
+    const sizes = [{ name: 'Small', l: 40, w: 30, h: 30, price: 8 }, { name: 'Large', l: 80, w: 60, h: 60, price: 25 }, { name: 'Medium', l: 60, w: 40, h: 40, price: 15 }];
+    assert.equal(fitSize(sizes, { l: 30, w: 40, h: 25 }).name, 'Small');        // rotated still fits
+    assert.equal(fitSize(sizes, { l: 55, w: 45, h: 30 }).name, 'Large');        // 45 > 40 → not medium
+    assert.equal(fitSize(sizes, { l: 90, w: 10, h: 10 }), null);
+    const q = quoteShipment([{ dest_country_code: '*', cargo_type_code: '*', method: 'box_size', sizes, currency: 'OMR' }],
+        { dest: 'IN', boxes: [{ l: 30, w: 30, h: 30, weight: 5 }, { l: 50, w: 40, h: 40, weight: 9 }, { l: 120, w: 50, h: 50, weight: 20 }] });
+    assert.equal(q.amount, 23);
+    assert.equal(q.unmatched, 1);
+    assert.match(q.lines[0].description, /1 × Small, 1 × Medium/);
+});
+
+test('invoice lines are cleaned: unknown kinds become freight, zero lines dropped', () => {
+    const l = cleanLines([{ kind: 'material', product_id: '7', qty: '2', rate: '1.25' }, { kind: 'hack', rate: 3 }, { kind: 'charge', rate: 0 }]);
+    assert.deepEqual(l.map(x => [x.kind, x.product_id, x.qty, x.rate]), [['material', 7, 2, 1.25], ['freight', null, 1, 3]]);
+});
+
+test('accounts: purchase + stock count go to the RPCs with the branch currency', async () => {
+    const calls = fake(MGR, {
+        '/rest/v1/branches?branch_code=eq.ALFSLL': () => [{ branch_code: 'ALFSLL', currency: 'OMR' }],
+        'rpc/purchase_create': () => ({ id: 1, purchase_no: 'PUR-ALFSLL-000001', total: 60 }),
+        'rpc/stock_count': () => ({ difference: -2, value: 1 })
+    });
+    let r = res();
+    await accounts(req('POST', { body: { action: 'purchase', branch: 'ALFKNR', supplier_id: 3, pay_method: 'credit', lines: [{ product_id: 1, qty: 100, unit_cost: 0.4 }, { qty: 0 }] } }), r);
+    assert.equal(r.body.purchase_no, 'PUR-ALFSLL-000001');
+    const p = calls.find(c => c.url.includes('purchase_create')).body;
+    assert.deepEqual([p.p_branch, p.p_currency, p.p_pay_method, p.p_lines.length, p.p_supplier_id], ['ALFSLL', 'OMR', 'credit', 1, 3]);
+    r = res();
+    await accounts(req('POST', { body: { action: 'stock_count', product_id: 1, counted: 95 } }), r);
+    assert.equal(r.body.difference, -2);
+});
+
+test('accounts: commodities are admin-only; box-size cards need sizes', async () => {
+    fake(MGR);
+    let r = res();
+    await accounts(req('POST', { body: { action: 'commodity_save', code: 'PERF', name: 'Perfume' } }), r);
+    assert.equal(r.code, 403);
+    fake(ADMIN, { '/rest/v1/branches?branch_code=eq.ALFSLL': () => [{ branch_code: 'ALFSLL', currency: 'OMR' }] });
+    r = res();
+    await accounts(req('POST', { body: { action: 'rate_save', branch_code: 'ALFSLL', method: 'box_size', sizes: [{ name: 'S', l: 0 }] } }), r);
+    assert.match(r.body.error, /box size/);
+});

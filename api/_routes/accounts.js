@@ -4,17 +4,21 @@
 //         super_admin / head_office → all branches + chart of accounts, journal, trial balance, P&L, balance sheet
 // Reports are per currency (no conversion).
 //
-// GET  ?view=quote&branch&dest&cargo&kg&pieces&boxes
+// GET  ?view=quote&branch&dest&cargo&boxes=<JSON [{weight,l,w,h,commodity}]>   (or &kg&pieces for a simple quote)
+// GET  ?view=booking_options&branch&dest      packages, extra charges, materials, commodities (any role)
+// GET  ?view=pricing | materials | purchases                                       (branch manager +)
 // GET  ?view=overview|invoices|invoice&id|payments|expenses|balances|cash&date|rates|ledger&from&to|journal   [&branch]
 // POST { action: invoice | payment | invoice_void | payment_void | expense | expense_void | cash_close
 //                | rate_save | rate_delete | account_save | journal, ... }
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
-import { pickCard, priceFor, PAY_MAP } from '../_lib/accounts.js';
+import { pickCard, priceFor, quoteShipment, cleanLines, PAY_MAP } from '../_lib/accounts.js';
 
 const enc = encodeURIComponent;
 const FULL = ADMIN_ROLES;                         // super_admin, head_office
 const OPS = [...FULL, 'branch_manager'];
-const METHODS = ['per_kg', 'vol_band', 'per_package', 'per_box'];
+const METHODS = ['per_kg', 'vol_band', 'per_package', 'per_box', 'per_cbm', 'box_size'];
+const BASES = ['per_shipment', 'per_box', 'per_kg'];
+const str = (v, n = 120) => String(v ?? '').trim().slice(0, n);
 class UserError extends Error { constructor(m, s = 400) { super(m); this.status = s; } }
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -68,10 +72,35 @@ export default async function handler(req, res) {
             if (view === 'quote') {
                 const branch = String((full ? q.branch : session.branch) || '').toUpperCase();
                 if (!branch) throw new UserError('Choose the branch.');
-                const cards = await get(`rate_cards?branch_code=eq.${enc(branch)}&active=is.true&select=*`);
+                const [cards, coms] = await Promise.all([
+                    get(`rate_cards?branch_code=eq.${enc(branch)}&active=is.true&select=*`),
+                    get('commodities?select=code,name')
+                ]);
+                let boxes = null;
+                try { boxes = q.boxes ? JSON.parse(q.boxes) : null; } catch (e) { boxes = null; }
+                if (Array.isArray(boxes) && boxes.length) {
+                    const out = quoteShipment(cards, { dest: q.dest, cargo: q.cargo, boxes: boxes.slice(0, 200), commodityNames: Object.fromEntries(coms.map(c => [c.code, c.name])) });
+                    return res.status(200).json({ quote: out.lines.length ? out : null, missing: out.missing,
+                        message: out.lines.length ? null : 'No rate card for this route — enter the charge by hand.' });
+                }
                 const card = pickCard(cards, { dest: q.dest, cargo: q.cargo });
                 if (!card) return res.status(200).json({ quote: null, message: 'No rate card for this route — enter the charge by hand.' });
                 return res.status(200).json({ quote: priceFor(card, { kg: num(q.kg), pieces: num(q.pieces) || 1, boxes: num(q.boxes) || 1 }), card_id: card.id });
+            }
+            if (view === 'booking_options') {
+                const branch = String((full ? q.branch : session.branch) || '').toUpperCase();
+                if (!branch) throw new UserError('Choose the branch.');
+                const dest = String(q.dest || '').toUpperCase();
+                const [packages, charges, materials, commodities] = await Promise.all([
+                    get(`package_rates?branch_code=eq.${enc(branch)}&active=is.true&dest_country_code=in.(%22*%22,%22${enc(dest || '*')}%22)&select=id,name,price,includes,dest_country_code&order=name`),
+                    get(`charge_items?branch_code=eq.${enc(branch)}&active=is.true&select=id,name,basis,price&order=name`),
+                    get(`branch_products?branch_code=eq.${enc(branch)}&sell_price=gt.0&select=product_id,sell_price,qty,products!inner(name,unit,track_stock,active)&products.active=is.true`),
+                    get('commodities?active=is.true&select=code,name&order=sort,name')
+                ]);
+                return res.status(200).json({
+                    packages, charges, commodities,
+                    materials: materials.map(m => ({ product_id: m.product_id, name: m.products.name, unit: m.products.unit, price: m.sell_price, qty: m.products.track_stock ? m.qty : null }))
+                });
             }
 
             need(OPS);
@@ -145,13 +174,40 @@ export default async function handler(req, res) {
                 const closings = await get(`cash_closings?branch_code=eq.${enc(b)}&select=*&order=close_date.desc,currency&limit=60`);
                 return res.status(200).json({ branch: b, date, days, closings });
             }
-            if (view === 'rates') {
-                const [cards, dests, cargo] = await Promise.all([
-                    get(`rate_cards?select=*${bf(branch)}&order=branch_code,dest_country_code,cargo_type_code`),
+            if (view === 'rates' || view === 'pricing') {
+                const [cards, dests, cargo, packages, charges, commodities] = await Promise.all([
+                    get(`rate_cards?select=*${bf(branch)}&order=branch_code,dest_country_code,cargo_type_code,commodity`),
                     get('destination_codes?select=country_code,country_name&order=country_name'),
-                    get('cargo_types?active=is.true&select=code,name&order=code')
+                    get('cargo_types?active=is.true&select=code,name&order=code'),
+                    get(`package_rates?select=*${bf(branch)}&order=branch_code,name`),
+                    get(`charge_items?select=*${bf(branch)}&order=branch_code,name`),
+                    get('commodities?select=*&order=sort,name')
                 ]);
-                return res.status(200).json({ cards, destinations: dests, cargo_types: cargo });
+                return res.status(200).json({ cards, destinations: dests, cargo_types: cargo, packages, charges, commodities });
+            }
+            if (view === 'materials') {
+                const b = writeBranch(q.branch);
+                const [products, stock, suppliers, moves] = await Promise.all([
+                    get('products?select=*&order=name'),
+                    get(`branch_products?branch_code=eq.${enc(b)}&select=*`),
+                    get('suppliers?select=*&order=name'),
+                    get(`stock_moves?branch_code=eq.${enc(b)}&select=*,products(name,unit)&order=created_at.desc&limit=60`)
+                ]);
+                const br = await branchRow(b);
+                return res.status(200).json({
+                    branch: b, currency: br.currency, suppliers, moves,
+                    products: products.map(pr => { const st = stock.find(x => x.product_id === pr.id) || {}; return { ...pr, sell_price: st.sell_price ?? 0, avg_cost: st.avg_cost ?? 0, qty: st.qty ?? 0, reorder_level: st.reorder_level ?? 0 }; })
+                });
+            }
+            if (view === 'purchases') {
+                const [purchases, suppliers] = await Promise.all([
+                    get(`purchases?purchase_date=gte.${from}&purchase_date=lte.${to}${bf(branch)}&select=*,suppliers(name)&order=purchase_date.desc,id.desc&limit=300`),
+                    get('suppliers?select=*&order=name')
+                ]);
+                const owed = await get(`purchases?status=in.(unpaid,partial)${bf(branch)}&select=supplier_id,currency,balance`);
+                const bySup = {};
+                owed.forEach(o => { const k = `${o.supplier_id}|${o.currency}`; bySup[k] = (bySup[k] || 0) + +o.balance; });
+                return res.status(200).json({ purchases, suppliers, owed: Object.entries(bySup).map(([k, v]) => { const [id, cur] = k.split('|'); return { supplier_id: +id, currency: cur, balance: Math.round(v * 1000) / 1000 }; }) });
             }
 
             need(FULL);
@@ -178,7 +234,7 @@ export default async function handler(req, res) {
         switch (b.action) {
             case 'invoice': {
                 const br = await branchRow(writeBranch(b.branch));
-                const lines = (Array.isArray(b.lines) ? b.lines : []).map(l => ({ description: String(l.description || '').slice(0, 200), qty: num(l.qty) || 1, rate: num(l.rate) || 0 })).filter(l => l.rate > 0);
+                const lines = cleanLines(b.lines);
                 if (!lines.length) throw new UserError('Add at least one line with an amount.');
                 const out = await rpc('invoice_create', {
                     p_branch: br.branch_code, p_booking_id: null, p_awb: b.awb || null, p_customer_name: b.customer_name || null, p_customer_phone: b.customer_phone || null,
@@ -220,12 +276,16 @@ export default async function handler(req, res) {
                 const bands = b.method === 'vol_band'
                     ? (Array.isArray(b.bands) ? b.bands : []).map(x => ({ upto: num(x.upto), price: num(x.price) })).filter(x => x.upto > 0 && x.price >= 0).sort((x, y) => x.upto - y.upto)
                     : [];
+                const sizes = b.method === 'box_size'
+                    ? (Array.isArray(b.sizes) ? b.sizes : []).map(x => ({ name: str(x.name, 40), l: num(x.l), w: num(x.w), h: num(x.h), price: num(x.price) })).filter(x => x.name && x.l > 0 && x.w > 0 && x.h > 0 && x.price >= 0)
+                    : [];
                 if (b.method === 'vol_band' && !bands.length) throw new UserError('Add at least one weight band.');
-                if (b.method !== 'vol_band' && !(num(b.rate) > 0)) throw new UserError('Enter the rate.');
+                if (b.method === 'box_size' && !sizes.length) throw new UserError('Add at least one box size (name, L × W × H cm, price).');
+                if (!['vol_band', 'box_size'].includes(b.method) && !(num(b.rate) > 0)) throw new UserError('Enter the rate.');
                 const dest = b.dest_country_code ? String(b.dest_country_code).toUpperCase() : '*';
                 if (dest !== '*' && !/^[A-Z]{2}$/.test(dest)) throw new UserError('Destination must be a 2-letter country code or "any".');
                 const row = {
-                    branch_code: branch, dest_country_code: dest, cargo_type_code: b.cargo_type_code || '*', method: b.method,
+                    branch_code: branch, dest_country_code: dest, cargo_type_code: b.cargo_type_code || '*', commodity: b.commodity || '*', method: b.method, sizes,
                     currency: br.currency || 'OMR', rate: num(b.rate) || 0, min_charge: num(b.min_charge) || 0, bands,
                     extra_per_kg: num(b.extra_per_kg) || 0, note: b.note || null, active: b.active !== false,
                     updated_at: new Date().toISOString(), updated_by_name: userName
@@ -235,13 +295,97 @@ export default async function handler(req, res) {
                     method: b.id ? 'PATCH' : 'POST', headers: { ...serviceHeaders(), Prefer: 'return=representation' }, body: JSON.stringify(row)
                 });
                 const out = await r.json().catch(() => ({}));
-                if (!r.ok) throw new UserError(/duplicate|unique/i.test(out.message || '') ? 'A rate card for this branch, destination and cargo already exists — edit that one.' : out.message || 'Could not save.');
+                if (!r.ok) throw new UserError(/duplicate|unique/i.test(out.message || '') ? 'A rate card for this branch, destination, cargo and commodity already exists — edit that one.' : out.message || 'Could not save.');
                 return res.status(200).json({ success: true, card: out[0] });
             }
             case 'rate_delete': {
                 own((await get(`rate_cards?id=eq.${enc(b.id)}&select=id,branch_code`))[0]);
                 await fetch(`${rest}/rate_cards?id=eq.${enc(b.id)}`, { method: 'DELETE', headers: serviceHeaders() });
                 return res.status(200).json({ success: true });
+            }
+            case 'package_save':
+            case 'charge_save': {
+                const isPkg = b.action === 'package_save';
+                const branch = writeBranch(b.branch_code);
+                const name = str(b.name, 80);
+                if (!name) throw new UserError('Enter the name.');
+                if (!(num(b.price) >= 0) || b.price === '' || b.price === null) throw new UserError('Enter the price.');
+                if (!isPkg && !BASES.includes(b.basis)) throw new UserError('Choose how the charge is counted.');
+                const table = isPkg ? 'package_rates' : 'charge_items';
+                const row = isPkg
+                    ? { branch_code: branch, dest_country_code: /^[A-Z]{2}$/.test(String(b.dest_country_code || '').toUpperCase()) ? String(b.dest_country_code).toUpperCase() : '*', name, price: num(b.price), includes: str(b.includes, 200) || null, active: b.active !== false, updated_at: new Date().toISOString() }
+                    : { branch_code: branch, name, basis: b.basis, price: num(b.price), active: b.active !== false };
+                if (b.id) own((await get(`${table}?id=eq.${enc(b.id)}&select=id,branch_code`))[0]);
+                const r = await fetch(`${rest}/${table}${b.id ? `?id=eq.${enc(b.id)}` : ''}`, { method: b.id ? 'PATCH' : 'POST', headers: serviceHeaders(), body: JSON.stringify(row) });
+                if (!r.ok) { const out = await r.json().catch(() => ({})); throw new UserError(/duplicate|unique/i.test(out.message || '') ? 'That name already exists for this branch.' : out.message || 'Could not save.'); }
+                return res.status(200).json({ success: true });
+            }
+            case 'package_delete':
+            case 'charge_delete': {
+                const table = b.action === 'package_delete' ? 'package_rates' : 'charge_items';
+                own((await get(`${table}?id=eq.${enc(b.id)}&select=id,branch_code`))[0]);
+                await fetch(`${rest}/${table}?id=eq.${enc(b.id)}`, { method: 'DELETE', headers: serviceHeaders() });
+                return res.status(200).json({ success: true });
+            }
+            case 'commodity_save': {
+                need(FULL);
+                const code = String(b.code || '').trim().toUpperCase();
+                if (!/^[A-Z0-9]{2,8}$/.test(code)) throw new UserError('Commodity code: 2–8 letters / numbers (e.g. ELEC).');
+                if (!str(b.name, 40)) throw new UserError('Enter the commodity name.');
+                const r = await fetch(`${rest}/commodities?on_conflict=code`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'resolution=merge-duplicates' }, body: JSON.stringify({ code, name: str(b.name, 40), active: b.active !== false }) });
+                if (!r.ok) throw new UserError('Could not save.');
+                return res.status(200).json({ success: true });
+            }
+            case 'product_save': {
+                const sku = String(b.sku || '').trim().toUpperCase().replace(/\s+/g, '-');
+                if (!/^[A-Z0-9-]{2,20}$/.test(sku)) throw new UserError('Item code: 2–20 letters, numbers or dashes.');
+                if (!str(b.name, 80)) throw new UserError('Enter the item name.');
+                const row = { sku, name: str(b.name, 80), unit: str(b.unit, 10) || 'pcs', track_stock: b.track_stock !== false, active: b.active !== false };
+                const r = await fetch(`${rest}/products${b.id ? `?id=eq.${enc(b.id)}` : ''}`, { method: b.id ? 'PATCH' : 'POST', headers: { ...serviceHeaders(), Prefer: 'return=representation' }, body: JSON.stringify(row) });
+                const out = await r.json().catch(() => ({}));
+                if (!r.ok) throw new UserError(/duplicate|unique/i.test(out.message || '') ? `Item code ${sku} is already used.` : out.message || 'Could not save.');
+                const id = b.id || out[0]?.id;
+                if (b.branch_code !== undefined || b.sell_price !== undefined) {
+                    const branch = writeBranch(b.branch_code);
+                    await fetch(`${rest}/branch_products?on_conflict=branch_code,product_id`, {
+                        method: 'POST', headers: { ...serviceHeaders(), Prefer: 'resolution=merge-duplicates' },
+                        body: JSON.stringify({ branch_code: branch, product_id: id, sell_price: num(b.sell_price) || 0, reorder_level: num(b.reorder_level) || 0 })
+                    });
+                }
+                return res.status(200).json({ success: true, id });
+            }
+            case 'supplier_save': {
+                if (!str(b.name, 80)) throw new UserError('Enter the supplier name.');
+                const row = { name: str(b.name, 80), phone: str(b.phone, 30) || null, notes: str(b.notes, 200) || null, active: b.active !== false };
+                const r = await fetch(`${rest}/suppliers${b.id ? `?id=eq.${enc(b.id)}` : ''}`, { method: b.id ? 'PATCH' : 'POST', headers: { ...serviceHeaders(), Prefer: 'return=representation' }, body: JSON.stringify(row) });
+                const out = await r.json().catch(() => ({}));
+                if (!r.ok) throw new UserError(/duplicate|unique/i.test(out.message || '') ? 'A supplier with that name exists.' : 'Could not save.');
+                return res.status(200).json({ success: true, id: b.id || out[0]?.id });
+            }
+            case 'purchase': {
+                const br = await branchRow(writeBranch(b.branch));
+                const lines = (Array.isArray(b.lines) ? b.lines : []).slice(0, 60).map(l => ({ product_id: l.product_id ? Number(l.product_id) : null, description: str(l.description, 200), qty: num(l.qty), unit_cost: num(l.unit_cost) })).filter(l => l.qty > 0);
+                if (!lines.length) throw new UserError('Add at least one item.');
+                const out = await rpc('purchase_create', {
+                    p_branch: br.branch_code, p_supplier_id: b.supplier_id ? Number(b.supplier_id) : null, p_currency: br.currency || 'OMR', p_lines: lines,
+                    p_pay_method: b.pay_method === 'credit' ? 'credit' : (PAY_MAP[b.pay_method] || b.pay_method), p_bill_ref: b.bill_ref || null, p_date: b.date || null, p_notes: b.notes || null, p_user_name: userName
+                });
+                return res.status(200).json({ success: true, ...out });
+            }
+            case 'supplier_pay': {
+                own((await get(`purchases?id=eq.${enc(b.purchase_id)}&select=id,branch_code`))[0]);
+                const out = await rpc('supplier_pay', { p_purchase_id: Number(b.purchase_id), p_amount: num(b.amount), p_method: PAY_MAP[b.method] || b.method, p_reference: b.reference || null, p_user_name: userName });
+                return res.status(200).json({ success: true, ...out });
+            }
+            case 'purchase_void': {
+                own((await get(`purchases?id=eq.${enc(b.id)}&select=id,branch_code`))[0]);
+                await rpc('purchase_void', { p_id: Number(b.id), p_reason: b.reason || '', p_user_name: userName });
+                return res.status(200).json({ success: true });
+            }
+            case 'stock_count': {
+                const br = await branchRow(writeBranch(b.branch));
+                const out = await rpc('stock_count', { p_branch: br.branch_code, p_product: Number(b.product_id), p_counted: num(b.counted), p_note: b.note || null, p_user_name: userName, p_currency: br.currency || 'OMR' });
+                return res.status(200).json({ success: true, ...out });
             }
             case 'account_save': {
                 need(FULL);

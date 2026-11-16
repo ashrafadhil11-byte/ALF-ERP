@@ -141,7 +141,7 @@ export default async function handler(req, res) {
                 raw: fromApi && body.raw && typeof body.raw === 'object' ? body.raw : null
             }, fields.intake_mode);
             // Counter bookings with a charge get an invoice (+ receipt when paid now). Imports are paid online.
-            const acc = fromApi ? {} : await autoInvoice({ awb: out.awb || awb, branch, fields, userName });
+            const acc = fromApi ? {} : await autoInvoice({ awb: out.awb || awb, branch, fields, userName, lines: body.charge_lines });
             return res.status(200).json({ ...out, invoice: acc.invoice || null, invoice_error: acc.error || null });
         }
 

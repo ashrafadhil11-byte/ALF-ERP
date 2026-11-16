@@ -133,9 +133,9 @@
                             <button type="button" id="addBox" class="btn btn-light btn-sm"><span data-icon="plus"></span>Add box</button>
                         </div>
                         <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-x-auto custom-scrollbar">
-                            <table class="w-full text-xs min-w-[520px]">
+                            <table class="w-full text-xs min-w-[640px]">
                                 <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
-                                    <th class="p-3 pl-4 font-extrabold w-10">#</th><th class="p-3 font-extrabold">Weight kg</th><th class="p-3 font-extrabold">L cm</th><th class="p-3 font-extrabold">W cm</th><th class="p-3 font-extrabold">H cm</th><th class="p-3 font-extrabold text-right">Vol. kg</th><th class="p-3 w-10"></th>
+                                    <th class="p-3 pl-4 font-extrabold w-10">#</th><th class="p-3 font-extrabold">Contents</th><th class="p-3 font-extrabold">Weight kg</th><th class="p-3 font-extrabold">L cm</th><th class="p-3 font-extrabold">W cm</th><th class="p-3 font-extrabold">H cm</th><th class="p-3 font-extrabold text-right">Vol. kg</th><th class="p-3 w-10"></th>
                                 </tr></thead>
                                 <tbody id="boxRows" class="divide-y divide-gray-100"></tbody>
                             </table>
@@ -154,14 +154,28 @@
                     <!-- 5. Charges -->
                     <section class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 space-y-4">
                         <div class="flex items-center gap-2"><span class="step">5</span><span class="font-extrabold text-xs uppercase tracking-wider">Charges & payment</span></div>
+                        <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-x-auto custom-scrollbar">
+                            <table class="w-full text-xs min-w-[560px]">
+                                <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                                    <th class="p-3 pl-4 font-extrabold">Item</th><th class="p-3 font-extrabold">Qty</th><th class="p-3 font-extrabold">Rate</th><th class="p-3 font-extrabold text-right">Amount</th><th class="p-3 w-10"></th></tr></thead>
+                                <tbody id="chargeRows" class="divide-y divide-gray-100"></tbody>
+                                <tfoot><tr class="border-t border-gray-100"><td colspan="3" class="p-3 pl-4 text-right font-extrabold">Total</td><td id="chargeTotal" class="p-3 text-right font-extrabold tabular-nums">—</td><td></td></tr></tfoot>
+                            </table>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+                            <select id="addPackage" class="field text-xs" aria-label="Add package rate"><option value="">+ Package rate</option></select>
+                            <select id="addCharge" class="field text-xs" aria-label="Add extra charge"><option value="">+ Extra charge</option></select>
+                            <select id="addMaterial" class="field text-xs" aria-label="Add packing material"><option value="">+ Packing material</option></select>
+                            <button type="button" id="addOther" class="btn btn-light"><span data-icon="plus"></span>Other</button>
+                        </div>
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div><label class="ui-label" for="declared">Declared value</label><input id="declared" class="field num" type="number" min="0" step="0.001" inputmode="decimal"></div>
-                            <div><label class="ui-label" for="amount">Charge <span id="curLabel" class="text-gray-400">(OMR)</span></label><input id="amount" class="field num" type="number" min="0" step="0.001" inputmode="decimal"></div>
+                            <div><label class="ui-label" for="amount">Total charge <span id="curLabel" class="text-gray-400">(OMR)</span></label><input id="amount" class="field num soft" readonly tabindex="-1"></div>
                             <div><label class="ui-label" for="payment">Payment</label>
                                 <select id="payment" class="field"><option value="cash">Cash</option><option value="card">Card</option><option value="bank_transfer">Bank transfer</option><option value="credit">Credit account</option><option value="pay_on_delivery">Pay on delivery</option></select></div>
                             <div class="sm:col-span-3"><label class="ui-label" for="notes">Notes</label><input id="notes" class="field" placeholder="Internal note (optional)"></div>
                         </div>
-                        <p id="quoteHint" class="text-[11px] text-gray-400">The charge fills in from the branch rate card once destination, cargo and weight are set. You can always change it.</p>
+                        <p id="quoteHint" class="text-[11px] text-gray-400">Freight fills in from the branch rate card (per contents type) once destination, cargo and weights are set. Every price can be changed.</p>
                     </section>
                 </div>
 
@@ -228,6 +242,7 @@
         function boxRow(i, b = {}) {
             return `<tr data-box>
                 <td class="p-2 pl-4 font-extrabold text-gray-400">${i + 1}</td>
+                <td class="p-2"><select data-k="commodity" class="field !py-2 !px-2 text-xs !w-32" aria-label="Box ${i + 1} contents">${commodityOptions(b.commodity)}</select></td>
                 ${['weight', 'l', 'w', 'h'].map(k => `<td class="p-2"><input data-k="${k}" class="field num !py-2 !px-3" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(b[k] ?? '')}" aria-label="Box ${i + 1} ${k}"></td>`).join('')}
                 <td class="p-2 text-right font-bold text-gray-500" data-vol>—</td>
                 <td class="p-2"><button type="button" class="icon-btn !w-8 !h-8" data-remove aria-label="Remove box ${i + 1}">${I('x', 'w-3.5 h-3.5')}</button></td>
@@ -236,7 +251,7 @@
         function readBoxes() {
             return [...document.querySelectorAll('[data-box]')].map(tr => {
                 const v = Object.fromEntries([...tr.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value]));
-                const b = { weight: num(v.weight), l: num(v.l), w: num(v.w), h: num(v.h) };
+                const b = { weight: num(v.weight), l: num(v.l), w: num(v.w), h: num(v.h), commodity: v.commodity || 'GEN' };
                 b.vol = b.l && b.w && b.h ? round2(b.l * b.w * b.h / 5000) : 0;
                 return b;
             });
@@ -249,28 +264,92 @@
             e.target.closest('tr').remove(); renumber(); refresh();
         });
         $('boxRows').addEventListener('input', refresh);
+        $('boxRows').addEventListener('change', refresh);
 
-        // ---------- rate-card quote (Accounts) ----------
-        let quoteTimer, quoteKey = '', amountTyped = false;
-        $('amount').addEventListener('input', () => { amountTyped = true; $('quoteHint').innerHTML = 'Charge entered by hand. <button type="button" class="font-bold text-[#D55C48]" onclick="useRateCard()">Use rate card</button>'; });
-        window.useRateCard = () => { amountTyped = false; quoteKey = ''; refresh(); };
-        function scheduleQuote(kg, boxes) {
-            const b = branch(), c = dest(), t = cargo();
-            if (!b.branch_code || !c || !t || !(kg > 0)) return;
-            const key = [b.branch_code, c.c, t.code, kg, boxes].join('|');
-            if (key === quoteKey || amountTyped) return;
+        // ---------- itemised charges: freight (rate card) · packages · extra charges · materials · other ----------
+        // charges: [{ kind, description, qty, rate, product_id?, auto?, basis? }]  auto = freight line from the rate card
+        let charges = [], options = { packages: [], charges: [], materials: [], commodities: [] }, optionsKey = '';
+        let quoteTimer, quoteKey = '', freightOff = false;
+        const r3 = (n) => Math.round((+n || 0) * 1000) / 1000;
+        const totalCharges = () => r3(charges.reduce((s, l) => s + r3(l.qty * l.rate), 0));
+        const shipment = () => { const bx = readBoxes(); return { boxes: bx.length, kg: Math.max(round2(bx.reduce((s, b) => s + b.weight, 0)), round2(bx.reduce((s, b) => s + b.vol, 0))) }; };
+        const basisQty = (basis) => basis === 'per_box' ? shipment().boxes : basis === 'per_kg' ? shipment().kg : 1;
+        const KIND_TAG = { freight: ['Freight', 'pill-dark'], package: ['Package', 'pill-coral'], charge: ['Charge', 'pill-amber'], material: ['Material', 'pill-green'] };
+
+        function renderCharges() {
+            charges.forEach(l => { if (l.basis) l.qty = basisQty(l.basis) || 1; });
+            $('chargeRows').innerHTML = charges.map((l, i) => `<tr data-ci="${i}">
+                <td class="p-2 pl-4 w-full"><div class="flex items-center gap-1.5"><span class="pill-tag ${KIND_TAG[l.kind][1]} flex-shrink-0">${KIND_TAG[l.kind][0]}</span>
+                    <input class="bg-transparent font-bold flex-1 min-w-[180px] focus:outline-none focus:bg-[#F8F8FA] rounded-lg px-1.5 py-1" data-f="description" value="${esc(l.description)}" title="${esc(l.description)}" aria-label="Description"></div></td>
+                <td class="p-2"><input class="field num !py-1.5 !px-2 !w-20" type="number" min="0" step="any" data-f="qty" value="${l.qty}" ${l.basis ? 'readonly title="Counted from the boxes"' : ''} aria-label="Quantity"></td>
+                <td class="p-2"><input class="field num !py-1.5 !px-2 !w-24" type="number" min="0" step="0.001" data-f="rate" value="${l.rate}" aria-label="Rate"></td>
+                <td class="p-2 text-right font-extrabold tabular-nums">${r3(l.qty * l.rate).toFixed(3)}</td>
+                <td class="p-2 pr-3"><button type="button" class="icon-btn !w-7 !h-7" data-cdel="${i}" aria-label="Remove">${I('x', 'w-3 h-3')}</button></td></tr>`).join('')
+                || '<tr><td colspan="5" class="p-5 text-center text-gray-400">No charges yet — they fill in from the rate card, or add them below.</td></tr>';
+            $('amount').value = charges.length ? totalCharges().toFixed(3) : '';
+            $('chargeTotal').textContent = `${cur()} ${totalCharges().toFixed(3)}`;
+            $('sumAmount').textContent = charges.length ? `${cur()} ${totalCharges().toFixed(3)}` : '—';
+        }
+        $('chargeRows').addEventListener('input', (e) => {
+            const tr = e.target.closest('[data-ci]'); if (!tr) return;
+            const l = charges[+tr.dataset.ci], f = e.target.dataset.f;
+            l[f] = f === 'description' ? e.target.value : (+e.target.value || 0);
+            if (l.auto && f === 'rate') l.auto = false;   // a typed freight price is kept
+            tr.children[3].textContent = r3(l.qty * l.rate).toFixed(3);
+            $('amount').value = totalCharges().toFixed(3); $('chargeTotal').textContent = `${cur()} ${totalCharges().toFixed(3)}`; $('sumAmount').textContent = `${cur()} ${totalCharges().toFixed(3)}`;
+        });
+        $('chargeRows').addEventListener('click', (e) => {
+            const d = e.target.closest('[data-cdel]'); if (!d) return;
+            const l = charges[+d.dataset.cdel];
+            if (l.kind === 'freight' && l.auto) { freightOff = true; $('quoteHint').innerHTML = 'Freight removed. <button type="button" class="font-bold text-[#D55C48]" onclick="useRateCard()">Add freight from the rate card</button>'; }
+            charges.splice(+d.dataset.cdel, 1); renderCharges();
+        });
+        window.useRateCard = () => { freightOff = false; quoteKey = ''; charges = charges.filter(l => !(l.kind === 'freight')); refresh(); };
+
+        async function loadOptions() {
+            const b = branch(), c = dest();
+            if (!b.branch_code) return;
+            const key = `${b.branch_code}|${c ? c.c : ''}`;
+            if (key === optionsKey) return;
+            optionsKey = key;
+            try { options = await api(`/api/accounts?view=booking_options&branch=${encodeURIComponent(b.branch_code)}&dest=${c ? c.c : ''}`); } catch (e) { return; }
+            $('addPackage').innerHTML = `<option value="">+ Package rate${options.packages.length ? '' : ' (none set)'}</option>` + options.packages.map(p => `<option value="${p.id}">${esc(p.name)} — ${cur()} ${(+p.price).toFixed(3)}${p.includes ? ' · ' + esc(p.includes) : ''}</option>`).join('');
+            $('addCharge').innerHTML = `<option value="">+ Extra charge${options.charges.length ? '' : ' (none set)'}</option>` + options.charges.map(x => `<option value="${x.id}">${esc(x.name)} — ${(+x.price).toFixed(3)} ${x.basis === 'per_box' ? 'per box' : x.basis === 'per_kg' ? 'per kg' : ''}</option>`).join('');
+            $('addMaterial').innerHTML = `<option value="">+ Packing material${options.materials.length ? '' : ' (none priced)'}</option>` + options.materials.map(m => `<option value="${m.product_id}">${esc(m.name)} — ${(+m.price).toFixed(3)}/${esc(m.unit)}${m.qty !== null ? ` · ${+m.qty} in stock` : ''}</option>`).join('');
+            const coms = options.commodities.length ? options.commodities : [{ code: 'GEN', name: 'General' }];
+            document.querySelectorAll('[data-box] select[data-k="commodity"]').forEach(s => { const v = s.value; s.innerHTML = commodityOptions(v); });
+            window._commodities = coms;
+        }
+        const commodityOptions = (v = 'GEN') => (window._commodities || [{ code: 'GEN', name: 'General' }]).map(c => `<option value="${esc(c.code)}" ${c.code === v ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+        $('addPackage').onchange = (e) => { const p = options.packages.find(x => String(x.id) === e.target.value); if (p) { charges.push({ kind: 'package', description: p.name + (p.includes ? ` (${p.includes})` : ''), qty: 1, rate: +p.price }); renderCharges(); } e.target.value = ''; };
+        $('addCharge').onchange = (e) => { const x = options.charges.find(y => String(y.id) === e.target.value); if (x) { charges.push({ kind: 'charge', description: x.name, qty: basisQty(x.basis) || 1, rate: +x.price, basis: x.basis === 'per_shipment' ? null : x.basis }); renderCharges(); } e.target.value = ''; };
+        $('addMaterial').onchange = (e) => { const m = options.materials.find(y => String(y.product_id) === e.target.value); if (m) { charges.push({ kind: 'material', description: m.name, qty: 1, rate: +m.price, product_id: m.product_id }); renderCharges(); } e.target.value = ''; };
+        $('addOther').onclick = () => { charges.push({ kind: 'charge', description: 'Other charge', qty: 1, rate: 0 }); renderCharges(); document.querySelector('#chargeRows tr:last-child [data-f="description"]').select(); };
+
+        function scheduleQuote() {
+            loadOptions();
+            const b = branch(), c = dest(), t = cargo(), bx = readBoxes();
+            if (!b.branch_code || !c || !t || !bx.some(x => x.weight > 0 || x.vol > 0)) { renderCharges(); return; }
+            const payload = bx.map(x => ({ weight: x.weight, l: x.l, w: x.w, h: x.h, commodity: x.commodity }));
+            const key = [b.branch_code, c.c, t.code, JSON.stringify(payload)].join('|');
+            renderCharges();
+            if (key === quoteKey || freightOff) return;
             clearTimeout(quoteTimer);
             quoteTimer = setTimeout(async () => {
                 quoteKey = key;
                 try {
-                    const r = await api(`/api/accounts?view=quote&branch=${encodeURIComponent(b.branch_code)}&dest=${c.c}&cargo=${encodeURIComponent(t.code)}&kg=${kg}&pieces=${boxes}&boxes=${boxes}`);
-                    if (amountTyped) return;
+                    const r = await api(`/api/accounts?view=quote&branch=${encodeURIComponent(b.branch_code)}&dest=${c.c}&cargo=${encodeURIComponent(t.code)}&boxes=${encodeURIComponent(JSON.stringify(payload))}`);
+                    if (freightOff) return;
+                    const kept = charges.filter(l => !(l.kind === 'freight' && l.auto));
                     if (r.quote) {
-                        $('amount').value = r.quote.amount.toFixed(3);
-                        $('quoteHint').textContent = `From rate card: ${r.quote.detail} = ${r.quote.currency} ${r.quote.amount.toFixed(3)}. You can change it.`;
-                        $('sumAmount').textContent = `${cur()} ${r.quote.amount.toFixed(3)}`;
-                    } else $('quoteHint').textContent = r.message || 'No rate card for this route — enter the charge by hand.';
-                } catch (e) { $('quoteHint').textContent = 'Could not load the rate card — enter the charge by hand.'; }
+                        charges = [...r.quote.lines.map(l => ({ kind: 'freight', description: l.description, qty: 1, rate: l.amount, auto: true })).filter(l => !kept.some(k => k.kind === 'freight' && !k.auto)), ...kept];
+                        $('quoteHint').textContent = `Freight from the rate card${r.missing?.length ? ` — no card for ${r.missing.join(', ')}: add it by hand` : ''}${r.quote.unmatched ? ` — ${r.quote.unmatched} box(es) need L × W × H for this rate` : ''}. You can change any price.`;
+                    } else {
+                        charges = kept;
+                        $('quoteHint').textContent = r.message || 'No rate card for this route — add the freight with “+ Other”.';
+                    }
+                    renderCharges();
+                } catch (e) { $('quoteHint').textContent = 'Could not load the rate card — add the freight with “+ Other”.'; }
             }, 350);
         }
 
@@ -282,7 +361,7 @@
             const vol = round2(boxes.reduce((s, b) => s + b.vol, 0));
             const charge = Math.max(actual, vol);
             $('totActual').textContent = `${actual} kg`; $('totVol').textContent = `${vol} kg`; $('totCharge').textContent = `${charge} kg`;
-            scheduleQuote(charge, boxes.length);
+            scheduleQuote();
             const c = dest(), t = cargo(), b = branch();
             $('pvD').textContent = destCode(c); $('pvB').textContent = b.booking_code || 'B'; $('pvC').textContent = t ? t.code : 'C';
             if (c) { rcvPh?.setCountry(c.c, { soft: true }); waPh?.setCountry(c.c, { soft: true }); }
@@ -290,7 +369,7 @@
             $('sumCargo').textContent = t ? `${t.code} · ${t.name}` : '—';
             $('sumBoxes').textContent = boxes.length;
             $('sumWeight').textContent = `${charge} kg`;
-            $('sumAmount').textContent = $('amount').value ? `${cur()} ${num($('amount').value).toFixed(3)}` : '—';
+            
             $('curLabel').textContent = `(${cur()})`;
             const bc = COUNTRIES.find(x => x.n === b.country);
             if (bc) senderPh?.setCountry(bc.c, { soft: true });
@@ -304,7 +383,8 @@
         var senderPh = UI.phoneField($('senderPhone'), { country: 'OM' });
         var rcvPh = UI.phoneField($('rcvPhone'), { country: 'IN' });
         var waPh = UI.phoneField($('rcvWhatsapp'), { country: 'IN' });
-        ['destCountry', 'rcvCity', 'amount', 'branch'].forEach(id => $(id).addEventListener('input', refresh));
+        ['destCountry', 'rcvCity', 'branch'].forEach(id => $(id).addEventListener('input', refresh));
+        $('branch').addEventListener('change', () => { optionsKey = ''; quoteKey = ''; refresh(); });
         // Destination country → receiver state → district / city (any value can also be typed)
         let rcvState = null;
         const cityBox = UI.combobox($('rcvCity'), {
@@ -382,7 +462,7 @@
 
             $('bookBtn').disabled = true; $('bookBtn').textContent = 'Booking…';
             try {
-                const out = await api('/api/bookings', { method: 'POST', body: { action: 'create', auto_ref: true, branch: b.branch_code, fields } });
+                const out = await api('/api/bookings', { method: 'POST', body: { action: 'create', auto_ref: true, branch: b.branch_code, fields, charge_lines: charges.map(({ kind, description, qty, rate, product_id }) => ({ kind, description, qty, rate, product_id })) } });
                 if (!out.awb) throw new Error('The booking was saved but no reference came back. Check Shipments before booking again.');
                 done = { ...fields, awb: out.awb, booked_at: new Date().toISOString(), cargo_name: t.name, shipper: fields.shipper, consignee: fields.consignee,
                          declared_value: fields.declared_value || null, amount: fields.amount || null };

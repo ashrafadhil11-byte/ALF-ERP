@@ -92,14 +92,14 @@
         const day = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
         const iso = (d) => d.toISOString().slice(0, 10);
         const METHOD_LABEL = { cash: 'Cash', card: 'Card', bank: 'Bank', payable: 'On account (payable)' };
-        const PRICE_LABEL = { per_kg: 'Per kg', vol_band: 'Weight band', per_package: 'Per package', per_box: 'Per box' };
+        const PRICE_LABEL = { per_kg: 'Per kg', per_box: 'Per box', box_size: 'By box size', per_cbm: 'Per CBM', vol_band: 'Weight band', per_package: 'Per package' };
         const STATUS_PILL = { paid: 'pill-green', partial: 'pill-amber', unpaid: 'pill-coral', void: 'pill-gray' };
         let ctx = { full: false, branches: [], my_branch: null }, tab = new URLSearchParams(location.search).get('tab') || 'overview';
         let cache = {};
 
         const TABS = [
             ['overview', 'Overview'], ['invoices', 'Invoices'], ['payments', 'Receipts'], ['expenses', 'Expenses'],
-            ['cash', 'Cash closing'], ['balances', 'Customer balances'], ['rates', 'Rate cards'],
+            ['cash', 'Cash closing'], ['balances', 'Customer balances'], ['pricing', 'Pricing'], ['materials', 'Packing materials'], ['purchases', 'Purchases'],
             ['reports', 'Reports', true], ['journal', 'Journal', true], ['chart', 'Chart of accounts', true]
         ];
 
@@ -145,7 +145,7 @@
                         <div class="flex items-center justify-between bg-white rounded-2xl p-3"><div><p class="sd-label">Owed by customers</p><p class="text-base font-extrabold money">${money(c.currency, c.receivable)}</p></div>
                         ${c.overdue ? `<span class="pill-tag pill-coral">${fmt(c.currency, c.overdue)} overdue</span>` : '<span class="pill-tag pill-green">Nothing overdue</span>'}</div>
                     </div>`).join('');
-                panel(toolbar('', `<button type="button" class="btn btn-coral" onclick="newInvoice()"><span data-icon="plus"></span>New invoice</button><button type="button" class="btn btn-light" onclick="newExpense()"><span data-icon="plus"></span>Expense</button>`)
+                panel(toolbar('', `<button type="button" class="btn btn-coral" onclick="newInvoice()"><span data-icon="plus"></span>New invoice</button><button type="button" class="btn btn-light" onclick="newSale()"><span data-icon="cash"></span>Counter sale</button><button type="button" class="btn btn-light" onclick="newExpense()"><span data-icon="plus"></span>Expense</button>`)
                     + `<div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">${cards || '<p class="col-span-full p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">No money movements in this period yet. Invoices are created automatically when a booking with a charge is saved.</p>'}</div>`);
             },
             async invoices() {
@@ -236,22 +236,95 @@
                     <td class="p-3 pr-4 text-right money font-extrabold" data-label="Balance">${money(c.currency, c.balance)}</td></tr>`).join('');
                 panel(table([['Customer'], ['Open invoices'], ['Overdue', 'right'], ['Balance', 'right']], rows, 'Nobody owes anything right now.'));
             },
-            async rates() {
-                const d = await api(`/api/accounts?view=rates&${qs()}`);
+            async pricing() {
+                const d = await api(`/api/accounts?view=pricing&${qs()}`);
                 cache.rates = d;
                 const destName = (c) => c === '*' ? 'Any destination' : (d.destinations.find(x => x.country_code === c)?.country_name || (window.ALF_COUNTRIES || []).find(x => x.c === c)?.n || c);
                 const cargoName = (c) => c === '*' ? 'Any cargo' : (d.cargo_types.find(x => x.code === c)?.name || c);
-                const price = (r) => r.method === 'vol_band' ? r.bands.map(b => `≤${b.upto}kg ${fmt(r.currency, b.price)}`).join(' · ') + (+r.extra_per_kg ? ` · +${fmt(r.currency, r.extra_per_kg)}/kg` : '') : `${money(r.currency, r.rate)} ${PRICE_LABEL[r.method].toLowerCase()}`;
-                const rows = d.cards.map(r => `<tr class="${r.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-rate="${r.id}">
-                    <td class="p-3 pl-4 font-extrabold" data-label="Branch">${esc(r.branch_code)}</td>
-                    <td class="p-3" data-label="Destination">${esc(destName(r.dest_country_code))}</td>
-                    <td class="p-3" data-label="Cargo">${esc(cargoName(r.cargo_type_code))}</td>
-                    <td class="p-3" data-label="Method"><span class="pill-tag pill-gray">${PRICE_LABEL[r.method]}</span></td>
-                    <td class="p-3" data-label="Price">${esc(price(r))}</td>
-                    <td class="p-3 pr-4 text-right money" data-label="Minimum">${+r.min_charge ? money(r.currency, r.min_charge) : '—'}</td></tr>`).join('');
-                panel(toolbar('<p class="text-xs text-gray-500">The booking form fills the charge from the most specific card: destination + cargo, then destination, then cargo, then “any”.</p>',
-                    `<button type="button" class="btn btn-coral" onclick="editRate()"><span data-icon="plus"></span>New rate card</button>`)
-                    + table([['Branch'], ['Destination'], ['Cargo'], ['Method'], ['Price'], ['Minimum', 'right']], rows, 'No rate cards yet — the charge is typed by hand until you add one.'));
+                const comName = (c) => !c || c === '*' ? 'General' : (d.commodities.find(x => x.code === c)?.name || c);
+                const price = (r) => r.method === 'vol_band' ? r.bands.map(b => `≤${b.upto}kg ${fmt(r.currency, b.price)}`).join(' · ') + (+r.extra_per_kg ? ` · +${fmt(r.currency, r.extra_per_kg)}/kg` : '')
+                    : r.method === 'box_size' ? (r.sizes || []).map(s => `${s.name} ${s.l}×${s.w}×${s.h} ${fmt(r.currency, s.price)}`).join(' · ')
+                    : `${money(r.currency, r.rate)} ${PRICE_LABEL[r.method].toLowerCase()}`;
+                const sub = cache.pricingSub || 'freight';
+                const subs = [['freight', 'Freight rate cards'], ['packages', 'Package rates'], ['charges', 'Extra charges'], ...(ctx.full ? [['commodities', 'Commodities']] : [])];
+                let body = '';
+                if (sub === 'freight') {
+                    const rows = d.cards.map(r => `<tr class="${r.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-rate="${r.id}">
+                        <td class="p-3 pl-4 font-extrabold" data-label="Branch">${esc(r.branch_code)}</td>
+                        <td class="p-3" data-label="Destination">${esc(destName(r.dest_country_code))}</td>
+                        <td class="p-3" data-label="Cargo">${esc(cargoName(r.cargo_type_code))}</td>
+                        <td class="p-3" data-label="Contents"><span class="pill-tag ${r.commodity && r.commodity !== '*' ? 'pill-amber' : 'pill-gray'}">${esc(comName(r.commodity))}</span></td>
+                        <td class="p-3" data-label="Method"><span class="pill-tag pill-gray">${PRICE_LABEL[r.method]}</span></td>
+                        <td class="p-3" data-label="Price">${esc(price(r))}</td>
+                        <td class="p-3 pr-4 text-right money" data-label="Minimum">${+r.min_charge ? money(r.currency, r.min_charge) : '—'}</td></tr>`).join('');
+                    body = toolbar('<p class="text-xs text-gray-500">Most specific card wins: destination + cargo + contents, then wider. Each contents type in a shipment is priced on its own card.</p>',
+                        `<button type="button" class="btn btn-coral" onclick="editRate()"><span data-icon="plus"></span>New rate card</button>`)
+                        + table([['Branch'], ['Destination'], ['Cargo'], ['Contents'], ['Method'], ['Price'], ['Minimum', 'right']], rows, 'No rate cards yet — freight is typed by hand until you add one.');
+                } else if (sub === 'packages') {
+                    const rows = d.packages.map(p => `<tr class="${p.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-pkg="${p.id}">
+                        <td class="p-3 pl-4 font-extrabold" data-label="Branch">${esc(p.branch_code)}</td><td class="p-3 font-bold" data-label="Package">${esc(p.name)}</td>
+                        <td class="p-3" data-label="Destination">${esc(destName(p.dest_country_code))}</td><td class="p-3 text-gray-500" data-label="Includes">${esc(p.includes || '—')}</td>
+                        <td class="p-3 pr-4 text-right money font-extrabold" data-label="Price">${fmt(ctx.branches.find(b => b.branch_code === p.branch_code)?.currency, p.price)}</td></tr>`).join('');
+                    body = toolbar('<p class="text-xs text-gray-500">All-in prices per item, e.g. a TV including wooden box, customs duty and freight. Picked in the booking form.</p>',
+                        `<button type="button" class="btn btn-coral" onclick="editPackage()"><span data-icon="plus"></span>New package rate</button>`)
+                        + table([['Branch'], ['Package'], ['Destination'], ['Includes'], ['Price', 'right']], rows, 'No package rates yet.');
+                } else if (sub === 'charges') {
+                    const BL = { per_shipment: 'Per shipment', per_box: 'Per box', per_kg: 'Per kg' };
+                    const rows = d.charges.map(c => `<tr class="${c.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-chg="${c.id}">
+                        <td class="p-3 pl-4 font-extrabold" data-label="Branch">${esc(c.branch_code)}</td><td class="p-3 font-bold" data-label="Charge">${esc(c.name)}</td>
+                        <td class="p-3" data-label="Counted"><span class="pill-tag pill-gray">${BL[c.basis]}</span></td>
+                        <td class="p-3 pr-4 text-right money font-extrabold" data-label="Price">${fmt(ctx.branches.find(b => b.branch_code === c.branch_code)?.currency, c.price)}</td></tr>`).join('');
+                    body = toolbar('<p class="text-xs text-gray-500">Handling, packing, documentation… ticked in the booking form. Per box / per kg follow the boxes entered.</p>',
+                        `<button type="button" class="btn btn-coral" onclick="editCharge()"><span data-icon="plus"></span>New charge</button>`)
+                        + table([['Branch'], ['Charge'], ['Counted'], ['Price', 'right']], rows, 'No extra charges yet.');
+                } else {
+                    const rows = d.commodities.map(c => `<tr class="${c.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-com="${esc(c.code)}">
+                        <td class="p-3 pl-4 font-mono font-extrabold" data-label="Code">${esc(c.code)}</td><td class="p-3" data-label="Name">${esc(c.name)}</td><td class="p-3 pr-4" data-label="">${c.active ? '' : 'Inactive'}</td></tr>`).join('');
+                    body = toolbar('<p class="text-xs text-gray-500">Contents types staff choose per box (General, Electronics…). Each can have its own rate card.</p>',
+                        `<button type="button" class="btn btn-coral" onclick="editCommodity()"><span data-icon="plus"></span>New type</button>`)
+                        + table([['Code'], ['Name'], ['']], rows, 'No commodities.');
+                }
+                panel(`<div class="flex flex-wrap gap-1 bg-[#F8F8FA] p-1 rounded-full w-fit mb-4">${subs.map(([k, l]) => `<button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-psub="${k}" aria-pressed="${k === sub}">${l}</button>`).join('')}</div>` + body);
+                document.querySelectorAll('[data-psub]').forEach(b => b.onclick = () => { cache.pricingSub = b.dataset.psub; show(); });
+            },
+            async materials() {
+                if (!curBranch()) return panel('<p class="p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">Choose a branch (top right) to see its packing-material stock.</p>');
+                const d = await api(`/api/accounts?view=materials&branch=${encodeURIComponent(curBranch())}`);
+                cache.materials = d;
+                const rows = d.products.map(p => {
+                    const low = p.track_stock && +p.qty <= +p.reorder_level;
+                    return `<tr class="${p.active ? '' : 'opacity-50'}">
+                    <td class="p-3 pl-4" data-label="Item"><span class="font-extrabold">${esc(p.name)}</span><span class="block text-[10px] text-gray-400 font-mono">${esc(p.sku)}</span></td>
+                    <td class="p-3" data-label="Type">${p.track_stock ? '<span class="pill-tag pill-gray">Counted</span>' : '<span class="pill-tag pill-amber" title="Expensed when bought; not counted">Consumable</span>'}</td>
+                    <td class="p-3 text-right" data-label="In stock">${p.track_stock ? `<span class="font-extrabold ${low ? 'text-[#D55C48]' : ''}">${+p.qty} ${esc(p.unit)}</span>${low ? '<span class="block text-[10px] text-[#D55C48] font-bold">Reorder</span>' : ''}` : '<span class="text-gray-300">—</span>'}</td>
+                    <td class="p-3 text-right money" data-label="Avg cost">${p.track_stock ? fmt(d.currency, p.avg_cost) : '—'}</td>
+                    <td class="p-3 text-right money font-extrabold" data-label="Sell price">${+p.sell_price ? fmt(d.currency, p.sell_price) : '<span class="text-gray-300">not sold</span>'}</td>
+                    <td class="p-3 pr-4 text-right whitespace-nowrap" data-label=""><button type="button" class="btn btn-light btn-sm" onclick="editProduct(${p.id})">Edit</button>${p.track_stock ? ` <button type="button" class="btn btn-light btn-sm" onclick="countStock(${p.id})">Count</button>` : ''}</td></tr>`;
+                }).join('');
+                const moves = d.moves.slice(0, 25).map(m => `<tr><td class="p-3 pl-4" data-label="When">${day(m.created_at)}</td><td class="p-3" data-label="Item">${esc(m.products?.name || '')}</td>
+                    <td class="p-3" data-label="Type"><span class="pill-tag pill-gray">${esc(m.kind)}</span></td><td class="p-3 text-right font-extrabold ${+m.qty < 0 ? 'text-[#D55C48]' : 'text-emerald-600'}" data-label="Qty">${+m.qty > 0 ? '+' : ''}${+m.qty}</td>
+                    <td class="p-3 pr-4" data-label="Ref">${esc(m.note || '')}</td></tr>`).join('');
+                panel(toolbar(`<p class="text-xs text-gray-500">Stock at <b>${esc(curBranch())}</b> (${esc(d.currency)}). Consumables (bubble roll, tape…) are expensed on purchase and not counted.</p>`,
+                    `<button type="button" class="btn btn-coral" onclick="newSale()"><span data-icon="cash"></span>Counter sale</button><button type="button" class="btn btn-light" onclick="newPurchase()"><span data-icon="plus"></span>Purchase</button><button type="button" class="btn btn-light" onclick="editProduct()"><span data-icon="plus"></span>New item</button>`)
+                    + table([['Item'], ['Type'], ['In stock', 'right'], ['Avg cost', 'right'], ['Sell price', 'right'], ['']], rows, 'No items yet — add cartons, bubble roll, tape…')
+                    + `<p class="sd-label mt-6 mb-2">Recent stock movements</p>` + table([['When'], ['Item'], ['Type'], ['Qty', 'right'], ['Reference']], moves, 'No movements yet.'));
+            },
+            async purchases() {
+                const d = await api(`/api/accounts?view=purchases&${qs()}`);
+                cache.suppliers = d.suppliers;
+                const sup = (id) => d.suppliers.find(s => s.id === id)?.name || '—';
+                const rows = d.purchases.map(p => `<tr class="${p.status === 'void' ? 'opacity-50' : ''}">
+                    <td class="p-3 pl-4 font-extrabold font-mono" data-label="No.">${esc(p.purchase_no)}${p.bill_ref ? `<span class="block text-[10px] text-gray-400 font-sans">Bill ${esc(p.bill_ref)}</span>` : ''}</td>
+                    <td class="p-3" data-label="Date">${day(p.purchase_date)}</td>
+                    <td class="p-3" data-label="Supplier">${esc(p.suppliers?.name || '—')}</td>
+                    <td class="p-3" data-label="Items">${p.lines.map(l => `${+l.qty} × ${esc(l.description)}`).join(', ')}</td>
+                    <td class="p-3 text-right money font-extrabold" data-label="Total">${money(p.currency, p.total)}</td>
+                    <td class="p-3" data-label="Status"><span class="pill-tag ${STATUS_PILL[p.status]}">${p.status === 'unpaid' ? 'owed' : p.status}</span>${+p.balance && p.status !== 'void' ? `<span class="block text-[10px] text-[#D55C48] font-bold">${fmt(p.currency, p.balance)} due</span>` : ''}</td>
+                    <td class="p-3 pr-4 text-right whitespace-nowrap" data-label="">${['unpaid', 'partial'].includes(p.status) ? `<button type="button" class="btn btn-dark btn-sm" onclick="paySupplier(${p.id}, '${esc(p.purchase_no)}', ${p.balance}, '${esc(p.currency)}')">Pay</button> ` : ''}${p.status !== 'void' ? `<button type="button" class="btn btn-light btn-sm" onclick="voidDoc('purchase_void', ${p.id}, '${esc(p.purchase_no)}')">Void</button>` : ''}</td></tr>`).join('');
+                const owed = d.owed.filter(o => o.balance > 0).map(o => `<span class="pill-tag pill-coral">${esc(sup(o.supplier_id))}: ${money(o.currency, o.balance)}</span>`).join(' ');
+                panel(toolbar(owed ? `<span class="text-xs font-bold text-gray-500 mr-1">Owed to suppliers:</span>${owed}` : '<span class="text-xs text-gray-500">Nothing owed to suppliers.</span>',
+                    `<button type="button" class="btn btn-coral" onclick="newPurchase()"><span data-icon="plus"></span>New purchase</button><button type="button" class="btn btn-light" onclick="editSupplier()"><span data-icon="plus"></span>Supplier</button>`)
+                    + table([['No.'], ['Date'], ['Supplier'], ['Items'], ['Total', 'right'], ['Status'], ['']], rows, 'No purchases in this period.'));
             },
             async reports() {
                 const d = await api(`/api/accounts?view=ledger&${qs()}`);
@@ -336,7 +409,8 @@
         const xb = () => ctx.full ? $('xBranch').value : ctx.my_branch;
 
         function lineRow(l = {}) {
-            return `<div class="grid grid-cols-[1fr_70px_110px_32px] gap-2" data-line>
+            return `<div class="grid grid-cols-[110px_1fr_70px_110px_32px] gap-2" data-line>
+                <select class="field text-xs" data-k="kind" aria-label="Type">${[['freight', 'Freight'], ['package', 'Package'], ['charge', 'Charge']].map(([k, n]) => `<option value="${k}" ${k === (l.kind || 'charge') ? 'selected' : ''}>${n}</option>`).join('')}</select>
                 <input class="field" placeholder="Description" value="${esc(l.description || '')}" data-k="description" aria-label="Description">
                 <input class="field" type="number" min="0" step="any" value="${l.qty || 1}" data-k="qty" aria-label="Qty">
                 <input class="field" type="number" min="0" step="0.001" value="${l.rate || ''}" placeholder="Rate" data-k="rate" aria-label="Rate">
@@ -388,7 +462,8 @@
         async function openInvoice(id) {
             const { invoice: i, payments, branch } = await api(`/api/accounts?view=invoice&id=${id}`);
             cache.invoice = { i, payments, branch };
-            const lines = i.lines.map(l => `<tr><td class="py-1.5">${esc(l.description)}</td><td class="text-right">${l.qty}</td><td class="text-right money">${fmt(i.currency, l.rate)}</td><td class="text-right money">${fmt(i.currency, l.amount)}</td></tr>`).join('');
+            const KT = { package: 'Package', charge: 'Charge', material: 'Material' };
+            const lines = i.lines.map(l => `<tr><td class="py-1.5">${KT[l.kind] ? `<span class="pill-tag pill-gray mr-1">${KT[l.kind]}</span>` : ''}${esc(l.description)}</td><td class="text-right">${l.qty}</td><td class="text-right money">${fmt(i.currency, l.rate)}</td><td class="text-right money">${fmt(i.currency, l.amount)}</td></tr>`).join('');
             const pays = payments.map(p => `<div class="flex justify-between text-xs ${p.void ? 'line-through opacity-50' : ''}"><span>${esc(p.receipt_no)} · ${METHOD_LABEL[p.method]} · ${day(p.received_at)}</span><span class="money">${fmt(i.currency, p.amount)}</span></div>`).join('');
             const open = ['unpaid', 'partial'].includes(i.status);
             form(i.invoice_no, `${day(i.issued_at)} · ${i.branch_code}${i.awb ? ' · ' + i.awb : ''}`,
@@ -439,35 +514,42 @@
         };
 
         window.editRate = (id) => {
-            const d = cache.rates, r = (id && d.cards.find(x => String(x.id) === String(id))) || { method: 'per_kg', dest_country_code: '*', cargo_type_code: '*', bands: [], active: true, branch_code: curBranch() };
+            const d = cache.rates, r = (id && d.cards.find(x => String(x.id) === String(id))) || { method: 'per_kg', dest_country_code: '*', cargo_type_code: '*', commodity: '*', bands: [], sizes: [], active: true, branch_code: curBranch() };
             const destOpts = `<option value="*">Any destination</option>` + d.destinations.map(x => `<option value="${x.country_code}" ${x.country_code === r.dest_country_code ? 'selected' : ''}>${esc(x.country_name)} (${x.country_code})</option>`).join('')
                 + ((window.ALF_COUNTRIES || []).filter(c => !d.destinations.some(x => x.country_code === c.c)).map(c => `<option value="${c.c}" ${c.c === r.dest_country_code ? 'selected' : ''}>${esc(c.n)} (${c.c})</option>`).join(''));
             const band = (b = {}) => `<div class="grid grid-cols-[1fr_1fr_32px] gap-2" data-band><input class="field" type="number" min="0" step="any" placeholder="Up to kg" value="${b.upto ?? ''}" data-k="upto" aria-label="Up to kg"><input class="field" type="number" min="0" step="0.001" placeholder="Price" value="${b.price ?? ''}" data-k="price" aria-label="Price"><button type="button" class="icon-btn self-center" onclick="this.closest('[data-band]').remove()" aria-label="Remove band">${UI.icon('x', 'w-3.5 h-3.5')}</button></div>`;
             window._bandHtml = band;
+            const sizeRow = (z = {}) => `<div class="grid grid-cols-[1fr_64px_64px_64px_90px_32px] gap-2" data-size>${[['name', 'Name', 'text'], ['l', 'L', 'number'], ['w', 'W', 'number'], ['h', 'H', 'number'], ['price', 'Price', 'number']].map(([k, ph, t]) => `<input class="field !px-2" type="${t}" min="0" step="any" placeholder="${ph}" value="${esc(z[k] ?? '')}" data-k="${k}" aria-label="${ph}">`).join('')}<button type="button" class="icon-btn self-center" onclick="this.closest('[data-size]').remove()" aria-label="Remove size">${UI.icon('x', 'w-3.5 h-3.5')}</button></div>`;
+            window._sizeHtml = sizeRow;
             form(id ? 'Edit rate card' : 'New rate card', 'Prices are in the branch currency.',
                 `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     ${ctx.full ? field('xBranch', 'Branch', `<select id="xBranch" class="field" ${id ? 'disabled' : ''}>${ctx.branches.map(b => `<option value="${b.branch_code}" ${b.branch_code === r.branch_code ? 'selected' : ''}>${esc(b.branch_name)} · ${esc(b.currency || '')}</option>`).join('')}</select>`) : ''}
                     ${field('rDest', 'Destination', `<select id="rDest" class="field">${destOpts}</select>`)}
                     ${field('rCargo', 'Cargo type', `<select id="rCargo" class="field"><option value="*">Any cargo</option>${d.cargo_types.map(c => `<option value="${c.code}" ${c.code === r.cargo_type_code ? 'selected' : ''}>${c.code} · ${esc(c.name)}</option>`).join('')}</select>`)}
-                    <div class="sm:col-span-2"><p class="ui-label">Pricing method</p><div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-[1.25rem]">${Object.entries(PRICE_LABEL).map(([k, v]) => `<button type="button" class="opt py-2 rounded-full text-[11px] font-extrabold" data-method="${k}" aria-pressed="${k === r.method}">${v}</button>`).join('')}</div></div>
+                    ${field('rCom', 'Contents', `<select id="rCom" class="field"><option value="*">General (any contents)</option>${d.commodities.filter(c => c.code !== 'GEN').map(c => `<option value="${c.code}" ${c.code === r.commodity ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>`)}
+                    <div class="sm:col-span-2"><p class="ui-label">Pricing method</p><div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-[1.25rem]">${Object.entries(PRICE_LABEL).map(([k, v]) => `<button type="button" class="opt py-2 rounded-full text-[11px] font-extrabold" data-method="${k}" aria-pressed="${k === r.method}">${v}</button>`).join('')}</div></div>
                     <div data-for="simple">${field('rRate', '<span id="rRateLabel">Rate</span>', `<input id="rRate" type="number" min="0" step="0.001" class="field" value="${r.rate ?? ''}">`)}</div>
                     ${field('rMin', 'Minimum charge', `<input id="rMin" type="number" min="0" step="0.001" class="field" value="${r.min_charge ?? ''}">`)}
                     <div data-for="vol_band" class="sm:col-span-2"><p class="ui-label">Weight bands (chargeable kg)</p><div id="rBands" class="space-y-2">${(r.bands.length ? r.bands : [{}]).map(band).join('')}</div>
                         <button type="button" class="btn btn-light btn-sm mt-2" onclick="document.getElementById('rBands').insertAdjacentHTML('beforeend', _bandHtml())"><span data-icon="plus"></span>Add band</button>
                         <div class="mt-3 max-w-xs">${field('rExtra', 'Each kg above the last band', `<input id="rExtra" type="number" min="0" step="0.001" class="field" value="${r.extra_per_kg ?? ''}">`)}</div></div>
+                    <div data-for="box_size" class="sm:col-span-2"><p class="ui-label">Box sizes (cm) — each box is charged at the smallest size it fits</p><div id="rSizes" class="space-y-2">${(r.sizes?.length ? r.sizes : [{}]).map(sizeRow).join('')}</div>
+                        <button type="button" class="btn btn-light btn-sm mt-2" onclick="document.getElementById('rSizes').insertAdjacentHTML('beforeend', _sizeHtml())"><span data-icon="plus"></span>Add size</button></div>
                     <div class="sm:col-span-2">${field('rNote', 'Note', `<input id="rNote" class="field" value="${esc(r.note || '')}">`)}</div>
                     <label class="flex items-center gap-2 text-xs font-bold"><input id="rActive" type="checkbox" class="w-4 h-4" ${r.active ? 'checked' : ''}>Active</label></div>`,
                 async () => {
                     const bands = [...document.querySelectorAll('#rBands [data-band]')].map(x => Object.fromEntries([...x.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
-                    await api('/api/accounts', { method: 'POST', body: { action: 'rate_save', id: id || null, branch_code: ctx.full ? $('xBranch').value : ctx.my_branch, dest_country_code: $('rDest').value, cargo_type_code: $('rCargo').value, method: cache.rateMethod, rate: $('rRate').value, min_charge: $('rMin').value, bands, extra_per_kg: $('rExtra').value, note: $('rNote').value, active: $('rActive').checked } });
+                    const sizes = [...document.querySelectorAll('#rSizes [data-size]')].map(x => Object.fromEntries([...x.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
+                    await api('/api/accounts', { method: 'POST', body: { action: 'rate_save', id: id || null, branch_code: ctx.full ? $('xBranch').value : ctx.my_branch, dest_country_code: $('rDest').value, cargo_type_code: $('rCargo').value, commodity: $('rCom').value, sizes, method: cache.rateMethod, rate: $('rRate').value, min_charge: $('rMin').value, bands, extra_per_kg: $('rExtra').value, note: $('rNote').value, active: $('rActive').checked } });
                     toast(true, 'Rate card saved.');
                 }, 'Save', id ? `<button type="button" class="btn btn-danger" onclick="deleteRate(${id})">Delete</button>` : '');
             const setMethod = (m) => {
                 cache.rateMethod = m;
                 document.querySelectorAll('[data-method]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.method === m)));
-                document.querySelector('[data-for=simple]').classList.toggle('hidden', m === 'vol_band');
+                document.querySelector('[data-for=simple]').classList.toggle('hidden', ['vol_band', 'box_size'].includes(m));
+                document.querySelector('[data-for=box_size]').classList.toggle('hidden', m !== 'box_size');
                 document.querySelector('[data-for=vol_band]').classList.toggle('hidden', m !== 'vol_band');
-                $('rRateLabel').textContent = { per_kg: 'Price per kg', per_package: 'Price per package', per_box: 'Price per box' }[m] || 'Rate';
+                $('rRateLabel').textContent = { per_kg: 'Price per kg', per_package: 'Price per package', per_box: 'Price per box', per_cbm: 'Price per CBM (m³)' }[m] || 'Rate';
             };
             document.querySelectorAll('[data-method]').forEach(b => b.onclick = () => setMethod(b.dataset.method));
             setMethod(r.method);
@@ -511,9 +593,149 @@
             };
         };
 
+
+        // ---------- pricing forms ----------
+        const destOptions = (d, sel) => `<option value="*">Any destination</option>` + d.destinations.map(x => `<option value="${x.country_code}" ${x.country_code === sel ? 'selected' : ''}>${esc(x.country_name)} (${x.country_code})</option>`).join('')
+            + (window.ALF_COUNTRIES || []).filter(c => !d.destinations.some(x => x.country_code === c.c)).map(c => `<option value="${c.c}" ${c.c === sel ? 'selected' : ''}>${esc(c.n)} (${c.c})</option>`).join('');
+        const branchPick = (id, sel, disabled) => ctx.full ? field(id, 'Branch', `<select id="${id}" class="field" ${disabled ? 'disabled' : ''}>${ctx.branches.map(b => `<option value="${b.branch_code}" ${b.branch_code === (sel || curBranch()) ? 'selected' : ''}>${esc(b.branch_name)} · ${esc(b.currency || '')}</option>`).join('')}</select>`) : '';
+        const pickedBranch = (id) => ctx.full ? $(id).value : ctx.my_branch;
+        const delBtn = (action, id) => `<button type="button" class="btn btn-danger" onclick="delPricing('${action}', ${id})">Delete</button>`;
+        window.delPricing = async (action, id) => {
+            if (!await UI.confirm({ title: 'Delete this?', message: 'Bookings already made keep their charges.', confirmText: 'Delete', danger: true })) return;
+            try { await api('/api/accounts', { method: 'POST', body: { action, id } }); closeModal('formModal'); toast(true, 'Deleted.'); show(); } catch (e) { toast(false, e.message); }
+        };
+        window.editPackage = (id) => {
+            const d = cache.rates, p = (id && d.packages.find(x => String(x.id) === String(id))) || { dest_country_code: '*', active: true };
+            form(id ? 'Edit package rate' : 'New package rate', 'An all-in price for one item.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${branchPick('pkBranch', p.branch_code, id)}
+                    ${field('pkDest', 'Destination', `<select id="pkDest" class="field">${destOptions(d, p.dest_country_code)}</select>`)}
+                    <div class="sm:col-span-2">${field('pkName', 'Item / package <span class="req">*</span>', `<input id="pkName" class="field" required value="${esc(p.name || '')}" placeholder='e.g. TV up to 55"'>`)}</div>
+                    ${field('pkPrice', 'Price <span class="req">*</span>', `<input id="pkPrice" type="number" min="0" step="0.001" class="field" required value="${p.price ?? ''}">`)}
+                    ${field('pkInc', 'Includes', `<input id="pkInc" class="field" value="${esc(p.includes || '')}" placeholder="Wooden box, customs duty, freight">`)}
+                    <label class="flex items-center gap-2 text-xs font-bold"><input id="pkActive" type="checkbox" class="w-4 h-4" ${p.active ? 'checked' : ''}>Active</label></div>`,
+                async () => { await api('/api/accounts', { method: 'POST', body: { action: 'package_save', id: id || null, branch_code: pickedBranch('pkBranch') || p.branch_code, dest_country_code: $('pkDest').value, name: $('pkName').value, price: $('pkPrice').value, includes: $('pkInc').value, active: $('pkActive').checked } }); toast(true, 'Package rate saved.'); },
+                'Save', id ? delBtn('package_delete', id) : '');
+        };
+        window.editCharge = (id) => {
+            const c = (id && cache.rates.charges.find(x => String(x.id) === String(id))) || { basis: 'per_shipment', active: true };
+            form(id ? 'Edit extra charge' : 'New extra charge', 'Offered in the booking form.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${branchPick('chBranch', c.branch_code, id)}
+                    ${field('chName', 'Name <span class="req">*</span>', `<input id="chName" class="field" required value="${esc(c.name || '')}" placeholder="Handling, Packing…">`)}
+                    ${field('chBasis', 'Counted', `<select id="chBasis" class="field">${[['per_shipment', 'Per shipment'], ['per_box', 'Per box'], ['per_kg', 'Per kg (chargeable)']].map(([k, l]) => `<option value="${k}" ${k === c.basis ? 'selected' : ''}>${l}</option>`).join('')}</select>`)}
+                    ${field('chPrice', 'Price <span class="req">*</span>', `<input id="chPrice" type="number" min="0" step="0.001" class="field" required value="${c.price ?? ''}">`)}
+                    <label class="flex items-center gap-2 text-xs font-bold"><input id="chActive" type="checkbox" class="w-4 h-4" ${c.active ? 'checked' : ''}>Active</label></div>`,
+                async () => { await api('/api/accounts', { method: 'POST', body: { action: 'charge_save', id: id || null, branch_code: pickedBranch('chBranch') || c.branch_code, name: $('chName').value, basis: $('chBasis').value, price: $('chPrice').value, active: $('chActive').checked } }); toast(true, 'Charge saved.'); },
+                'Save', id ? delBtn('charge_delete', id) : '');
+        };
+        window.editCommodity = (code) => {
+            const c = (code && cache.rates.commodities.find(x => x.code === code)) || { active: true };
+            form(code ? `Contents type ${code}` : 'New contents type', 'e.g. Electronics, Perfumes, Documents.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${field('coCode', 'Code', `<input id="coCode" class="field font-mono uppercase" required value="${esc(c.code || '')}" ${code ? 'readonly' : ''} placeholder="ELEC">`)}
+                    ${field('coName', 'Name', `<input id="coName" class="field" required value="${esc(c.name || '')}">`)}
+                    <label class="flex items-center gap-2 text-xs font-bold"><input id="coActive" type="checkbox" class="w-4 h-4" ${c.active ? 'checked' : ''}>Active</label></div>`,
+                async () => { await api('/api/accounts', { method: 'POST', body: { action: 'commodity_save', code: $('coCode').value, name: $('coName').value, active: $('coActive').checked } }); toast(true, 'Saved.'); });
+        };
+
+        // ---------- materials / purchases / counter sale ----------
+        window.editProduct = (id) => {
+            const p = (id && cache.materials?.products.find(x => x.id === id)) || { unit: 'pcs', track_stock: true, active: true };
+            form(id ? `Edit ${p.name}` : 'New packing material', `Price and reorder level are for ${curBranch()}.`,
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    ${field('prSku', 'Item code <span class="req">*</span>', `<input id="prSku" class="field font-mono uppercase" required value="${esc(p.sku || '')}" placeholder="CTN-L">`)}
+                    ${field('prName', 'Name <span class="req">*</span>', `<input id="prName" class="field" required value="${esc(p.name || '')}" placeholder="Carton box — large">`)}
+                    ${field('prUnit', 'Unit', `<select id="prUnit" class="field">${['pcs', 'roll', 'm', 'kg', 'box', 'set'].map(u => `<option ${u === p.unit ? 'selected' : ''}>${u}</option>`).join('')}</select>`)}
+                    ${field('prPrice', `Sell price (${cache.materials?.currency || ''})`, `<input id="prPrice" type="number" min="0" step="0.001" class="field" value="${+p.sell_price || ''}" placeholder="0 = not sold">`)}
+                    <div class="sm:col-span-2"><p class="ui-label">Stock</p><div class="grid grid-cols-2 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full">
+                        <button type="button" class="opt py-2 rounded-full text-[11px] font-extrabold" data-track="1" aria-pressed="${p.track_stock}">Counted (cartons…)</button>
+                        <button type="button" class="opt py-2 rounded-full text-[11px] font-extrabold" data-track="0" aria-pressed="${!p.track_stock}">Consumable (tape, bubble…)</button></div></div>
+                    <div data-for-track>${field('prReorder', 'Reorder when stock falls to', `<input id="prReorder" type="number" min="0" step="any" class="field" value="${+p.reorder_level || ''}">`)}</div>
+                    <label class="flex items-center gap-2 text-xs font-bold"><input id="prActive" type="checkbox" class="w-4 h-4" ${p.active ? 'checked' : ''}>Active</label></div>`,
+                async () => {
+                    await api('/api/accounts', { method: 'POST', body: { action: 'product_save', id: id || null, sku: $('prSku').value, name: $('prName').value, unit: $('prUnit').value, track_stock: cache.track, active: $('prActive').checked, branch_code: curBranch(), sell_price: $('prPrice').value, reorder_level: $('prReorder').value } });
+                    toast(true, 'Item saved.');
+                });
+            const setTrack = (v) => { cache.track = v; document.querySelectorAll('[data-track]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.track === '1') === v))); document.querySelector('[data-for-track]').classList.toggle('hidden', !v); };
+            document.querySelectorAll('[data-track]').forEach(b => b.onclick = () => setTrack(b.dataset.track === '1'));
+            setTrack(p.track_stock !== false);
+        };
+        window.countStock = (id) => {
+            const p = cache.materials.products.find(x => x.id === id);
+            form(`Count ${p.name}`, `System says ${+p.qty} ${p.unit}. The difference is booked at average cost.`,
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${field('scQty', `Counted (${esc(p.unit)})`, `<input id="scQty" type="number" min="0" step="any" class="field" required value="${+p.qty}">`)}${field('scNote', 'Note', '<input id="scNote" class="field" placeholder="Monthly count">')}</div>`,
+                async () => { const r = await api('/api/accounts', { method: 'POST', body: { action: 'stock_count', branch: curBranch(), product_id: id, counted: $('scQty').value, note: $('scNote').value } }); toast(true, +r.difference ? `Adjusted by ${+r.difference} ${p.unit}.` : 'No difference.'); }, 'Save count');
+        };
+        window.editSupplier = (id) => {
+            const s = (id && (cache.suppliers || []).find(x => x.id === id)) || { active: true };
+            form(id ? `Supplier ${s.name}` : 'New supplier', '',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${field('suName', 'Name <span class="req">*</span>', `<input id="suName" class="field" required value="${esc(s.name || '')}">`)}${field('suPhone', 'Phone', `<input id="suPhone" class="field" value="${esc(s.phone || '')}">`)}
+                    <div class="sm:col-span-2">${field('suNotes', 'Notes', `<input id="suNotes" class="field" value="${esc(s.notes || '')}">`)}</div></div>`,
+                async () => { await api('/api/accounts', { method: 'POST', body: { action: 'supplier_save', id: id || null, name: $('suName').value, phone: $('suPhone').value, notes: $('suNotes').value } }); toast(true, 'Supplier saved.'); });
+        };
+        async function ensureMaterials() {
+            if (!cache.materials || cache.materials.branch !== curBranch()) cache.materials = await api(`/api/accounts?view=materials&branch=${encodeURIComponent(curBranch())}`);
+            return cache.materials;
+        }
+        window.newPurchase = async () => {
+            if (!needBranch()) return;
+            const d = await ensureMaterials();
+            const opts = `<option value="">Other / not a stock item</option>` + d.products.filter(p => p.active).map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.unit)}${p.track_stock ? '' : ', consumable'})</option>`).join('');
+            const row = () => `<div class="grid grid-cols-[1fr_80px_100px_32px] gap-2" data-pl><select class="field text-xs" data-k="product_id" aria-label="Item">${opts}</select>
+                <input class="field" type="number" min="0" step="any" placeholder="Qty" data-k="qty" aria-label="Qty"><input class="field" type="number" min="0" step="0.0001" placeholder="Unit cost" data-k="unit_cost" aria-label="Unit cost">
+                <button type="button" class="icon-btn self-center" onclick="this.closest('[data-pl]').remove()" aria-label="Remove">${UI.icon('x', 'w-3.5 h-3.5')}</button>
+                <input class="field text-xs col-span-3 hidden" placeholder="Description" data-k="description" aria-label="Description"></div>`;
+            window._prow = row;
+            form('New purchase', `Into ${curBranch()} · ${d.currency}. Counted items go to stock; consumables and other items are expensed.`,
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    ${field('puSup', 'Supplier', `<select id="puSup" class="field"><option value="">— Cash purchase / no supplier —</option>${d.suppliers.filter(s => s.active).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select>`)}
+                    ${field('puPay', 'Paid by', '<select id="puPay" class="field"><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank</option><option value="credit">Supplier credit (pay later)</option></select>')}
+                    ${field('puBill', 'Supplier bill no.', '<input id="puBill" class="field">')}${field('puDate', 'Date', `<input id="puDate" type="date" class="field" value="${iso(new Date())}">`)}</div>
+                 <p class="sd-label mt-5 mb-2">Items</p><div id="puLines" class="space-y-2">${row()}</div>
+                 <div class="flex justify-between items-center mt-2"><button type="button" class="btn btn-light btn-sm" onclick="document.getElementById('puLines').insertAdjacentHTML('beforeend', _prow())"><span data-icon="plus"></span>Add item</button><span id="puTotal" class="text-sm font-extrabold"></span></div>`,
+                async () => {
+                    const lines = [...document.querySelectorAll('#puLines [data-pl]')].map(x => Object.fromEntries([...x.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
+                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'purchase', branch: curBranch(), supplier_id: $('puSup').value || null, pay_method: $('puPay').value, bill_ref: $('puBill').value, date: $('puDate').value, lines } });
+                    toast(true, `${r.purchase_no} saved — ${money(d.currency, r.total)}.`); cache.materials = null;
+                }, 'Save purchase');
+            $('puLines').addEventListener('change', (e) => { if (e.target.dataset.k === 'product_id') e.target.closest('[data-pl]').querySelector('[data-k=description]').classList.toggle('hidden', Boolean(e.target.value)); });
+            $('puLines').addEventListener('input', () => { let t = 0; document.querySelectorAll('#puLines [data-pl]').forEach(x => { t += (+x.querySelector('[data-k=qty]').value || 0) * (+x.querySelector('[data-k=unit_cost]').value || 0); }); $('puTotal').textContent = `Total ${money(d.currency, t)}`; });
+        };
+        window.paySupplier = (id, no, balance, cur) => {
+            form(`Pay supplier · ${no}`, `Owed ${money(cur, balance)}`,
+                `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">${field('spAmt', 'Amount', `<input id="spAmt" type="number" min="0" step="0.001" class="field" value="${balance}" required>`)}
+                    ${field('spMethod', 'Method', '<select id="spMethod" class="field"><option value="cash">Cash</option><option value="bank">Bank</option><option value="card">Card</option></select>')}${field('spRef', 'Reference', '<input id="spRef" class="field">')}</div>`,
+                async () => { const r = await api('/api/accounts', { method: 'POST', body: { action: 'supplier_pay', purchase_id: id, amount: $('spAmt').value, method: $('spMethod').value, reference: $('spRef').value } }); toast(true, `${r.payment_no}: ${money(cur, r.amount)} paid.`); }, 'Pay');
+        };
+        window.newSale = async () => {
+            if (!needBranch()) return;
+            const d = await ensureMaterials();
+            const sellable = d.products.filter(p => p.active && +p.sell_price > 0);
+            if (!sellable.length) return toast(false, 'Set a sell price on at least one packing material first.');
+            const row = () => `<div class="grid grid-cols-[1fr_80px_100px_32px] gap-2" data-sl><select class="field text-xs" data-k="product_id" aria-label="Item">${sellable.map(p => `<option value="${p.id}" data-price="${p.sell_price}">${esc(p.name)}${p.track_stock ? ` · ${+p.qty} ${esc(p.unit)} left` : ''}</option>`).join('')}</select>
+                <input class="field" type="number" min="0" step="any" value="1" data-k="qty" aria-label="Qty"><input class="field" type="number" min="0" step="0.001" value="${sellable[0].sell_price}" data-k="rate" aria-label="Price">
+                <button type="button" class="icon-btn self-center" onclick="this.closest('[data-sl]').remove()" aria-label="Remove">${UI.icon('x', 'w-3.5 h-3.5')}</button></div>`;
+            window._srow = row;
+            form('Counter sale', `Packing materials sold at ${curBranch()} (walk-in customers).`,
+                `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">${field('saName', 'Customer', '<input id="saName" class="field" placeholder="Walk-in">')}${field('saPhone', 'Phone', '<input id="saPhone" class="field">')}
+                    ${field('saPay', 'Payment', '<select id="saPay" class="field"><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank</option><option value="credit">Credit</option></select>')}</div>
+                 <p class="sd-label mt-5 mb-2">Items</p><div id="saLines" class="space-y-2">${row()}</div>
+                 <div class="flex justify-between items-center mt-2"><button type="button" class="btn btn-light btn-sm" onclick="document.getElementById('saLines').insertAdjacentHTML('beforeend', _srow())"><span data-icon="plus"></span>Add item</button><span id="saTotal" class="text-sm font-extrabold"></span></div>`,
+                async () => {
+                    const lines = [...document.querySelectorAll('#saLines [data-sl]')].map(x => ({ kind: 'material', product_id: x.querySelector('[data-k=product_id]').value, qty: x.querySelector('[data-k=qty]').value, rate: x.querySelector('[data-k=rate]').value }));
+                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'invoice', branch: curBranch(), customer_name: $('saName').value || 'Walk-in', customer_phone: $('saPhone').value, pay_method: $('saPay').value, lines } });
+                    toast(true, `${r.invoice_no} — ${money(r.currency, r.total)}${r.payment ? ' paid' : ''}.`); cache.materials = null;
+                    setTimeout(() => openInvoice(r.id), 300);
+                }, 'Complete sale');
+            const total = () => { let t = 0; document.querySelectorAll('#saLines [data-sl]').forEach(x => { t += (+x.querySelector('[data-k=qty]').value || 0) * (+x.querySelector('[data-k=rate]').value || 0); }); $('saTotal').textContent = `Total ${money(d.currency, t)}`; };
+            $('saLines').addEventListener('change', (e) => { if (e.target.dataset.k === 'product_id') { e.target.closest('[data-sl]').querySelector('[data-k=rate]').value = e.target.selectedOptions[0].dataset.price; total(); } });
+            $('saLines').addEventListener('input', total); total();
+        };
+
         document.addEventListener('click', (e) => {
             const inv = e.target.closest('[data-inv]'); if (inv) return openInvoice(inv.dataset.inv).catch(err => toast(false, err.message));
             const r = e.target.closest('[data-rate]'); if (r) return editRate(r.dataset.rate);
+            const pk = e.target.closest('[data-pkg]'); if (pk) return editPackage(pk.dataset.pkg);
+            const ch = e.target.closest('[data-chg]'); if (ch) return editCharge(ch.dataset.chg);
+            const co = e.target.closest('[data-com]'); if (co) return editCommodity(co.dataset.com);
             const a = e.target.closest('[data-acct]'); if (a) return editAccount(a.dataset.acct);
         });
 
