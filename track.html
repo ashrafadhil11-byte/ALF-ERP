@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#111827">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <title>Track Shipment - Al-Farha Cargo</title>
+    <meta name="description" content="Track your Al-Farha Cargo shipment and rate your delivery.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>tailwind.config = { theme: { extend: { fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] } } } };</script>
+    <style>
+        .star { color: #E5E7EB; transition: transform .1s, color .1s; }
+        .star.on { color: #F59E0B; }
+        .star:hover { transform: scale(1.12); }
+        .field { width: 100%; background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; padding: .85rem 1rem; font-size: .875rem; font-weight: 600; }
+        .field:focus { outline: none; border-color: transparent; box-shadow: 0 0 0 2px #E86D58; }
+    </style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen antialiased text-gray-900 font-sans p-3 sm:p-6">
+    <main class="max-w-2xl mx-auto bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.08)] p-5 sm:p-8">
+        <header class="flex items-center justify-between gap-3 pb-5 mb-6 border-b border-gray-100">
+            <img src="/assets/LOGO%20BG%20W.svg" alt="Al-Farha Cargo" class="h-10 w-auto object-contain">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">Shipment tracking</span>
+        </header>
+
+        <form id="f" class="flex gap-2 mb-6">
+            <label for="awb" class="sr-only">Tracking number</label>
+            <input id="awb" class="field font-mono uppercase" placeholder="Enter tracking / AWB number" autocomplete="off" required>
+            <button class="px-5 rounded-2xl bg-[#111827] text-white text-sm font-extrabold hover:bg-black">Track</button>
+        </form>
+
+        <p id="msg" class="hidden text-center text-sm text-gray-500 py-10"></p>
+
+        <section id="result" class="hidden space-y-6">
+            <div class="bg-[#111827] text-white rounded-[2rem] p-6">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-white/50">Tracking no.</p>
+                <p id="rAwb" class="font-mono text-xl font-extrabold"></p>
+                <p id="rStatus" class="mt-4 text-2xl font-extrabold text-[#F7A99A]"></p>
+                <p id="rRoute" class="text-xs text-white/60 mt-1"></p>
+                <ol id="steps" class="grid grid-cols-6 gap-1.5 mt-5" aria-label="Progress"></ol>
+                <div id="stepLabels" class="grid grid-cols-6 gap-1.5 mt-2 text-[9px] sm:text-[10px] font-bold text-white/50"></div>
+            </div>
+
+            <div id="review" class="hidden bg-[#FFF5F3] border border-[#FFE8E3] rounded-[2rem] p-6">
+                <h2 class="font-extrabold">How was your delivery?</h2>
+                <p class="text-xs text-gray-500 mt-1">Your rating helps us serve you better.</p>
+                <div id="stars" class="flex gap-1 my-4" role="radiogroup" aria-label="Rating"></div>
+                <label for="comment" class="sr-only">Comment</label>
+                <textarea id="comment" rows="3" maxlength="1000" class="field" placeholder="Anything you'd like to tell us? (optional)"></textarea>
+                <button id="sendReview" class="mt-3 w-full py-3 rounded-2xl bg-[#E86D58] hover:bg-[#D55C48] text-white text-sm font-extrabold disabled:opacity-50" disabled>Send review</button>
+            </div>
+            <div id="thanks" class="hidden bg-emerald-50 border border-emerald-100 rounded-[2rem] p-6 text-center">
+                <p class="font-extrabold text-emerald-700">Thank you for your review!</p>
+                <p id="thanksStars" class="text-amber-500 text-xl mt-1"></p>
+            </div>
+
+            <div>
+                <h2 class="text-xs font-extrabold uppercase tracking-wider text-gray-400 mb-3">History</h2>
+                <ol id="events" class="relative border-l-2 border-gray-100 ml-2 space-y-5"></ol>
+            </div>
+        </section>
+    </main>
+    <p class="text-center text-[10px] text-gray-400 mt-4">© Al-Farha Cargo</p>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const STEPS = [['Booked', 1], ['Received', 2], ['In transit', 3], ['Customs', 6], ['Out for delivery', 7], ['Delivered', 8]];
+        const params = new URLSearchParams(location.search);
+        const token = params.get('r') || '';
+        let rating = 0;
+
+        async function track(awb) {
+            $('msg').classList.add('hidden'); $('result').classList.add('hidden');
+            $('msg').textContent = 'Looking up your shipment…'; $('msg').classList.remove('hidden');
+            try {
+                const r = await fetch(`/api/track?awb=${encodeURIComponent(awb)}${token ? `&r=${encodeURIComponent(token)}` : ''}`);
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.error || 'Tracking is unavailable.');
+                show(d);
+            } catch (e) { $('msg').textContent = e.message; }
+        }
+
+        function show(d) {
+            $('msg').classList.add('hidden'); $('result').classList.remove('hidden');
+            $('rAwb').textContent = d.awb;
+            $('rStatus').textContent = d.status;
+            $('rRoute').textContent = [d.origin, d.destination].filter(Boolean).join('  →  ') + (d.pieces ? `  ·  ${d.pieces} piece${d.pieces > 1 ? 's' : ''}` : '');
+            const reached = STEPS.filter(([, s]) => d.stage >= s).length;
+            $('steps').innerHTML = STEPS.map((_, i) => `<li class="h-1.5 rounded-full ${i < reached ? 'bg-[#E86D58]' : 'bg-white/15'}"></li>`).join('');
+            $('stepLabels').innerHTML = STEPS.map(([l], i) => `<span class="${i < reached ? 'text-white' : ''}">${l}</span>`).join('');
+            $('events').innerHTML = d.events.map((e, i) => `<li class="pl-5 relative">
+                    <span class="absolute -left-[7px] top-1 w-3 h-3 rounded-full ${i === 0 ? 'bg-[#E86D58] ring-4 ring-[#FFE8E3]' : 'bg-gray-300'}"></span>
+                    <p class="text-sm font-extrabold">${esc(e.status)}</p>
+                    <p class="text-xs text-gray-400">${esc(new Date(e.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }))}${e.location ? ' · ' + esc(e.location) : ''}</p>
+                </li>`).join('') || '<li class="pl-5 text-xs text-gray-400">No updates yet.</li>';
+            $('review').classList.toggle('hidden', !d.review.can_review);
+            $('thanks').classList.toggle('hidden', !d.review.done || !token);
+            if (d.review.done) $('thanksStars').textContent = '★'.repeat(d.review.rating || 0);
+        }
+
+        $('stars').innerHTML = [1, 2, 3, 4, 5].map(n => `<button type="button" class="star text-4xl leading-none" data-n="${n}" role="radio" aria-checked="false" aria-label="${n} star${n > 1 ? 's' : ''}">★</button>`).join('');
+        $('stars').onclick = (e) => {
+            const b = e.target.closest('[data-n]'); if (!b) return;
+            rating = +b.dataset.n;
+            document.querySelectorAll('.star').forEach(s => { s.classList.toggle('on', +s.dataset.n <= rating); s.setAttribute('aria-checked', String(+s.dataset.n === rating)); });
+            $('sendReview').disabled = false;
+        };
+        $('sendReview').onclick = async () => {
+            $('sendReview').disabled = true; $('sendReview').textContent = 'Sending…';
+            try {
+                const r = await fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, rating, comment: $('comment').value }) });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.error);
+                $('review').classList.add('hidden'); $('thanks').classList.remove('hidden'); $('thanksStars').textContent = '★'.repeat(rating);
+            } catch (e) { alert(e.message || 'Could not send your review.'); $('sendReview').disabled = false; }
+            $('sendReview').textContent = 'Send review';
+        };
+
+        $('f').onsubmit = (e) => {
+            e.preventDefault();
+            const awb = $('awb').value.trim().toUpperCase().replace(/\s+/g, '');
+            if (!awb) return;
+            history.replaceState(null, '', `?awb=${encodeURIComponent(awb)}${token ? `&r=${token}` : ''}`);
+            track(awb);
+        };
+        if (params.get('awb')) { $('awb').value = params.get('awb'); track(params.get('awb')); }
+    </script>
+</body>
+</html>

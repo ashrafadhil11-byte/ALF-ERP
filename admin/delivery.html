@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
+    <title>Delivery & POD - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
+    </script>
+    <style>
+        .tab[aria-selected="true"] { background: #111827; color: #fff; }
+        .seg[aria-pressed="true"] { background: #111827; color: #fff; }
+        #sigPad { touch-action: none; }
+    </style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar pb-24 lg:pb-4">
+            <section class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center"><span data-icon="truck"></span></div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Delivery & POD</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Send out • proof of delivery • failed attempts • reviews</p>
+                    </div>
+                </div>
+                <button id="reloadBtn" type="button" class="btn btn-light self-start sm:self-auto"><span data-icon="refresh"></span>Refresh</button>
+            </section>
+
+            <!-- KPIs -->
+            <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                <div class="bg-[#F8F8FA] rounded-[1.5rem] p-4"><p class="text-[10px] font-extrabold text-gray-400 uppercase">Ready to deliver</p><p id="kReady" class="text-2xl font-extrabold mt-1">—</p></div>
+                <div class="bg-[#F8F8FA] rounded-[1.5rem] p-4"><p class="text-[10px] font-extrabold text-gray-400 uppercase">Out for delivery</p><p id="kOut" class="text-2xl font-extrabold mt-1">—</p></div>
+                <div class="bg-emerald-50 rounded-[1.5rem] p-4"><p class="text-[10px] font-extrabold text-emerald-600 uppercase">Delivered today</p><p id="kDone" class="text-2xl font-extrabold mt-1 text-emerald-700">—</p></div>
+                <div class="bg-[#FFF5F3] rounded-[1.5rem] p-4"><p class="text-[10px] font-extrabold text-[#D55C48] uppercase">Failed today</p><p id="kFail" class="text-2xl font-extrabold mt-1 text-[#D55C48]">—</p></div>
+            </section>
+
+            <div class="flex flex-wrap gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full w-fit mb-5" role="tablist">
+                <button type="button" class="tab px-4 py-2 rounded-full text-xs font-extrabold hidden" data-tab="mine" role="tab">My run <span data-count="mine"></span></button>
+                <button type="button" class="tab px-4 py-2 rounded-full text-xs font-extrabold" data-tab="ready" role="tab">To dispatch <span data-count="ready"></span></button>
+                <button type="button" class="tab px-4 py-2 rounded-full text-xs font-extrabold" data-tab="out" role="tab">Out for delivery <span data-count="out"></span></button>
+                <button type="button" class="tab px-4 py-2 rounded-full text-xs font-extrabold" data-tab="done" role="tab">Done today <span data-count="done"></span></button>
+            </div>
+
+            <!-- To dispatch -->
+            <section data-panel="ready" class="space-y-4">
+                <form id="pickForm" class="flex flex-col sm:flex-row gap-2">
+                    <input id="pickInput" class="field scan" placeholder="Scan AWB to select it, or search name / city" autocomplete="off" aria-label="Scan or search" data-camera="submit" data-camera-continuous>
+                    <button class="btn btn-dark">Select</button>
+                </form>
+                <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
+                    <table class="rtable w-full text-xs">
+                        <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                            <th class="p-3 pl-4 w-10"><input id="selAll" type="checkbox" class="w-4 h-4" aria-label="Select all"></th>
+                            <th class="p-3 font-extrabold">AWB</th><th class="p-3 font-extrabold">Receiver</th><th class="p-3 font-extrabold">Destination</th>
+                            <th class="p-3 font-extrabold">Status</th><th class="p-3 font-extrabold text-right pr-4">Action</th>
+                        </tr></thead>
+                        <tbody id="readyRows" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Out for delivery / My run -->
+            <section data-panel="out" class="hidden"><div id="outCards" class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4"></div></section>
+            <section data-panel="mine" class="hidden"><div id="mineCards" class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4"></div></section>
+
+            <!-- Done today -->
+            <section data-panel="done" class="hidden">
+                <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
+                    <table class="rtable w-full text-xs">
+                        <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                            <th class="p-3 pl-4 font-extrabold">AWB</th><th class="p-3 font-extrabold">Result</th><th class="p-3 font-extrabold">By</th>
+                            <th class="p-3 font-extrabold">Received by / reason</th><th class="p-3 font-extrabold">Time</th><th class="p-3 font-extrabold text-right pr-4">Review</th>
+                        </tr></thead>
+                        <tbody id="doneRows" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- Selection bar -->
+        <div id="selBar" class="hidden absolute left-4 right-4 bottom-20 lg:bottom-6 z-20 bg-[#111827] text-white rounded-full shadow-2xl p-2 pl-5 flex items-center justify-between gap-3">
+            <span class="text-xs font-extrabold"><span id="selCount">0</span> selected</span>
+            <div class="flex gap-2">
+                <button id="selClear" type="button" class="btn btn-sm !bg-white/10 !text-white">Clear</button>
+                <button id="selSend" type="button" class="btn btn-coral btn-sm"><span data-icon="truck"></span>Send out</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Dispatch -->
+    <div id="dispatchModal" class="ui-modal">
+        <form id="dispatchForm" class="panel max-w-lg">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 class="text-lg font-extrabold">Send out for delivery</h3><p id="dSub" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('dispatchModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div class="space-y-4 my-5 overflow-y-auto custom-scrollbar">
+                <div class="grid grid-cols-2 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full">
+                    <button type="button" class="seg py-2 rounded-full text-xs font-extrabold" data-mode="driver" aria-pressed="true">Our driver</button>
+                    <button type="button" class="seg py-2 rounded-full text-xs font-extrabold" data-mode="agent" aria-pressed="false">Delivery agent (3rd party)</button>
+                </div>
+                <div data-for="driver"><label class="ui-label" for="dDriver">Driver <span class="req">*</span></label><select id="dDriver" class="field"></select>
+                    <p class="text-[10px] text-gray-400 mt-1">Drivers are staff with “Driver” ticked in Staff & Users.</p></div>
+                <div data-for="agent" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="ui-label" for="dAgent">Agent <span class="req">*</span></label><input id="dAgent" class="field" placeholder="Select or type"></div>
+                    <div><label class="ui-label" for="dRef">Their tracking / docket no.</label><input id="dRef" class="field" placeholder="Optional"></div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('dispatchModal')">Cancel</button>
+                <button id="dispatchBtn" class="btn btn-dark"><span data-icon="truck"></span>Send out</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- POD / failed attempt -->
+    <div id="podModal" class="ui-modal">
+        <form id="podForm" class="panel max-w-lg">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 id="pTitle" class="text-lg font-extrabold">Proof of delivery</h3><p id="pSub" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('podModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div class="space-y-4 my-5 overflow-y-auto custom-scrollbar pr-1">
+                <div class="grid grid-cols-2 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full">
+                    <button type="button" class="seg py-2 rounded-full text-xs font-extrabold" data-outcome="delivered" aria-pressed="true">Delivered</button>
+                    <button type="button" class="seg py-2 rounded-full text-xs font-extrabold" data-outcome="failed" aria-pressed="false">Not delivered</button>
+                </div>
+                <div data-out="delivered" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="ui-label" for="pRcv">Received by <span class="req">*</span></label><input id="pRcv" class="field"></div>
+                    <div><label class="ui-label" for="pRel">Relation</label>
+                        <select id="pRel" class="field"><option>Self</option><option>Family member</option><option>Neighbour</option><option>Security / reception</option><option>Colleague</option><option>Other</option></select></div>
+                    <div class="sm:col-span-2"><label class="ui-label" for="pIdNo">Receiver ID no.</label><input id="pIdNo" class="field" placeholder="Optional"></div>
+                </div>
+                <div data-out="failed" class="hidden"><label class="ui-label" for="pReason">Reason <span class="req">*</span></label><select id="pReason" class="field"></select></div>
+                <div>
+                    <label class="ui-label">Photo <span id="photoHint" class="text-gray-400 font-medium normal-case">(parcel at the door / with receiver)</span></label>
+                    <label class="flex items-center gap-3 bg-[#F8F8FA] border border-dashed border-gray-300 rounded-2xl p-3 cursor-pointer hover:border-[#E86D58]">
+                        <img id="photoPrev" alt="" class="hidden w-16 h-16 object-cover rounded-xl">
+                        <span id="photoPh" class="w-16 h-16 rounded-xl bg-white flex items-center justify-center text-gray-400"><span data-icon="camera"></span></span>
+                        <span class="text-xs font-bold text-gray-600">Take or choose a photo</span>
+                        <input id="pPhoto" type="file" accept="image/*" capture="environment" class="sr-only">
+                    </label>
+                </div>
+                <div data-out="delivered">
+                    <div class="flex items-center justify-between"><label class="ui-label">Receiver signature</label><button type="button" id="sigClear" class="text-[11px] font-bold text-[#D55C48]">Clear</button></div>
+                    <canvas id="sigPad" class="w-full h-36 bg-[#F8F8FA] border border-gray-200 rounded-2xl" aria-label="Signature pad"></canvas>
+                </div>
+                <div><label class="ui-label" for="pNotes">Notes</label><textarea id="pNotes" rows="2" class="field" placeholder="Optional"></textarea></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('podModal')">Cancel</button>
+                <button id="podBtn" class="btn btn-dark"><span data-icon="checkCircle"></span>Save</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Review request -->
+    <div id="reviewModal" class="ui-modal">
+        <div class="panel max-w-md">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 class="text-lg font-extrabold">Ask for a review</h3><p id="rSub" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('reviewModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div class="my-5 space-y-3">
+                <p class="text-xs text-gray-500">Send the customer their tracking page with a 1–5 star review form.</p>
+                <input id="rLink" class="field text-xs" readonly aria-label="Review link">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <a id="rWa" target="_blank" rel="noopener" class="btn btn-coral"><span data-icon="message"></span>WhatsApp</a>
+                    <a id="rMail" class="btn btn-light"><span data-icon="link"></span>Email</a>
+                    <button id="rCopy" type="button" class="btn btn-light"><span data-icon="copy"></span>Copy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { api, esc, toast, openModal, closeModal } = UI;
+        const $ = (id) => document.getElementById(id);
+        const AGENTS = ['Aramex', 'SMSA Express', 'DHL Express', 'FedEx', 'UPS', 'India Post', 'Blue Dart', 'DTDC', 'Delhivery', 'Professional Couriers', 'Pakistan Post', 'TCS', 'Leopards', 'Sundarban Courier', 'Nepal Post', 'Naqel', 'Oman Post'];
+        let data = { ready: [], out: [], done: [], drivers: [], reasons: [], me: {} }, mine = [];
+        const sel = new Set();
+        let tab = 'ready', podCtx = null;
+
+        const fmtTime = (v) => v ? new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+        const pill = (code, label) => {
+            const cls = code === 'DELIVERY_FAILED' ? 'pill-coral' : code === 'READY_FOR_COLLECTION' ? 'pill-amber' : code === 'OUT_FOR_DELIVERY' ? 'pill-dark' : 'pill-gray';
+            return `<span class="pill-tag ${cls}">${esc(label || code)}</span>`;
+        };
+        const telLink = (p) => String(p || '').replace(/[^\d+]/g, '');
+        const waNum = (p) => String(p || '').replace(/\D/g, '');
+        const mapLink = (bk) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([bk.consignee_address, bk.dest_city, bk.dest_country].filter(Boolean).join(', '))}`;
+
+        async function load() {
+            try {
+                data = await api('/api/delivery');
+                if (data.me?.is_driver) mine = (await api('/api/delivery?mine=1')).out || [];
+            } catch (e) { toast(false, e.message); }
+            $('kReady').textContent = data.ready.length;
+            $('kOut').textContent = data.out.length;
+            $('kDone').textContent = data.done.filter(d => d.status === 'delivered').length;
+            $('kFail').textContent = data.done.filter(d => d.status === 'failed').length;
+            const counts = { ready: data.ready.length, out: data.out.length, done: data.done.length, mine: mine.length };
+            document.querySelectorAll('[data-count]').forEach(s => s.textContent = counts[s.dataset.count] ? `· ${counts[s.dataset.count]}` : '');
+            const mineTab = document.querySelector('[data-tab=mine]');
+            mineTab.classList.toggle('hidden', !data.me?.is_driver);
+            $('pReason').innerHTML = (data.reasons || []).map(r => `<option>${esc(r)}</option>`).join('');
+            $('dDriver').innerHTML = '<option value="">Choose driver…</option>' + data.drivers.map(d => `<option value="${esc(d.id)}">${esc(d.full_name)}${d.branch ? ` · ${esc(d.branch)}` : ''}</option>`).join('');
+            [...sel].forEach(a => { if (!data.ready.some(r => r.awb === a)) sel.delete(a); });
+            render();
+        }
+
+        function render() {
+            document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+            document.querySelectorAll('[data-panel]').forEach(p => p.classList.toggle('hidden', p.dataset.panel !== tab));
+            const q = $('pickInput').value.trim().toLowerCase();
+            const rows = data.ready.filter(b => !q || [b.awb, b.consignee, b.dest_city, b.dest_country].some(v => String(v || '').toLowerCase().includes(q)));
+            $('readyRows').innerHTML = rows.map(b => `<tr class="${sel.has(b.awb) ? 'bg-[#FFF5F3]' : ''}">
+                    <td class="p-3 pl-4" data-label=""><input type="checkbox" class="w-4 h-4" data-sel="${esc(b.awb)}" ${sel.has(b.awb) ? 'checked' : ''} aria-label="Select ${esc(b.awb)}"></td>
+                    <td class="p-3 font-extrabold font-mono" data-label="AWB">${esc(b.awb)}</td>
+                    <td class="p-3" data-label="Receiver"><span class="font-bold">${esc(b.consignee || '—')}</span><span class="block text-[10px] text-gray-400">${esc(b.consignee_phone || '')}</span></td>
+                    <td class="p-3" data-label="Destination">${esc([b.dest_city, b.dest_country].filter(Boolean).join(', ') || '—')}</td>
+                    <td class="p-3" data-label="Status">${pill(b.current_status_code, b.current_status)}</td>
+                    <td class="p-3 pr-4 text-right" data-label=""><button type="button" class="btn btn-light btn-sm" data-collect="${esc(b.awb)}"><span data-icon="userCheck"></span>Collected</button></td>
+                </tr>`).join('') || `<tr><td colspan="6" class="p-8 text-center text-gray-400">${q ? 'No match.' : 'Nothing waiting for delivery.'}</td></tr>`;
+            $('selAll').checked = rows.length > 0 && rows.every(b => sel.has(b.awb));
+            $('selCount').textContent = sel.size;
+            $('selBar').classList.toggle('hidden', !sel.size || tab !== 'ready');
+
+            $('outCards').innerHTML = cards(data.out) || empty('No shipments are out for delivery.');
+            $('mineCards').innerHTML = cards(mine) || empty('Nothing assigned to you right now.');
+
+            $('doneRows').innerHTML = data.done.map(d => `<tr>
+                    <td class="p-3 pl-4 font-extrabold font-mono" data-label="AWB">${esc(d.awb)}${d.attempt > 1 ? `<span class="block text-[10px] text-gray-400 font-sans">Attempt ${d.attempt}</span>` : ''}</td>
+                    <td class="p-3" data-label="Result">${d.status === 'delivered' ? '<span class="pill-tag pill-green">Delivered</span>' : '<span class="pill-tag pill-coral">Failed</span>'}</td>
+                    <td class="p-3" data-label="By">${esc(d.mode === 'collection' ? 'Collected at branch' : d.driver_name || d.agent_name || '—')}</td>
+                    <td class="p-3" data-label="Detail">${esc(d.received_by || d.failure_reason || '—')} ${d.pod_photo ? UI.icon('camera', 'w-3.5 h-3.5 inline text-gray-400') : ''} ${d.pod_signature ? UI.icon('edit', 'w-3.5 h-3.5 inline text-gray-400') : ''}</td>
+                    <td class="p-3" data-label="Time">${fmtTime(d.completed_at)}</td>
+                    <td class="p-3 pr-4 text-right" data-label="">${d.status === 'delivered' && d.bookings?.review_token ? `<button type="button" class="btn btn-light btn-sm" data-review="${esc(d.awb)}"><span data-icon="star"></span>${d.bookings?.reviewed_at ? 'Reviewed' : 'Send'}</button>` : ''}</td>
+                </tr>`).join('') || '<tr><td colspan="6" class="p-8 text-center text-gray-400">No deliveries completed today yet.</td></tr>';
+            UI.paintIcons();
+        }
+        const empty = (t) => `<p class="col-span-full p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">${t}</p>`;
+        function cards(list) {
+            return list.map(d => {
+                const bk = d.bookings || {};
+                const who = d.mode === 'agent' ? `${d.agent_name}${d.agent_ref ? ` · ${d.agent_ref}` : ''}` : d.driver_name;
+                const phone = bk.consignee_phone, wa = bk.receiver_whatsapp || phone;
+                return `<article class="bg-[#F8F8FA] rounded-[2rem] p-5 flex flex-col gap-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div><p class="font-extrabold font-mono text-sm">${esc(d.awb)}</p><p class="text-[10px] text-gray-400 font-bold">${d.attempt > 1 ? `Attempt ${d.attempt} · ` : ''}${esc(d.mode === 'agent' ? 'Agent' : 'Driver')}: ${esc(who || '—')}</p></div>
+                        <span class="pill-tag pill-dark">${bk.pieces || 1} pc · ${bk.weight || 0} kg</span>
+                    </div>
+                    <div class="bg-white rounded-2xl p-3 text-xs space-y-1.5">
+                        <p class="font-extrabold">${esc(bk.consignee || '—')}</p>
+                        <p class="text-gray-500">${esc([bk.consignee_address, bk.dest_city].filter(Boolean).join(', ') || '—')}</p>
+                        ${bk.amount && /credit|cod|cash on/i.test(bk.payment_method || '') ? `<p class="text-[#D55C48] font-bold">Collect: ${esc(bk.amount)}</p>` : ''}
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        ${phone ? `<a class="btn btn-light btn-sm" href="tel:${esc(telLink(phone))}"><span data-icon="phone"></span>Call</a>` : '<span></span>'}
+                        ${wa ? `<a class="btn btn-light btn-sm" target="_blank" rel="noopener" href="https://wa.me/${esc(waNum(wa))}"><span data-icon="message"></span>Chat</a>` : '<span></span>'}
+                        <a class="btn btn-light btn-sm" target="_blank" rel="noopener" href="${esc(mapLink(bk))}"><span data-icon="pin"></span>Map</a>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" class="btn btn-dark" data-pod="${esc(d.awb)}" data-outcome="delivered"><span data-icon="checkCircle"></span>Delivered</button>
+                        <button type="button" class="btn btn-light !text-[#D55C48]" data-pod="${esc(d.awb)}" data-outcome="failed"><span data-icon="alert"></span>Failed</button>
+                    </div>
+                </article>`;
+            }).join('');
+        }
+
+        // ---------- tabs / selection ----------
+        document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; render(); });
+        $('reloadBtn').onclick = load;
+        $('pickInput').addEventListener('input', render);
+        $('pickForm').onsubmit = (e) => {
+            e.preventDefault();
+            const v = UI.clean($('pickInput').value);
+            const hit = data.ready.find(b => b.awb === v);
+            if (hit) { sel.add(hit.awb); UI.beep?.(true); $('pickInput').value = ''; toast(true, `${hit.awb} selected`); }
+            else if (data.out.some(d => d.awb === v)) toast(false, `${v} is already out for delivery.`);
+            else if (v) toast(false, `${v} is not waiting for delivery here.`);
+            render();
+        };
+        $('readyRows').addEventListener('change', (e) => { const a = e.target.dataset.sel; if (!a) return; e.target.checked ? sel.add(a) : sel.delete(a); render(); });
+        $('selAll').onchange = (e) => {
+            const q = $('pickInput').value.trim().toLowerCase();
+            data.ready.filter(b => !q || [b.awb, b.consignee, b.dest_city].some(v => String(v || '').toLowerCase().includes(q))).forEach(b => e.target.checked ? sel.add(b.awb) : sel.delete(b.awb));
+            render();
+        };
+        $('selClear').onclick = () => { sel.clear(); render(); };
+
+        // ---------- dispatch ----------
+        let mode = 'driver';
+        const setMode = (m) => { mode = m; document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m))); document.querySelectorAll('[data-for]').forEach(x => x.classList.toggle('hidden', x.dataset.for !== m)); };
+        document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
+        UI.combobox($('dAgent'), { load: () => AGENTS.map(a => ({ value: a, label: a })), allowCustom: true });
+        $('selSend').onclick = () => {
+            $('dSub').textContent = `${sel.size} shipment${sel.size === 1 ? '' : 's'}: ${[...sel].slice(0, 6).join(', ')}${sel.size > 6 ? '…' : ''}`;
+            setMode(data.drivers.length ? 'driver' : 'agent');
+            openModal('dispatchModal');
+        };
+        $('dispatchForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const body = { action: 'dispatch', awbs: [...sel], mode, driver_id: $('dDriver').value, agent_name: $('dAgent').value.trim(), agent_ref: $('dRef').value.trim() };
+            if (mode === 'driver' && !body.driver_id) return toast(false, 'Choose the driver.');
+            if (mode === 'agent' && !body.agent_name) return toast(false, 'Enter the delivery agent.');
+            $('dispatchBtn').disabled = true;
+            try {
+                const r = await api('/api/delivery', { method: 'POST', body });
+                toast(true, `${r.dispatched} shipment${r.dispatched === 1 ? '' : 's'} out for delivery.`);
+                sel.clear(); closeModal('dispatchModal'); $('dRef').value = '';
+                tab = 'out'; await load();
+            } catch (err) { toast(false, err.message); }
+            $('dispatchBtn').disabled = false;
+        };
+
+        // ---------- POD ----------
+        let outcome = 'delivered', photoData = null;
+        const setOutcome = (o) => {
+            outcome = o;
+            document.querySelectorAll('[data-outcome]').forEach(b => { if (b.classList.contains('seg')) b.setAttribute('aria-pressed', String(b.dataset.outcome === o)); });
+            document.querySelectorAll('[data-out]').forEach(x => x.classList.toggle('hidden', x.dataset.out !== o));
+            $('pTitle').textContent = o === 'delivered' ? 'Proof of delivery' : 'Delivery attempt failed';
+            $('photoHint').textContent = o === 'delivered' ? '(parcel at the door / with receiver)' : '(door / location — optional)';
+            setTimeout(sizeSig, 0);
+        };
+        document.querySelectorAll('.seg[data-outcome]').forEach(b => b.onclick = () => setOutcome(b.dataset.outcome));
+
+        function openPod(awb, o, collection) {
+            const d = [...data.out, ...mine].find(x => x.awb === awb);
+            const bk = d?.bookings || data.ready.find(b => b.awb === awb) || {};
+            podCtx = { awb, consignee: bk.consignee, whatsapp: bk.receiver_whatsapp || bk.consignee_phone };
+            $('pSub').textContent = `${awb} · ${bk.consignee || ''}${collection ? ' · collected at branch' : ''}`;
+            $('pRcv').value = bk.consignee || ''; $('pRel').value = 'Self'; $('pIdNo').value = ''; $('pNotes').value = '';
+            photoData = null; $('pPhoto').value = ''; $('photoPrev').classList.add('hidden'); $('photoPh').classList.remove('hidden');
+            document.querySelectorAll('.seg[data-outcome]').forEach(b => b.disabled = Boolean(collection) && b.dataset.outcome === 'failed');
+            openModal('podModal');
+            setOutcome(o);
+            clearSig();
+        }
+        document.addEventListener('click', (e) => {
+            const p = e.target.closest('[data-pod]'); if (p) return openPod(p.dataset.pod, p.dataset.outcome);
+            const c = e.target.closest('[data-collect]'); if (c) return openPod(c.dataset.collect, 'delivered', true);
+            const r = e.target.closest('[data-review]'); if (r) { const d = data.done.find(x => x.awb === r.dataset.review); return openReview(d.awb, d.bookings.review_token, d.bookings.receiver_whatsapp || d.bookings.consignee_phone, d.bookings.consignee); }
+        });
+
+        // Photo → resized JPEG (max 1280px) so uploads stay small on mobile data
+        $('pPhoto').onchange = async () => {
+            const f = $('pPhoto').files[0]; if (!f) return;
+            try {
+                const img = await createImageBitmap(f);
+                const s = Math.min(1, 1280 / Math.max(img.width, img.height));
+                const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+                c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                photoData = c.toDataURL('image/jpeg', 0.72);
+                $('photoPrev').src = photoData; $('photoPrev').classList.remove('hidden'); $('photoPh').classList.add('hidden');
+            } catch (e) { toast(false, 'Could not read that photo.'); }
+        };
+
+        // Signature pad
+        const pad = $('sigPad'), ctx = pad.getContext('2d');
+        let drawing = false, signed = false;
+        function sizeSig() { const r = pad.getBoundingClientRect(); if (!r.width) return; const d = window.devicePixelRatio || 1; pad.width = r.width * d; pad.height = r.height * d; ctx.setTransform(d, 0, 0, d, 0, 0); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111827'; signed = false; }
+        function clearSig() { sizeSig(); }
+        const pt = (e) => { const r = pad.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+        pad.addEventListener('pointerdown', (e) => { drawing = true; pad.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(...pt(e)); });
+        pad.addEventListener('pointermove', (e) => { if (!drawing) return; ctx.lineTo(...pt(e)); ctx.stroke(); signed = true; });
+        ['pointerup', 'pointercancel'].forEach(t => pad.addEventListener(t, () => { drawing = false; }));
+        $('sigClear').onclick = clearSig;
+        window.addEventListener('resize', () => { if ($('podModal').classList.contains('open')) sizeSig(); });
+
+        const position = () => new Promise(res => {
+            if (!navigator.geolocation) return res({});
+            navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res({}), { timeout: 4000, maximumAge: 60000 });
+        });
+
+        $('podForm').onsubmit = async (e) => {
+            e.preventDefault();
+            if (outcome === 'delivered' && !$('pRcv').value.trim()) return toast(false, 'Enter who received the shipment.');
+            $('podBtn').disabled = true; $('podBtn').lastChild.textContent = 'Saving…';
+            try {
+                const geo = await position();
+                const body = {
+                    action: 'complete', awb: podCtx.awb, outcome,
+                    received_by: $('pRcv').value.trim(), relation: $('pRel').value, id_no: $('pIdNo').value.trim(),
+                    reason: $('pReason').value, notes: $('pNotes').value.trim(),
+                    photo: photoData, signature: outcome === 'delivered' && signed ? pad.toDataURL('image/png') : null, ...geo
+                };
+                const r = await api('/api/delivery', { method: 'POST', body });
+                closeModal('podModal');
+                toast(true, outcome === 'delivered' ? `${r.awb} delivered.` : `${r.awb}: attempt ${r.attempt} failed — it is back in “To dispatch”.`);
+                await load();
+                if (r.review_token) openReview(r.awb, r.review_token, podCtx.whatsapp, podCtx.consignee);
+            } catch (err) { toast(false, err.message); }
+            $('podBtn').disabled = false; $('podBtn').lastChild.textContent = 'Save';
+        };
+
+        // ---------- review request ----------
+        function openReview(awb, token, phone, name) {
+            const link = `${location.origin}/track.html?awb=${encodeURIComponent(awb)}&r=${token}`;
+            const msg = `Hello${name ? ' ' + name : ''}, your Al-Farha Cargo shipment ${awb} has been delivered. We'd love your feedback — please rate us here: ${link}`;
+            $('rSub').textContent = `${awb}${name ? ' · ' + name : ''}`;
+            $('rLink').value = link;
+            const n = waNum(phone);
+            $('rWa').href = `https://wa.me/${n}?text=${encodeURIComponent(msg)}`;
+            $('rWa').classList.toggle('hidden', !n);
+            $('rMail').href = `mailto:?subject=${encodeURIComponent(`How was your delivery? (${awb})`)}&body=${encodeURIComponent(msg)}`;
+            const sent = (channel) => api('/api/delivery', { method: 'POST', body: { action: 'review_sent', awb, channel } }).catch(() => {});
+            $('rWa').onclick = () => sent('whatsapp');
+            $('rMail').onclick = () => sent('email');
+            $('rCopy').onclick = async () => { try { await navigator.clipboard.writeText(link); toast(true, 'Link copied.'); sent('link'); } catch (e) { $('rLink').select(); } };
+            openModal('reviewModal');
+        }
+
+        load().then(() => { if (data.me?.is_driver && data.me.role === 'staff') { tab = 'mine'; render(); } });
+    </script>
+</body>
+</html>

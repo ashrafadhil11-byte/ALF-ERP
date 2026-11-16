@@ -45,7 +45,8 @@ Sri Lanka 7, Philippines 8, Egypt 9; code 1 free. Cargo: 1 Air, 2 Sea, 3 Road.
 
 ---
 
-## Phase B — Delivery + proof of delivery (POD)
+## Phase B — Delivery + proof of delivery (POD) ✅ built (Nov 2026)
+- Page: admin/delivery.html · API: /api/delivery · public page: /track.html (+ /api/track) · DB: 010_delivery_pod.sql
 - Out for delivery (own driver or 3rd-party agent), delivered, failed attempt with reason, re-attempt.
 - Driver phone screen (in the PWA): today's list, scan, receiver name, photo, signature.
 - POD files in Supabase Storage (private). POD visible in shipment details and printable.

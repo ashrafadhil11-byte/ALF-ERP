@@ -687,6 +687,9 @@
                     </div>
                 </div>` : ''}
 
+                <!-- Delivery attempts + POD (filled after load) -->
+                <div id="podBox"></div>
+
                 <!-- Timeline -->
                 <div class="sd-card mt-4">
                     <div class="flex items-center justify-between mb-4"><span class="sd-label">Tracking history</span><span class="pill-tag pill-gray">${events.length} events</span></div>
@@ -702,7 +705,60 @@
             try {
                 const { booking, events } = await api('/api/bookings?awb=' + encodeURIComponent(awb));
                 $('drawerBody').innerHTML = renderDetails(booking, events);
+                loadPod(booking);
             } catch (e) { $('drawerBody').innerHTML = `<p class="text-xs text-coral-600">${esc(e.message)}</p>`; }
+        };
+        // ---------- delivery attempts + proof of delivery ----------
+        let podCache = {};
+        async function loadPod(b) {
+            let list = [];
+            try { list = (await api('/api/delivery?awb=' + encodeURIComponent(b.awb))).deliveries || []; } catch (e) { return; }
+            if (!list.length && !b.reviewed_at) return;
+            podCache = { b, list };
+            const I = UI.icon;
+            const when = (v) => fmtDate(v, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+            const who = (d) => d.mode === 'collection' ? 'Collected at branch' : d.mode === 'agent' ? `${d.agent_name}${d.agent_ref ? ' · ' + d.agent_ref : ''}` : d.driver_name;
+            const rows = list.slice().reverse().map(d => `
+                <div class="border border-gray-100 rounded-2xl p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="text-xs font-extrabold">Attempt ${d.attempt} · ${esc(who(d) || '—')}</p>
+                        ${d.status === 'delivered' ? '<span class="pill-tag pill-green">Delivered</span>' : d.status === 'failed' ? '<span class="pill-tag pill-coral">Failed</span>' : '<span class="pill-tag pill-dark">Out for delivery</span>'}
+                    </div>
+                    <p class="text-[11px] text-gray-500 mt-1">${d.status === 'delivered'
+                        ? `Received by <b>${esc(d.received_by)}</b>${d.receiver_relation ? ' (' + esc(d.receiver_relation) + ')' : ''}${d.receiver_id_no ? ' · ID ' + esc(d.receiver_id_no) : ''}`
+                        : d.failure_reason ? esc(d.failure_reason) : 'Sent ' + when(d.assigned_at)}${d.completed_at ? ' · ' + when(d.completed_at) : ''}${d.completed_by_name ? ' · by ' + esc(d.completed_by_name) : ''}</p>
+                    ${d.notes ? `<p class="text-xs text-gray-600 mt-1.5 bg-[#F8F8FA] rounded-xl px-3 py-2">${esc(d.notes)}</p>` : ''}
+                    ${d.pod_photo_url || d.pod_signature_url ? `<div class="flex gap-2 mt-3">
+                        ${d.pod_photo_url ? `<a href="${esc(d.pod_photo_url)}" target="_blank" rel="noopener"><img src="${esc(d.pod_photo_url)}" alt="POD photo" class="w-24 h-24 object-cover rounded-xl border border-gray-100"></a>` : ''}
+                        ${d.pod_signature_url ? `<a href="${esc(d.pod_signature_url)}" target="_blank" rel="noopener"><img src="${esc(d.pod_signature_url)}" alt="Signature" class="w-40 h-24 object-contain rounded-xl border border-gray-100 bg-white"></a>` : ''}
+                    </div>` : ''}
+                    ${d.lat ? `<a class="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 mt-2 hover:text-coral-600" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${d.lat},${d.lng}">${I('pin', 'w-3 h-3')}Delivery location</a>` : ''}
+                </div>`).join('');
+            const stars = (n) => `<span class="text-amber-500 font-extrabold">${'★'.repeat(n)}</span><span class="text-gray-300 font-extrabold">${'★'.repeat(5 - n)}</span>`;
+            const review = b.reviewed_at ? `<div class="flex items-center gap-2 bg-amber-50 rounded-2xl px-4 py-3">${stars(b.review_rating || 0)}<span class="text-xs text-gray-600">${esc(b.review_comment || 'Customer review')}</span></div>` : '';
+            const box = document.getElementById('podBox'); if (!box) return;
+            box.innerHTML = `<div class="sd-card mt-4 space-y-3">
+                <div class="flex items-center justify-between"><span class="sd-label">Delivery & proof of delivery</span>
+                ${list.some(d => d.status === 'delivered') ? `<button type="button" class="btn btn-light btn-sm" onclick="printPod()">${I('clipboard', 'w-3.5 h-3.5')}Print POD</button>` : ''}</div>
+                ${review}${rows}</div>`;
+        }
+        window.printPod = () => {
+            const { b, list } = podCache; const d = list.filter(x => x.status === 'delivered').pop(); if (!d) return;
+            const w = window.open('', '_blank'); if (!w) return UI.toast(false, 'Allow pop-ups to print.');
+            const row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`;
+            w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>POD ${esc(b.awb)}</title>
+                <style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{font-size:20px;margin:0}table{border-collapse:collapse;width:100%;margin:16px 0}td{border:1px solid #ddd;padding:8px;font-size:13px;vertical-align:top}td:first-child{width:35%;font-weight:bold;background:#f7f7f7}img{max-width:46%;max-height:260px;border:1px solid #ddd;margin-right:12px}</style></head><body>
+                <h1>Proof of Delivery — Al-Farha Cargo</h1><p style="color:#666;font-size:12px">Printed ${esc(new Date().toLocaleString())}</p><table>
+                ${row('AWB', esc(b.awb))}${row('Shipper', esc(b.shipper || ''))}
+                ${row('Consignee', `${esc(b.consignee || '')}<br>${esc(b.consignee_address || [b.dest_city, b.dest_country].filter(Boolean).join(', '))}`)}
+                ${row('Pieces / weight', `${esc(b.pieces ?? '')} / ${esc(b.weight ?? '')} kg`)}
+                ${row('Delivered', `${esc(new Date(d.completed_at).toLocaleString())} — attempt ${d.attempt}`)}
+                ${row('Delivered by', esc(d.mode === 'collection' ? 'Collected at branch' : d.driver_name || d.agent_name || ''))}
+                ${row('Received by', `${esc(d.received_by || '')}${d.receiver_relation ? ' (' + esc(d.receiver_relation) + ')' : ''}${d.receiver_id_no ? '<br>ID: ' + esc(d.receiver_id_no) : ''}`)}
+                ${d.notes ? row('Notes', esc(d.notes)) : ''}</table>
+                <div>${d.pod_photo_url ? `<img src="${esc(d.pod_photo_url)}" alt="Photo">` : ''}${d.pod_signature_url ? `<img src="${esc(d.pod_signature_url)}" alt="Signature">` : ''}</div></body></html>`);
+            w.document.close();
+            w.onload = () => setTimeout(() => w.print(), 300);
         };
         window.closeDrawer = () => { $('drawer').classList.add('hidden'); $('drawer').classList.remove('flex'); document.body.style.overflow = ''; };
         document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });

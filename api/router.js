@@ -9,11 +9,13 @@ import countries from './_routes/countries.js';
 import createUser from './_routes/create-user.js';
 import dashboardLayout from './_routes/dashboard-layout.js';
 import dashboard from './_routes/dashboard.js';
+import delivery from './_routes/delivery.js';
 import integrations from './_routes/integrations.js';
 import login from './_routes/login.js';
 import postalLookup from './_routes/postal-lookup.js';
 import profile from './_routes/profile.js';
 import status from './_routes/status.js';
+import track from './_routes/track.js';
 import users from './_routes/users.js';
 
 const ROUTES = {
@@ -25,11 +27,13 @@ const ROUTES = {
     'create-user': createUser,
     'dashboard-layout': dashboardLayout,
     dashboard,
+    delivery,
     integrations,
     login,
     'postal-lookup': postalLookup,
     profile,
     status,
+    track,
     users
 };
 
