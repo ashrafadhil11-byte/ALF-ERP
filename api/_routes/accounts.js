@@ -6,7 +6,7 @@
 //
 // GET  ?view=quote&branch&dest&cargo&boxes=<JSON [{weight,l,w,h,commodity}]>   (or &kg&pieces for a simple quote)
 // GET  ?view=booking_options&branch&dest      packages, extra charges, materials, commodities (any role)
-// GET  ?view=pricing | materials | purchases                                       (branch manager +)
+// GET  ?view=pricing | materials | purchases | parties | costs | profit | inventory | requests | internal   (branch manager +)
 // GET  ?view=overview|invoices|invoice&id|payments|expenses|balances|cash&date|rates|ledger&from&to|journal   [&branch]
 // POST { action: invoice | payment | invoice_void | payment_void | expense | expense_void | cash_close
 //                | rate_save | rate_delete | account_save | journal, ... }
@@ -18,6 +18,8 @@ const FULL = ADMIN_ROLES;                         // super_admin, head_office
 const OPS = [...FULL, 'branch_manager'];
 const METHODS = ['per_kg', 'vol_band', 'per_package', 'per_box', 'per_cbm', 'box_size', 'doc_slab'];
 const BASES = ['per_shipment', 'per_box', 'per_kg'];
+const COST_TYPES = ['freight', 'customs', 'trucking', 'handling', 'other'];
+const SERVICES = ['air', 'sea', 'customs', 'delivery', 'trucking', 'packing', 'materials'];
 const str = (v, n = 120) => String(v ?? '').trim().slice(0, n);
 class UserError extends Error { constructor(m, s = 400) { super(m); this.status = s; } }
 
@@ -199,6 +201,56 @@ export default async function handler(req, res) {
                     products: products.map(pr => { const st = stock.find(x => x.product_id === pr.id) || {}; return { ...pr, sell_price: st.sell_price ?? 0, avg_cost: st.avg_cost ?? 0, qty: st.qty ?? 0, reorder_level: st.reorder_level ?? 0 }; })
                 });
             }
+            if (view === 'parties') {
+                const [parties, pur, cb] = await Promise.all([
+                    get('suppliers?select=*&order=name'),
+                    get(`purchases?status=in.(unpaid,partial)${bf(branch)}&select=supplier_id,currency,balance`),
+                    get(`cost_bills?status=in.(unpaid,partial)${bf(branch)}&select=supplier_id,currency,balance`)
+                ]);
+                const owed = {};
+                [...pur, ...cb].forEach(o => { if (!o.supplier_id) return; const k = `${o.supplier_id}|${o.currency}`; owed[k] = (owed[k] || 0) + +o.balance; });
+                return res.status(200).json({ parties: parties.map(x => ({ ...x, owed: Object.entries(owed).filter(([k]) => k.startsWith(x.id + '|')).map(([k, v]) => ({ currency: k.split('|')[1], balance: Math.round(v * 1000) / 1000 })) })) });
+            }
+            if (view === 'costs') {
+                const [bills, cons, parties] = await Promise.all([
+                    get(`cost_bills?bill_date=gte.${from}&bill_date=lte.${to}${bf(branch)}&select=*,suppliers(name),consolidations(mawb,kind),bookings(awb)&order=bill_date.desc,id.desc&limit=300`),
+                    get(`consolidations?select=id,mawb,kind,closed,origin_branch&order=closed.asc,created_at.desc&limit=100${full ? '' : `&origin_branch=eq.${enc(session.branch || '-')}`}`),
+                    get('suppliers?active=is.true&select=id,name,kind&order=name')
+                ]);
+                return res.status(200).json({ bills, consolidations: cons, parties });
+            }
+            if (view === 'profit') {
+                return res.status(200).json({ rows: await rpc('shipment_profit', { p_branch: branch, p_from: from, p_to: to }) });
+            }
+            if (view === 'inventory') {
+                const [stock, branches, moves] = await Promise.all([
+                    get(`branch_products?select=branch_code,product_id,qty,avg_cost,sell_price,reorder_level,products!inner(sku,name,unit,track_stock,active)&products.track_stock=is.true${bf(branch)}&order=branch_code`),
+                    get('branches?select=branch_code,branch_name,currency,branch_type&order=branch_name'),
+                    get(`stock_moves?created_at=gte.${from}&created_at=lt.${enc(nextDay(to))}${bf(branch)}${q.product ? `&product_id=eq.${enc(q.product)}` : ''}&select=*,products(name,unit)&order=created_at.desc&limit=300`)
+                ]);
+                return res.status(200).json({ stock, branches, moves });
+            }
+            if (view === 'requests') {
+                const mine = full ? '' : `&or=(branch_code.eq.${enc(session.branch || '-')},warehouse.eq.${enc(session.branch || '-')})`;
+                const [requests, warehouses] = await Promise.all([
+                    get(`stock_requests?select=*${mine}&order=requested_at.desc&limit=200`),
+                    get('branches?branch_type=eq.warehouse&select=branch_code,branch_name,currency')
+                ]);
+                const whStock = warehouses.length ? await get(`branch_products?branch_code=in.(${warehouses.map(w => enc(w.branch_code)).join(',')})&select=branch_code,product_id,qty,sell_price,products!inner(name,unit,track_stock,active)&products.track_stock=is.true&products.active=is.true`) : [];
+                return res.status(200).json({ requests, warehouses, warehouse_stock: whStock, my_branch: session.branch || null });
+            }
+            if (view === 'internal') {
+                const [reqs, sets] = await Promise.all([
+                    get('stock_requests?status=in.(dispatched,received)&select=warehouse,branch_code,currency,total'),
+                    get('internal_settlements?select=*&order=settled_at.desc&limit=100')
+                ]);
+                const bal = {};
+                reqs.forEach(r => { const k = `${r.warehouse}|${r.branch_code}|${r.currency}`; bal[k] = (bal[k] || 0) + +r.total; });
+                sets.forEach(x => { const k = `${x.warehouse}|${x.branch_code}|${x.currency}`; bal[k] = (bal[k] || 0) - +x.amount; });
+                const rows = Object.entries(bal).map(([k, v]) => { const [warehouse, branch_code, currency] = k.split('|'); return { warehouse, branch_code, currency, owed: Math.round(v * 1000) / 1000 }; })
+                    .filter(r => full || r.branch_code === session.branch || r.warehouse === session.branch);
+                return res.status(200).json({ balances: rows, settlements: sets.filter(x => full || x.branch_code === session.branch || x.warehouse === session.branch) });
+            }
             if (view === 'purchases') {
                 const [purchases, suppliers] = await Promise.all([
                     get(`purchases?purchase_date=gte.${from}&purchase_date=lte.${to}${bf(branch)}&select=*,suppliers(name)&order=purchase_date.desc,id.desc&limit=300`),
@@ -361,7 +413,15 @@ export default async function handler(req, res) {
             }
             case 'supplier_save': {
                 if (!str(b.name, 80)) throw new UserError('Enter the supplier name.');
-                const row = { name: str(b.name, 80), phone: str(b.phone, 30) || null, notes: str(b.notes, 200) || null, active: b.active !== false };
+                const row = {
+                    name: str(b.name, 80), phone: str(b.phone, 30) || null, notes: str(b.notes, 200) || null, active: b.active !== false,
+                    kind: ['supplier', 'agent', 'both'].includes(b.kind) ? b.kind : 'supplier',
+                    contact_person: str(b.contact_person, 80) || null, email: str(b.email, 120) || null, address: str(b.address, 300) || null,
+                    country: str(b.country, 60) || null, tax_no: str(b.tax_no, 40) || null,
+                    payment_terms_days: Math.max(0, Math.min(365, parseInt(b.payment_terms_days, 10) || 0)),
+                    services: (Array.isArray(b.services) ? b.services : []).filter(x => SERVICES.includes(x))
+                };
+                if (row.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(row.email)) throw new UserError('Check the email address.');
                 const r = await fetch(`${rest}/suppliers${b.id ? `?id=eq.${enc(b.id)}` : ''}`, { method: b.id ? 'PATCH' : 'POST', headers: { ...serviceHeaders(), Prefer: 'return=representation' }, body: JSON.stringify(row) });
                 const out = await r.json().catch(() => ({}));
                 if (!r.ok) throw new UserError(/duplicate|unique/i.test(out.message || '') ? 'A supplier with that name exists.' : 'Could not save.');
@@ -390,6 +450,57 @@ export default async function handler(req, res) {
             case 'stock_count': {
                 const br = await branchRow(writeBranch(b.branch));
                 const out = await rpc('stock_count', { p_branch: br.branch_code, p_product: Number(b.product_id), p_counted: num(b.counted), p_note: b.note || null, p_user_name: userName, p_currency: br.currency || 'OMR' });
+                return res.status(200).json({ success: true, ...out });
+            }
+            case 'cost_bill': {
+                const br = await branchRow(writeBranch(b.branch));
+                if (!COST_TYPES.includes(b.cost_type)) throw new UserError('Choose the cost type.');
+                let bookingId = null;
+                if (b.awb) {
+                    const bk = (await get(`bookings?awb=eq.${enc(String(b.awb).trim().toUpperCase())}&select=id,branch_code`))[0];
+                    if (!bk) throw new UserError(`Shipment ${b.awb} not found.`);
+                    bookingId = bk.id;
+                }
+                if (!b.consolidation_id && !bookingId) throw new UserError('Choose the MAWB / container, or enter the shipment AWB.');
+                const out = await rpc('cost_bill_create', {
+                    p_branch: br.branch_code, p_supplier_id: b.supplier_id ? Number(b.supplier_id) : null, p_consolidation_id: b.consolidation_id ? Number(b.consolidation_id) : null,
+                    p_booking_id: bookingId, p_type: b.cost_type, p_description: b.description || null, p_currency: br.currency || 'OMR', p_amount: num(b.amount),
+                    p_pay_method: b.pay_method === 'credit' ? 'credit' : (PAY_MAP[b.pay_method] || b.pay_method), p_bill_ref: b.bill_ref || null, p_date: b.date || null, p_user_name: userName
+                });
+                return res.status(200).json({ success: true, ...out });
+            }
+            case 'cost_bill_pay': {
+                own((await get(`cost_bills?id=eq.${enc(b.id)}&select=id,branch_code`))[0]);
+                const out = await rpc('cost_bill_pay', { p_id: Number(b.id), p_amount: num(b.amount), p_method: PAY_MAP[b.method] || b.method, p_reference: b.reference || null, p_user_name: userName });
+                return res.status(200).json({ success: true, ...out });
+            }
+            case 'cost_bill_void': {
+                own((await get(`cost_bills?id=eq.${enc(b.id)}&select=id,branch_code`))[0]);
+                await rpc('cost_bill_void', { p_id: Number(b.id), p_reason: b.reason || '', p_user_name: userName });
+                return res.status(200).json({ success: true });
+            }
+            case 'stock_request': {
+                const out = await rpc('stock_request_create', { p_branch: writeBranch(b.branch), p_warehouse: String(b.warehouse || '').toUpperCase(), p_lines: Array.isArray(b.lines) ? b.lines.slice(0, 60) : [], p_notes: b.notes || null, p_user_name: userName });
+                return res.status(200).json({ success: true, ...out });
+            }
+            case 'stock_dispatch':
+            case 'stock_receive':
+            case 'stock_reject':
+            case 'stock_cancel': {
+                const r = (await get(`stock_requests?id=eq.${enc(b.id)}&select=*`))[0];
+                if (!r) throw new UserError('Request not found.', 404);
+                const side = b.action === 'stock_dispatch' || b.action === 'stock_reject' ? r.warehouse : r.branch_code;
+                if (!full && session.branch !== side) throw new UserError(b.action === 'stock_dispatch' || b.action === 'stock_reject' ? 'Only the warehouse can do this.' : 'Only the requesting branch can do this.', 403);
+                if (b.action === 'stock_dispatch') return res.status(200).json({ success: true, ...(await rpc('stock_request_dispatch', { p_id: r.id, p_lines: Array.isArray(b.lines) ? b.lines : [], p_user_name: userName })) });
+                if (b.action === 'stock_receive') return res.status(200).json({ success: true, ...(await rpc('stock_request_receive', { p_id: r.id, p_user_name: userName })) });
+                if (r.status !== 'requested') throw new UserError(`${r.request_no} is already ${r.status}.`);
+                const patch = b.action === 'stock_reject' ? { status: 'rejected', reject_reason: str(b.reason, 200) || null } : { status: 'cancelled' };
+                await fetch(`${rest}/stock_requests?id=eq.${r.id}&status=eq.requested`, { method: 'PATCH', headers: serviceHeaders(), body: JSON.stringify(patch) });
+                return res.status(200).json({ success: true });
+            }
+            case 'internal_settle': {
+                need(FULL);
+                const out = await rpc('internal_settle', { p_warehouse: String(b.warehouse || '').toUpperCase(), p_branch: String(b.branch_code || '').toUpperCase(), p_amount: num(b.amount), p_method: PAY_MAP[b.method] || b.method, p_reference: b.reference || null, p_user_name: userName });
                 return res.status(200).json({ success: true, ...out });
             }
             case 'account_save': {

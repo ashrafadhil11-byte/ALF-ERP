@@ -1,7 +1,9 @@
 // File: api/_routes/consolidation.js — MAWB / bag consolidation.
 //   GET                     consolidations (open first, last 90 days) with piece / weight totals
 //   GET ?id=N               one consolidation with its shipments
-//   POST { action:'create', mawb, kind:'mawb'|'bag', carrier?, flight_no?, departure_date?, dest_country?, notes? }
+//   POST { action:'create', mawb, kind:'mawb'|'bag'|'container', carrier?, flight_no?, departure_date?, dest_country?, notes?,
+//          container_size?, seal_no?, vessel?, voyage?, bl_no?, eta? }   (container: mawb = container no.)
+//   POST { action:'add', id, awbs, pieces?: { AWB: [1,2] } }
 //   POST { action:'add', id, awbs }      POST { action:'remove', id, awb }
 //   POST { action:'close' | 'reopen', id }
 // Status for everything inside: the page sends the AWB list to /api/status (same rules as Scan & Update).
@@ -39,8 +41,21 @@ export default async function handler(req, res) {
             const q = req.query || {};
             if (q.id) {
                 const c = await load(q.id);
-                const items = await get(`consolidation_items?consolidation_id=eq.${enc(q.id)}&select=added_at,bookings(awb,shipper,consignee,dest_city,dest_country,pieces,weight,chargeable_weight,current_status,current_status_code,branch_code)&order=added_at.asc`);
-                return res.status(200).json({ consolidation: c, items: items.map(i => ({ ...i.bookings, added_at: i.added_at })) });
+                const [items, costs, alloc] = await Promise.all([
+                    get(`consolidation_items?consolidation_id=eq.${enc(q.id)}&select=added_at,pieces,bookings(awb,shipper,consignee,dest_city,dest_country,pieces,weight,chargeable_weight,current_status,current_status_code,branch_code,booking_pieces(piece_no,weight,l,w,h,status))&order=added_at.asc`),
+                    get(`cost_bills?consolidation_id=eq.${enc(q.id)}&status=neq.void&select=id,bill_no,cost_type,description,currency,amount,paid,status,bill_ref,bill_date,suppliers(name)&order=id`),
+                    fetch(`${rest}/rpc/consolidation_allocation`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify({ p_id: Number(q.id) }) }).then(r => r.ok ? r.json() : [])
+                ]);
+                return res.status(200).json({
+                    consolidation: c, costs, allocation: alloc,
+                    items: items.map(i => {
+                        const boxes = (i.bookings.booking_pieces || []).sort((a, b) => a.piece_no - b.piece_no);
+                        const inside = i.pieces ? boxes.filter(x => i.pieces.includes(x.piece_no)) : boxes;
+                        const { booking_pieces, ...bk } = i.bookings;
+                        return { ...bk, added_at: i.added_at, boxes_in: i.pieces, boxes_total: boxes.length, boxes,
+                                 in_pieces: inside.length, in_weight: Math.round(inside.reduce((s, x) => s + (+x.weight || 0), 0) * 100) / 100 };
+                    })
+                });
             }
             const since = new Date(Date.now() - 90 * 864e5).toISOString();
             const list = await get(`consolidations?or=(closed.is.false,created_at.gte.${enc(since)})${scope}&select=*,consolidation_items(bookings(pieces,weight))&order=closed.asc,created_at.desc&limit=100`);
@@ -59,7 +74,7 @@ export default async function handler(req, res) {
         if (b.action === 'create') {
             const mawb = String(b.mawb || '').trim().toUpperCase().replace(/\s+/g, '');
             if (!/^[A-Z0-9-]{3,30}$/.test(mawb)) throw new UserError('Enter the MAWB / bag number (letters, numbers, dashes).');
-            const kind = b.kind === 'bag' ? 'bag' : 'mawb';
+            const kind = ['bag', 'container'].includes(b.kind) ? b.kind : 'mawb';
             if (kind === 'mawb' && /^\d{3}-?\d{8}$/.test(mawb)) {
                 // IATA check digit: last digit = first 7 digits of the serial mod 7
                 const serial = mawb.replace('-', '').slice(3);
@@ -70,6 +85,8 @@ export default async function handler(req, res) {
                 body: JSON.stringify({
                     mawb, kind, origin_branch: branch, carrier: b.carrier || null, flight_no: b.flight_no || null,
                     departure_date: b.departure_date || null, dest_country: b.dest_country || null, notes: b.notes || null,
+                    container_size: kind === 'container' ? String(b.container_size || '').slice(0, 10) || null : null,
+                    seal_no: b.seal_no || null, vessel: b.vessel || null, voyage: b.voyage || null, bl_no: b.bl_no || null, eta: b.eta || null,
                     created_by: session.user.id, created_by_name: userName
                 })
             });
@@ -89,7 +106,8 @@ export default async function handler(req, res) {
                 const other = found.filter(f => f.branch_code !== session.branch).map(f => f.awb);
                 if (other.length) throw new UserError(`Held by another branch: ${other.slice(0, 10).join(', ')}`);
             }
-            const added = await rpc('consolidation_add', { p_id: c.id, p_awbs: awbs, p_user_id: session.user.id, p_user_name: userName, p_branch: branch });
+            const pieces = b.pieces && typeof b.pieces === 'object' ? Object.fromEntries(Object.entries(b.pieces).map(([k, v]) => [cleanOrderNo(k), (Array.isArray(v) ? v : []).map(Number).filter(Number.isInteger)])) : null;
+            const added = await rpc('consolidation_add', { p_id: c.id, p_awbs: awbs, p_user_id: session.user.id, p_user_name: userName, p_branch: branch, p_pieces: pieces });
             return res.status(200).json({ success: true, added });
         }
         if (b.action === 'remove') {

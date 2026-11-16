@@ -1,6 +1,7 @@
 // File: api/status.js — status list + status updates (single or bulk scan).
 //   GET                      active statuses for dropdowns
-//   POST { awbs:[...], code, location?, remark?, event_at?, fwd_agent?, fwd_docket?, to_branch?, mawb?, driver? }
+//   GET  ?boxes=AWB          the shipment's boxes (for ticking which ones the update is for)
+//   POST { awbs:[...], code, location?, remark?, event_at?, fwd_agent?, fwd_docket?, to_branch?, mawb?, driver?, pieces?: { AWB: [1,2] } }
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 import { cleanOrderNo } from '../_lib/booking-map.js';
 
@@ -14,6 +15,14 @@ export default async function handler(req, res) {
     const rest = `${process.env.SUPABASE_URL}/rest/v1`;
 
     try {
+        if (req.method === 'GET' && req.query?.boxes) {
+            const awb = cleanOrderNo(req.query.boxes);
+            const br = await fetch(`${rest}/bookings?or=(awb.eq.${enc(awb)},external_ref.eq.${enc(awb)})&select=id,awb,consignee,dest_city,dest_country,branch_code,current_status,pieces,booking_pieces(piece_no,weight,l,w,h,commodity,status)&limit=1`, { headers: serviceHeaders() });
+            const bk = (br.ok ? await br.json() : [])[0];
+            if (!bk || (!ADMIN_ROLES.includes(session.role) && bk.branch_code !== session.branch)) return res.status(404).json({ error: `Shipment ${awb} not found.` });
+            const { booking_pieces: boxes = [], ...booking } = bk;
+            return res.status(200).json({ booking, boxes: boxes.sort((a, b) => a.piece_no - b.piece_no) });
+        }
         if (req.method === 'GET') {
             const r = await fetch(`${rest}/statuses?active=is.true&select=code,label,customer_label,stage,sort,is_exception,requires&order=is_exception,stage,sort`, { headers: serviceHeaders() });
             return res.status(200).json({ statuses: r.ok ? await r.json() : [] });
@@ -58,11 +67,29 @@ export default async function handler(req, res) {
         ].filter(Boolean);
         const remark = [String(b.remark || '').trim(), ...extras].filter(Boolean).join(' • ') || null;
 
+        // Boxes: shipments where only some boxes were ticked go one by one; the rest in one batch.
+        const picked = b.pieces && typeof b.pieces === 'object' ? b.pieces : {};
+        const partial = awbs.filter(a => Array.isArray(picked[a]) && picked[a].length);
+        for (const a of partial) {
+            const rp = await fetch(`${rest}/rpc/set_status_pieces`, {
+                method: 'POST', headers: serviceHeaders(),
+                body: JSON.stringify({
+                    p_awb: a, p_pieces: picked[a].map(Number).filter(Number.isInteger), p_code: status.code, p_user_id: session.user.id,
+                    p_user_name: session.employee?.full_name || session.user.email, p_branch: session.branch || 'HQ',
+                    p_location: b.location ? String(b.location).trim() : null, p_remark: remark,
+                    p_allow_back: CAN_GO_BACK.includes(session.role), p_source: 'scan'
+                })
+            });
+            const po = await rp.json().catch(() => ({}));
+            if (!rp.ok) return res.status(400).json({ error: `${a}: ${po.message || 'Status update failed.'}` });
+        }
+        const whole = awbs.filter(a => !partial.includes(a));
+        if (!whole.length) return res.status(200).json({ success: true, updated: partial.length, status: status.label });
         const r = await fetch(`${rest}/rpc/set_status`, {
             method: 'POST',
             headers: serviceHeaders(),
             body: JSON.stringify({
-                p_awbs: awbs,
+                p_awbs: whole,
                 p_code: status.code,
                 p_user_id: session.user.id,
                 p_user_name: session.employee?.full_name || session.user.email,
@@ -84,7 +111,7 @@ export default async function handler(req, res) {
                 body: JSON.stringify({ fwd_agent: b.fwd_agent || null, fwd_docket: b.fwd_docket || null })
             });
         }
-        return res.status(200).json({ success: true, updated: out, status: status.label });
+        return res.status(200).json({ success: true, updated: out + partial.length, status: status.label });
     } catch (e) {
         if (e instanceof UserError) return res.status(400).json({ error: e.message });
         return res.status(500).json({ error: 'Internal server error.' });

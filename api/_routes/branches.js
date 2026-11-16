@@ -11,6 +11,7 @@ function financeFields(body = {}) {
         if (Number.isFinite(r) && r >= 0 && r <= 100) out.tax_rate = r;
     }
     if (body.isHub !== undefined) out.is_hub = Boolean(body.isHub);
+    if (body.branchType !== undefined) out.branch_type = body.branchType === 'warehouse' ? 'warehouse' : 'branch';
     return out;
 }
 
