@@ -121,7 +121,7 @@
             $('batchRows').innerHTML = batch.length ? batch.map((b, i) => `
                 <tr class="${b.error ? 'bg-[#FFF5F3]' : ''}">
                     <td class="cell-main p-3 pl-4 font-extrabold"><a class="hover:text-coral-500" href="shipments.html?awb=${encodeURIComponent(b.awb)}">${esc(b.awb)}</a></td>
-                    <td class="p-3 truncate max-w-[180px]" data-label="Consignee">${b.error ? `<span class="text-coral-600 font-bold">${esc(b.error)}</span>` : esc(b.consignee || '—')}</td>
+                    <td class="p-3 truncate max-w-[180px]" data-label="Consignee">${b.error ? `<span class="text-coral-600 font-bold">${esc(b.error)}</span>` : esc(b.consignee || '—')}${!b.error && b.total > 1 ? `<button type="button" onclick="reBoxes(${i})" class="block text-[10px] font-extrabold ${b.pieces ? 'text-[#D55C48]' : 'text-gray-400'} hover:underline">${b.pieces ? `Boxes ${b.pieces.join(', ')} of ${b.total}` : `All ${b.total} boxes`} · change</button>` : ''}</td>
                     <td class="p-3" data-label="Status">${b.error ? '' : `<span class="pill-tag pill-coral">${esc(b.status || 'New')}</span>`}</td>
                     <td class="cell-menu p-3"><button type="button" onclick="removeAt(${i})" aria-label="Remove ${esc(b.awb)}" class="icon-btn !w-7 !h-7 hover:!text-coral-600">${UI.icon('x', 'w-3.5 h-3.5')}</button></td>
                 </tr>`).join('') : '<tr><td colspan="4" class="cell-empty p-6 text-center text-gray-400">Scan AWBs to build the batch.</td></tr>';
@@ -141,11 +141,20 @@
                 const { booking } = await api('/api/bookings?awb=' + encodeURIComponent(awb));
                 item.awb = booking.awb; item.consignee = booking.consignee; item.status = booking.current_status;
                 beep(true);
+                // several boxes: all ticked, staff untick the ones not here
+                const pick = await UI.pickBoxes(item.awb, { title: 'Boxes for this update', confirmText: 'Add to batch' });
+                if (!pick) { batch.splice(batch.indexOf(item), 1); render(); return; }
+                item.pieces = pick.pieces; item.total = pick.total;
             } catch (e) { item.error = e.message; beep(false); }
             render();
         }
+        window.reBoxes = async (i) => {
+            const it = batch[i];
+            const pick = await UI.pickBoxes(it.awb, { title: 'Boxes for this update', confirmText: 'Save' });
+            if (pick) { it.pieces = pick.pieces; render(); }
+        };
         $('scanForm').onsubmit = (e) => { e.preventDefault(); const v = $('scanInput').value; $('scanInput').value = ''; $('scanInput').focus(); addAwb(v); };
-        $('pasteBtn').onclick = () => { $('pasteInput').value.split(/[\s,;]+/).forEach(addAwb); $('pasteInput').value = ''; };
+        $('pasteBtn').onclick = async () => { const list = $('pasteInput').value.split(/[\s,;]+/).filter(Boolean); $('pasteInput').value = ''; for (const a of list) await addAwb(a); };
 
         $('statusSelect').onchange = () => {
             const st = statuses.find(s => s.code === $('statusSelect').value);
@@ -158,8 +167,9 @@
 
         $('updateBtn').onclick = async () => {
             const awbs = batch.filter(b => !b.error).map(b => b.awb);
+            const pieces = Object.fromEntries(batch.filter(b => !b.error && b.pieces).map(b => [b.awb, b.pieces]));
             const st = statuses.find(s => s.code === $('statusSelect').value);
-            const body = { awbs, code: st.code, location: $('location').value, remark: $('remark').value,
+            const body = { awbs, pieces, code: st.code, location: $('location').value, remark: $('remark').value,
                 event_at: $('eventAt').value ? new Date($('eventAt').value).toISOString() : undefined };
             document.querySelectorAll('[data-extra]').forEach(el => body[el.dataset.extra] = el.value.trim());
             if (!await UI.confirm({ title: `Set ${awbs.length} shipment(s) to “${st.label}”?`, message: esc(awbs.slice(0, 12).join(', ')) + (awbs.length > 12 ? ` and ${awbs.length - 12} more` : ''), confirmText: 'Update' })) return;

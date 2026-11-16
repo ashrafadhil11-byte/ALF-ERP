@@ -99,7 +99,7 @@
 
         const TABS = [
             ['overview', 'Overview'], ['invoices', 'Invoices'], ['payments', 'Receipts'], ['expenses', 'Expenses'],
-            ['cash', 'Cash closing'], ['balances', 'Customer balances'], ['pricing', 'Pricing'], ['materials', 'Packing materials'], ['purchases', 'Purchases'],
+            ['cash', 'Cash closing'], ['balances', 'Customer balances'], ['pricing', 'Pricing'], ['costs', 'Cost center'], ['parties', 'Suppliers & agents'], ['materials', 'Packing materials'], ['inventory', 'Inventory'], ['purchases', 'Purchases'],
             ['reports', 'Reports', true], ['journal', 'Journal', true], ['chart', 'Chart of accounts', true]
         ];
 
@@ -325,8 +325,126 @@
                     <td class="p-3 pr-4 text-right whitespace-nowrap" data-label="">${['unpaid', 'partial'].includes(p.status) ? `<button type="button" class="btn btn-dark btn-sm" onclick="paySupplier(${p.id}, '${esc(p.purchase_no)}', ${p.balance}, '${esc(p.currency)}')">Pay</button> ` : ''}${p.status !== 'void' ? `<button type="button" class="btn btn-light btn-sm" onclick="voidDoc('purchase_void', ${p.id}, '${esc(p.purchase_no)}')">Void</button>` : ''}</td></tr>`).join('');
                 const owed = d.owed.filter(o => o.balance > 0).map(o => `<span class="pill-tag pill-coral">${esc(sup(o.supplier_id))}: ${money(o.currency, o.balance)}</span>`).join(' ');
                 panel(toolbar(owed ? `<span class="text-xs font-bold text-gray-500 mr-1">Owed to suppliers:</span>${owed}` : '<span class="text-xs text-gray-500">Nothing owed to suppliers.</span>',
-                    `<button type="button" class="btn btn-coral" onclick="newPurchase()"><span data-icon="plus"></span>New purchase</button><button type="button" class="btn btn-light" onclick="editSupplier()"><span data-icon="plus"></span>Supplier</button>`)
+                    `<button type="button" class="btn btn-coral" onclick="newPurchase()"><span data-icon="plus"></span>New purchase</button>`)
                     + table([['No.'], ['Date'], ['Supplier'], ['Items'], ['Total', 'right'], ['Status'], ['']], rows, 'No purchases in this period.'));
+            },
+            async parties() {
+                const d = await api(`/api/accounts?view=parties&${qs()}`);
+                cache.suppliers = d.parties;
+                const KL = { supplier: 'Supplier', agent: 'Agent', both: 'Supplier & agent' };
+                const kf = cache.partyKind || 'all';
+                const rows = d.parties.filter(p => kf === 'all' || p.kind === kf || p.kind === 'both').map(p => `<tr class="${p.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-party="${p.id}">
+                    <td class="p-3 pl-4" data-label="Name"><span class="font-extrabold">${esc(p.name)}</span>${p.contact_person ? `<span class="block text-[10px] text-gray-400">${esc(p.contact_person)}</span>` : ''}</td>
+                    <td class="p-3" data-label="Type"><span class="pill-tag ${p.kind === 'agent' ? 'pill-dark' : p.kind === 'both' ? 'pill-coral' : 'pill-gray'}">${KL[p.kind] || p.kind}</span></td>
+                    <td class="p-3" data-label="Services">${(p.services || []).map(s => `<span class="pill-tag pill-gray mr-1">${esc(s)}</span>`).join('') || '—'}</td>
+                    <td class="p-3" data-label="Contact">${esc(p.phone || '')}${p.email ? `<span class="block text-[10px] text-gray-400">${esc(p.email)}</span>` : ''}</td>
+                    <td class="p-3" data-label="Terms">${p.payment_terms_days ? `${p.payment_terms_days} days` : 'Cash'}</td>
+                    <td class="p-3 pr-4 text-right" data-label="We owe">${p.owed.length ? p.owed.map(o => `<span class="block font-extrabold text-[#D55C48] money">${money(o.currency, o.balance)}</span>`).join('') : '—'}</td></tr>`).join('');
+                panel(toolbar(`<div class="flex gap-1 bg-[#F8F8FA] p-1 rounded-full">${[['all', 'All'], ['agent', 'Agents'], ['supplier', 'Suppliers']].map(([k, l]) => `<button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-pkind="${k}" aria-pressed="${k === kf}">${l}</button>`).join('')}</div>`,
+                    `<button type="button" class="btn btn-coral" onclick="editSupplier()"><span data-icon="plus"></span>Add supplier / agent</button>`)
+                    + table([['Name'], ['Type'], ['Services'], ['Contact'], ['Terms'], ['We owe', 'right']], rows, 'No suppliers or agents yet.'));
+                document.querySelectorAll('[data-pkind]').forEach(b => b.onclick = () => { cache.partyKind = b.dataset.pkind; show(); });
+            },
+            async costs() {
+                const sub = cache.costSub || 'bills';
+                const head = `<div class="flex gap-1 bg-[#F8F8FA] p-1 rounded-full w-fit mb-4">${[['bills', 'Cost bills'], ['profit', 'Profit per shipment']].map(([k, l]) => `<button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-csub="${k}" aria-pressed="${k === sub}">${l}</button>`).join('')}</div>`;
+                if (sub === 'profit') {
+                    const d = await api(`/api/accounts?view=profit&${qs()}`);
+                    const tot = {};
+                    d.rows.forEach(r => { const t = (tot[r.currency] ||= { revenue: 0, cost: 0, profit: 0 }); t.revenue += +r.revenue; t.cost += +r.direct_cost + +r.allocated_cost; t.profit += +r.profit; });
+                    const rows = d.rows.map(r => `<tr><td class="p-3 pl-4 font-extrabold font-mono" data-label="AWB"><a href="shipments.html?awb=${encodeURIComponent(r.awb)}" class="hover:text-coral-600">${esc(r.awb)}</a><span class="block text-[10px] text-gray-400 font-sans">${day(r.booked_at)} · ${esc(r.branch_code)}</span></td>
+                        <td class="p-3" data-label="Consignee">${esc(r.consignee || '—')}<span class="block text-[10px] text-gray-400">${esc(r.dest_country || '')}</span></td>
+                        <td class="p-3 text-right money" data-label="Revenue">${fmt(r.currency, r.revenue)}</td>
+                        <td class="p-3 text-right money" data-label="Direct cost">${+r.direct_cost ? fmt(r.currency, r.direct_cost) : '—'}</td>
+                        <td class="p-3 text-right money" data-label="MAWB / container share">${+r.allocated_cost ? fmt(r.currency, r.allocated_cost) : '—'}</td>
+                        <td class="p-3 pr-4 text-right money font-extrabold ${+r.profit < 0 ? 'text-[#D55C48]' : 'text-emerald-600'}" data-label="Profit">${money(r.currency, r.profit)}</td></tr>`).join('');
+                    panel(head + `<div class="flex flex-wrap gap-2 mb-4">${Object.entries(tot).map(([c, t]) => `<div class="bg-[#F8F8FA] rounded-2xl px-4 py-3 text-xs"><span class="pill-tag pill-dark mr-2">${c}</span>Revenue <b class="money">${fmt(c, t.revenue)}</b> · Cost <b class="money">${fmt(c, t.cost)}</b> · Profit <b class="money ${t.profit < 0 ? 'text-[#D55C48]' : 'text-emerald-600'}">${fmt(c, t.profit)}</b> ${t.revenue ? `(${(t.profit / t.revenue * 100).toFixed(1)}%)` : ''}</div>`).join('')}</div>`
+                        + table([['Shipment'], ['Consignee'], ['Revenue', 'right'], ['Direct cost', 'right'], ['MAWB / container share', 'right'], ['Profit', 'right']], rows, 'No shipments with revenue or costs in this period.')
+                        + '<p class="text-[11px] text-gray-400 mt-3">Revenue = invoiced before tax. MAWB / container costs are split by chargeable weight (containers by CBM).</p>');
+                } else {
+                    const d = await api(`/api/accounts?view=costs&${qs()}`);
+                    cache.costs = d;
+                    const TL = { freight: 'Freight', customs: 'Customs', trucking: 'Trucking', handling: 'Handling', other: 'Other' };
+                    const rows = d.bills.map(b => `<tr class="${b.status === 'void' ? 'opacity-50' : ''}">
+                        <td class="p-3 pl-4 font-extrabold font-mono" data-label="No.">${esc(b.bill_no)}${b.bill_ref ? `<span class="block text-[10px] text-gray-400 font-sans">Bill ${esc(b.bill_ref)}</span>` : ''}</td>
+                        <td class="p-3" data-label="Date">${day(b.bill_date)}</td>
+                        <td class="p-3" data-label="For">${b.consolidations ? `<span class="pill-tag pill-dark">${esc(b.consolidations.kind)}</span> ${esc(b.consolidations.mawb)}` : `Shipment ${esc(b.bookings?.awb || '')}`}</td>
+                        <td class="p-3" data-label="Cost">${TL[b.cost_type]}${b.description ? `<span class="block text-[10px] text-gray-400">${esc(b.description)}</span>` : ''}</td>
+                        <td class="p-3" data-label="Agent / supplier">${esc(b.suppliers?.name || '—')}</td>
+                        <td class="p-3 text-right money font-extrabold" data-label="Amount">${money(b.currency, b.amount)}</td>
+                        <td class="p-3" data-label="Status"><span class="pill-tag ${STATUS_PILL[b.status]}">${b.status === 'unpaid' ? 'owed' : b.status}</span></td>
+                        <td class="p-3 pr-4 text-right whitespace-nowrap" data-label="">${['unpaid', 'partial'].includes(b.status) ? `<button type="button" class="btn btn-dark btn-sm" onclick="payCost(${b.id}, '${esc(b.bill_no)}', ${b.balance}, '${esc(b.currency)}')">Pay</button> ` : ''}${b.status !== 'void' ? `<button type="button" class="btn btn-light btn-sm" onclick="voidDoc('cost_bill_void', ${b.id}, '${esc(b.bill_no)}')">Void</button>` : ''}</td></tr>`).join('');
+                    panel(head + toolbar('<p class="text-xs text-gray-500">Agent and supplier bills for a MAWB / container (split across its shipments) or for one shipment.</p>', `<button type="button" class="btn btn-coral" onclick="newCost()"><span data-icon="plus"></span>Add cost</button>`)
+                        + table([['No.'], ['Date'], ['For'], ['Cost'], ['Agent / supplier'], ['Amount', 'right'], ['Status'], ['']], rows, 'No cost bills in this period.'));
+                }
+                document.querySelectorAll('[data-csub]').forEach(b => b.onclick = () => { cache.costSub = b.dataset.csub; show(); });
+            },
+            async inventory() {
+                const sub = cache.invSub || 'stock';
+                const subs = [['stock', 'Stock by location'], ['moves', 'Movements'], ['requests', 'Warehouse requests'], ['internal', 'Warehouse balances']];
+                const head = `<div class="flex flex-wrap gap-1 bg-[#F8F8FA] p-1 rounded-full w-fit mb-4">${subs.map(([k, l]) => `<button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-isub="${k}" aria-pressed="${k === sub}">${l}</button>`).join('')}</div>`;
+                if (sub === 'stock' || sub === 'moves') {
+                    const d = await api(`/api/accounts?view=inventory&${qs(cache.invProduct ? { product: cache.invProduct } : {})}`);
+                    const bn = (c) => d.branches.find(b => b.branch_code === c);
+                    if (sub === 'stock') {
+                        const byLoc = {};
+                        d.stock.forEach(s => (byLoc[s.branch_code] ||= []).push(s));
+                        const cards = Object.entries(byLoc).map(([code, items]) => {
+                            const b = bn(code) || {}, value = items.reduce((t, s) => t + (+s.qty) * (+s.avg_cost), 0), low = items.filter(s => +s.qty <= +s.reorder_level).length;
+                            return `<div class="bg-[#F8F8FA] rounded-[2rem] p-5">
+                                <div class="flex items-start justify-between gap-2 mb-3"><div><p class="font-extrabold">${esc(b.branch_name || code)}</p><p class="text-[10px] text-gray-400 font-bold">${esc(code)}${b.branch_type === 'warehouse' ? ' · Central warehouse' : ''}</p></div>
+                                <div class="text-right"><p class="sd-label">Stock value</p><p class="font-extrabold money">${money(b.currency, value)}</p>${low ? `<span class="pill-tag pill-coral">${low} to reorder</span>` : ''}</div></div>
+                                <table class="w-full text-xs bg-white rounded-2xl overflow-hidden"><thead><tr class="sd-label text-left"><th class="p-2 pl-3">Item</th><th class="p-2 text-right">Qty</th><th class="p-2 text-right">Avg cost</th><th class="p-2 pr-3 text-right">Value</th></tr></thead><tbody>
+                                ${items.map(s => `<tr class="border-t border-gray-100"><td class="p-2 pl-3 font-bold">${esc(s.products.name)}</td><td class="p-2 text-right font-extrabold ${+s.qty <= +s.reorder_level ? 'text-[#D55C48]' : ''}">${+s.qty} ${esc(s.products.unit)}</td><td class="p-2 text-right money">${fmt(b.currency, s.avg_cost)}</td><td class="p-2 pr-3 text-right money">${fmt(b.currency, s.qty * s.avg_cost)}</td></tr>`).join('')}</tbody></table></div>`;
+                        }).join('');
+                        panel(head + `<div class="grid grid-cols-1 xl:grid-cols-2 gap-4">${cards || '<p class="col-span-full p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">No counted stock yet.</p>'}</div>
+                            <p class="text-[11px] text-gray-400 mt-3">Counted items only (cartons…). Consumables are expensed when bought. Value = quantity × average cost.</p>`);
+                    } else {
+                        const KL = { purchase: 'Purchase', sale: 'Sale', adjust: 'Count', void: 'Void', transfer_out: 'To branch', transfer_in: 'From warehouse' };
+                        const prods = [...new Map(d.stock.map(s => [s.product_id, s.products.name])).entries()];
+                        const rows = d.moves.map(m => `<tr><td class="p-3 pl-4" data-label="When">${day(m.created_at)}<span class="block text-[10px] text-gray-400">${esc(m.created_by_name || '')}</span></td>
+                            <td class="p-3" data-label="Location">${esc(m.branch_code)}</td><td class="p-3 font-bold" data-label="Item">${esc(m.products?.name || '')}</td>
+                            <td class="p-3" data-label="Type"><span class="pill-tag pill-gray">${KL[m.kind] || m.kind}</span></td>
+                            <td class="p-3 text-right font-extrabold ${+m.qty < 0 ? 'text-[#D55C48]' : 'text-emerald-600'}" data-label="Qty">${+m.qty > 0 ? '+' : ''}${+m.qty} ${esc(m.products?.unit || '')}</td>
+                            <td class="p-3 text-right money" data-label="Unit cost">${(+m.unit_cost).toFixed(3)}</td><td class="p-3 pr-4" data-label="Reference">${esc(m.note || '')}</td></tr>`).join('');
+                        panel(head + toolbar(`<select id="mvProd" class="field !py-2 !w-60 text-xs"><option value="">All items</option>${prods.map(([id, n]) => `<option value="${id}" ${String(id) === String(cache.invProduct) ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>`, '')
+                            + table([['When'], ['Location'], ['Item'], ['Type'], ['Qty', 'right'], ['Unit cost', 'right'], ['Reference']], rows, 'No stock movements in this period.'));
+                        $('mvProd').onchange = () => { cache.invProduct = $('mvProd').value; show(); };
+                    }
+                } else if (sub === 'requests') {
+                    const d = await api('/api/accounts?view=requests');
+                    cache.requests = d;
+                    const SP = { requested: 'pill-amber', dispatched: 'pill-dark', received: 'pill-green', rejected: 'pill-coral', cancelled: 'pill-gray' };
+                    const me = ctx.full ? null : ctx.my_branch;
+                    const isWh = (code) => d.warehouses.some(w => w.branch_code === code);
+                    const rows = d.requests.map(r => {
+                        const iAmWh = ctx.full || me === r.warehouse, iAmBr = ctx.full || me === r.branch_code;
+                        const acts = [
+                            r.status === 'requested' && iAmWh ? `<button type="button" class="btn btn-dark btn-sm" onclick="dispatchReq(${r.id})">Send</button>` : '',
+                            r.status === 'requested' && iAmWh ? `<button type="button" class="btn btn-light btn-sm" onclick="reqAction('stock_reject', ${r.id}, '${esc(r.request_no)}')">Reject</button>` : '',
+                            r.status === 'requested' && iAmBr && !iAmWh ? `<button type="button" class="btn btn-light btn-sm" onclick="reqAction('stock_cancel', ${r.id}, '${esc(r.request_no)}')">Cancel</button>` : '',
+                            r.status === 'dispatched' && iAmBr ? `<button type="button" class="btn btn-coral btn-sm" onclick="reqAction('stock_receive', ${r.id}, '${esc(r.request_no)}')">Receive</button>` : ''
+                        ].join(' ');
+                        return `<tr><td class="p-3 pl-4 font-extrabold font-mono" data-label="Request">${esc(r.request_no)}<span class="block text-[10px] text-gray-400 font-sans">${day(r.requested_at)} · ${esc(r.requested_by || '')}</span></td>
+                            <td class="p-3" data-label="From → to">${esc(r.warehouse)} → <b>${esc(r.branch_code)}</b></td>
+                            <td class="p-3" data-label="Items">${r.lines.map(l => `${l.qty_sent != null ? `${+l.qty_sent}/${+l.qty_requested}` : +l.qty_requested} × ${esc(l.name)}`).join(', ')}${r.notes ? `<span class="block text-[10px] text-gray-400">${esc(r.notes)}</span>` : ''}${r.reject_reason ? `<span class="block text-[10px] text-[#D55C48]">${esc(r.reject_reason)}</span>` : ''}</td>
+                            <td class="p-3 text-right money font-extrabold" data-label="Value">${+r.total ? money(r.currency, r.total) : '—'}</td>
+                            <td class="p-3" data-label="Status"><span class="pill-tag ${SP[r.status]}">${r.status}</span></td>
+                            <td class="p-3 pr-4 text-right whitespace-nowrap" data-label="">${acts}</td></tr>`;
+                    }).join('');
+                    panel(head + toolbar(d.warehouses.length ? '<p class="text-xs text-gray-500">Branches request counted items; the warehouse sends them at its price for branches and the branch owes the warehouse until head office settles.</p>' : '<p class="text-xs text-[#D55C48] font-bold">No central warehouse yet — set a branch’s type to “Central warehouse” in Branch Network.</p>',
+                        d.warehouses.length && (ctx.full || !isWh(ctx.my_branch)) ? `<button type="button" class="btn btn-coral" onclick="newRequest()"><span data-icon="plus"></span>Request stock</button>` : '')
+                        + table([['Request'], ['From → to'], ['Items'], ['Value', 'right'], ['Status'], ['']], rows, 'No requests yet.'));
+                } else {
+                    const d = await api('/api/accounts?view=internal');
+                    cache.internal = d;
+                    const rows = d.balances.map(b => `<tr><td class="p-3 pl-4 font-extrabold" data-label="Branch">${esc(b.branch_code)}</td><td class="p-3" data-label="Owes">${esc(b.warehouse)}</td>
+                        <td class="p-3 text-right money font-extrabold ${b.owed > 0 ? 'text-[#D55C48]' : ''}" data-label="Balance">${money(b.currency, b.owed)}</td>
+                        <td class="p-3 pr-4 text-right" data-label="">${ctx.full && b.owed > 0 ? `<button type="button" class="btn btn-dark btn-sm" onclick="settle('${esc(b.warehouse)}', '${esc(b.branch_code)}', ${b.owed}, '${esc(b.currency)}')">Settle</button>` : ''}</td></tr>`).join('');
+                    const hist = d.settlements.map(x => `<tr><td class="p-3 pl-4" data-label="Date">${day(x.settled_at)}</td><td class="p-3" data-label="Branch → warehouse">${esc(x.branch_code)} → ${esc(x.warehouse)}</td><td class="p-3" data-label="Method">${METHOD_LABEL[x.method]}${x.reference ? ' · ' + esc(x.reference) : ''}</td><td class="p-3 pr-4 text-right money font-extrabold" data-label="Amount">${money(x.currency, x.amount)}</td></tr>`).join('');
+                    panel(head + table([['Branch'], ['Owes'], ['Balance', 'right'], ['']], rows, 'No internal balances.') + '<p class="sd-label mt-6 mb-2">Settlements</p>' + table([['Date'], ['Branch → warehouse'], ['Method'], ['Amount', 'right']], hist, 'No settlements yet.'));
+                }
+                document.querySelectorAll('[data-isub]').forEach(b => b.onclick = () => { cache.invSub = b.dataset.isub; show(); });
             },
             async reports() {
                 const d = await api(`/api/accounts?view=ledger&${qs()}`);
@@ -677,13 +795,6 @@
                 `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${field('scQty', `Counted (${esc(p.unit)})`, `<input id="scQty" type="number" min="0" step="any" class="field" required value="${+p.qty}">`)}${field('scNote', 'Note', '<input id="scNote" class="field" placeholder="Monthly count">')}</div>`,
                 async () => { const r = await api('/api/accounts', { method: 'POST', body: { action: 'stock_count', branch: curBranch(), product_id: id, counted: $('scQty').value, note: $('scNote').value } }); toast(true, +r.difference ? `Adjusted by ${+r.difference} ${p.unit}.` : 'No difference.'); }, 'Save count');
         };
-        window.editSupplier = (id) => {
-            const s = (id && (cache.suppliers || []).find(x => x.id === id)) || { active: true };
-            form(id ? `Supplier ${s.name}` : 'New supplier', '',
-                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${field('suName', 'Name <span class="req">*</span>', `<input id="suName" class="field" required value="${esc(s.name || '')}">`)}${field('suPhone', 'Phone', `<input id="suPhone" class="field" value="${esc(s.phone || '')}">`)}
-                    <div class="sm:col-span-2">${field('suNotes', 'Notes', `<input id="suNotes" class="field" value="${esc(s.notes || '')}">`)}</div></div>`,
-                async () => { await api('/api/accounts', { method: 'POST', body: { action: 'supplier_save', id: id || null, name: $('suName').value, phone: $('suPhone').value, notes: $('suNotes').value } }); toast(true, 'Supplier saved.'); });
-        };
         async function ensureMaterials() {
             if (!cache.materials || cache.materials.branch !== curBranch()) cache.materials = await api(`/api/accounts?view=materials&branch=${encodeURIComponent(curBranch())}`);
             return cache.materials;
@@ -743,7 +854,103 @@
             $('saLines').addEventListener('input', total); total();
         };
 
+
+        // ---------- suppliers & agents, costs, warehouse requests ----------
+        const SERVICES = [['air', 'Air'], ['sea', 'Sea'], ['customs', 'Customs'], ['delivery', 'Delivery'], ['trucking', 'Trucking'], ['packing', 'Packing'], ['materials', 'Materials']];
+        window.editSupplier = (id) => {
+            const s = (id && (cache.suppliers || []).find(x => x.id === id)) || { active: true, kind: 'supplier', services: [] };
+            form(id ? s.name : 'New supplier / agent', 'Agents bill MAWB / container and shipment costs; suppliers sell you materials.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    ${field('suName', 'Name <span class="req">*</span>', `<input id="suName" class="field" required value="${esc(s.name || '')}">`)}
+                    ${field('suKind', 'Type', `<select id="suKind" class="field">${[['supplier', 'Supplier'], ['agent', 'Agent (airline, shipping line, customs, delivery)'], ['both', 'Both']].map(([k, l]) => `<option value="${k}" ${k === s.kind ? 'selected' : ''}>${l}</option>`).join('')}</select>`)}
+                    ${field('suContact', 'Contact person', `<input id="suContact" class="field" value="${esc(s.contact_person || '')}">`)}
+                    ${field('suPhone', 'Phone', `<input id="suPhone" class="field" value="${esc(s.phone || '')}">`)}
+                    ${field('suEmail', 'Email', `<input id="suEmail" type="email" class="field" value="${esc(s.email || '')}">`)}
+                    ${field('suCountry', 'Country', `<input id="suCountry" class="field" value="${esc(s.country || '')}">`)}
+                    <div class="sm:col-span-2">${field('suAddr', 'Address', `<input id="suAddr" class="field" value="${esc(s.address || '')}">`)}</div>
+                    ${field('suTax', 'Tax / VAT no.', `<input id="suTax" class="field" value="${esc(s.tax_no || '')}">`)}
+                    ${field('suTerms', 'Payment terms (days, 0 = cash)', `<input id="suTerms" type="number" min="0" max="365" class="field" value="${s.payment_terms_days || 0}">`)}
+                    <div class="sm:col-span-2"><p class="ui-label">Services</p><div class="flex flex-wrap gap-2">${SERVICES.map(([k, l]) => `<label class="flex items-center gap-2 bg-[#F8F8FA] rounded-xl px-3 py-2 text-xs font-bold cursor-pointer"><input type="checkbox" class="w-4 h-4" data-svc="${k}" ${(s.services || []).includes(k) ? 'checked' : ''}>${l}</label>`).join('')}</div></div>
+                    <div class="sm:col-span-2">${field('suNotes', 'Notes', `<input id="suNotes" class="field" value="${esc(s.notes || '')}">`)}</div>
+                    <label class="flex items-center gap-2 text-xs font-bold"><input id="suActive" type="checkbox" class="w-4 h-4" ${s.active ? 'checked' : ''}>Active</label></div>`,
+                async () => {
+                    await api('/api/accounts', { method: 'POST', body: { action: 'supplier_save', id: id || null, name: $('suName').value, kind: $('suKind').value, contact_person: $('suContact').value, phone: $('suPhone').value, email: $('suEmail').value, country: $('suCountry').value, address: $('suAddr').value, tax_no: $('suTax').value, payment_terms_days: $('suTerms').value, services: [...document.querySelectorAll('[data-svc]:checked')].map(x => x.dataset.svc), notes: $('suNotes').value, active: $('suActive').checked } });
+                    toast(true, 'Saved.'); cache.suppliers = null;
+                });
+        };
+        window.newCost = async () => {
+            const d = cache.costs || await api(`/api/accounts?view=costs&${qs()}`);
+            form('Add cost', 'For a MAWB / container (split across its shipments) or for one shipment.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${branchSelect()}
+                    ${field('cFor', 'For', `<select id="cFor" class="field"><option value="">One shipment (enter AWB) …</option>${d.consolidations.map(c => `<option value="${c.id}">${esc(c.kind.toUpperCase())} ${esc(c.mawb)}${c.closed ? ' (closed)' : ''}</option>`).join('')}</select>`)}
+                    <div id="cAwbWrap">${field('cAwb', 'Shipment AWB', '<input id="cAwb" class="field font-mono uppercase">')}</div>
+                    ${field('cType', 'Cost', '<select id="cType" class="field"><option value="freight">Freight (airline / shipping line)</option><option value="customs">Customs & clearance</option><option value="trucking">Trucking / transport</option><option value="handling">Handling / terminal</option><option value="other">Other</option></select>')}
+                    ${field('cParty', 'Agent / supplier', `<select id="cParty" class="field"><option value="">— none —</option>${d.parties.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>`)}
+                    ${field('cAmt', 'Amount <span class="req">*</span>', '<input id="cAmt" type="number" min="0" step="0.001" class="field" required>')}
+                    ${field('cPay', 'Paid by', '<select id="cPay" class="field"><option value="credit">On credit (pay later)</option><option value="bank">Bank</option><option value="cash">Cash</option><option value="card">Card</option></select>')}
+                    ${field('cRef', 'Their bill no.', '<input id="cRef" class="field">')}${field('cDate2', 'Date', `<input id="cDate2" type="date" class="field" value="${iso(new Date())}">`)}
+                    <div class="sm:col-span-2">${field('cDesc', 'Note', '<input id="cDesc" class="field">')}</div></div>`,
+                async () => {
+                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'cost_bill', branch: xb(), consolidation_id: $('cFor').value || null, awb: $('cFor').value ? null : $('cAwb').value, cost_type: $('cType').value, supplier_id: $('cParty').value || null, amount: $('cAmt').value, pay_method: $('cPay').value, bill_ref: $('cRef').value, date: $('cDate2').value, description: $('cDesc').value } });
+                    toast(true, `${r.bill_no} saved.`); cache.costs = null;
+                });
+            $('cFor').onchange = () => $('cAwbWrap').classList.toggle('hidden', Boolean($('cFor').value));
+        };
+        window.payCost = (id, no, balance, cur) => {
+            form(`Pay · ${no}`, `Owed ${money(cur, balance)}`,
+                `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">${field('pcAmt', 'Amount', `<input id="pcAmt" type="number" min="0" step="0.001" class="field" value="${balance}" required>`)}
+                    ${field('pcMethod', 'Method', '<select id="pcMethod" class="field"><option value="bank">Bank</option><option value="cash">Cash</option><option value="card">Card</option></select>')}${field('pcRef', 'Reference', '<input id="pcRef" class="field">')}</div>`,
+                async () => { const r = await api('/api/accounts', { method: 'POST', body: { action: 'cost_bill_pay', id, amount: $('pcAmt').value, method: $('pcMethod').value, reference: $('pcRef').value } }); toast(true, `${r.payment_no}: ${money(cur, r.amount)} paid.`); }, 'Pay');
+        };
+        window.newRequest = () => {
+            const d = cache.requests, wh = d.warehouses;
+            const stockOf = (w) => d.warehouse_stock.filter(s => s.branch_code === w);
+            const rowsFor = (w) => stockOf(w).map(s => `<div class="grid grid-cols-[1fr_110px] gap-2 items-center" data-rq="${s.product_id}"><span class="text-xs font-bold">${esc(s.products.name)} <span class="text-gray-400 font-medium">· ${+s.qty} ${esc(s.products.unit)} in warehouse${+s.sell_price ? ` · ${(+s.sell_price).toFixed(3)} each` : ''}</span></span><input class="field" type="number" min="0" step="any" placeholder="Qty" aria-label="Quantity"></div>`).join('') || '<p class="text-xs text-gray-400">The warehouse has no counted items yet.</p>';
+            form('Request stock', 'From the central warehouse. Price is the warehouse’s price for branches.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${ctx.full ? field('rqBranch', 'For branch', `<select id="rqBranch" class="field">${ctx.branches.filter(b => !wh.some(w => w.branch_code === b.branch_code)).map(b => `<option value="${b.branch_code}">${esc(b.branch_name)}</option>`).join('')}</select>`) : ''}
+                    ${field('rqWh', 'Warehouse', `<select id="rqWh" class="field">${wh.map(w => `<option value="${w.branch_code}">${esc(w.branch_name)}</option>`).join('')}</select>`)}</div>
+                 <div id="rqLines" class="space-y-2 mt-4">${rowsFor(wh[0]?.branch_code)}</div>
+                 <div class="mt-4">${field('rqNotes', 'Notes', '<input id="rqNotes" class="field" placeholder="e.g. needed by Thursday">')}</div>`,
+                async () => {
+                    const lines = [...document.querySelectorAll('#rqLines [data-rq]')].map(x => ({ product_id: +x.dataset.rq, qty: x.querySelector('input').value })).filter(l => +l.qty > 0);
+                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'stock_request', branch: ctx.full ? $('rqBranch').value : ctx.my_branch, warehouse: $('rqWh').value, lines, notes: $('rqNotes').value } });
+                    toast(true, `${r.request_no} sent to the warehouse.`);
+                }, 'Send request');
+            $('rqWh').onchange = () => { $('rqLines').innerHTML = rowsFor($('rqWh').value); };
+        };
+        window.dispatchReq = (id) => {
+            const r = cache.requests.requests.find(x => x.id === id);
+            const stock = cache.requests.warehouse_stock.filter(s => s.branch_code === r.warehouse);
+            form(`Send ${r.request_no}`, `${r.warehouse} → ${r.branch_code}. Stock leaves the warehouse now; the branch confirms on arrival.`,
+                `<div class="space-y-2">${r.lines.map(l => { const s = stock.find(x => x.product_id === l.product_id) || {}; return `<div class="grid grid-cols-[1fr_90px_100px] gap-2 items-center" data-dl="${l.product_id}">
+                    <span class="text-xs font-bold">${esc(l.name)} <span class="text-gray-400 font-medium">· asked ${+l.qty_requested} · ${+(s.qty || 0)} in stock</span></span>
+                    <input class="field" type="number" min="0" step="any" value="${Math.min(+l.qty_requested, +(s.qty || 0))}" data-k="qty" aria-label="Quantity to send">
+                    <input class="field" type="number" min="0" step="0.001" value="${+(s.sell_price || 0) || ''}" placeholder="Price" data-k="unit_price" aria-label="Price each"></div>`; }).join('')}</div>
+                 <p class="text-[11px] text-gray-400 mt-3">Price each = what the branch pays the warehouse (set it once as the warehouse sell price in Packing materials).</p>`,
+                async () => {
+                    const lines = [...document.querySelectorAll('[data-dl]')].map(x => ({ product_id: +x.dataset.dl, qty: x.querySelector('[data-k=qty]').value, unit_price: x.querySelector('[data-k=unit_price]').value }));
+                    const out = await api('/api/accounts', { method: 'POST', body: { action: 'stock_dispatch', id, lines } });
+                    toast(true, `${out.request_no} sent — ${money(r.currency || '', out.total)}.`);
+                }, 'Send');
+        };
+        window.reqAction = async (action, id, no) => {
+            const verb = { stock_receive: 'Receive', stock_reject: 'Reject', stock_cancel: 'Cancel' }[action];
+            if (action === 'stock_reject') {
+                form(`Reject ${no}?`, '', field('rjReason', 'Reason', '<input id="rjReason" class="field" placeholder="e.g. out of stock">'),
+                    async () => { await api('/api/accounts', { method: 'POST', body: { action, id, reason: $('rjReason').value } }); toast(true, 'Rejected.'); }, 'Reject');
+                return;
+            }
+            if (!await UI.confirm({ title: `${verb} ${esc(no)}?`, message: action === 'stock_receive' ? 'Only after checking the items arrived. They are added to your stock and the branch owes the warehouse.' : 'The request is withdrawn.', confirmText: verb })) return;
+            try { await api('/api/accounts', { method: 'POST', body: { action, id } }); toast(true, `${no}: done.`); show(); } catch (e) { toast(false, e.message); }
+        };
+        window.settle = (warehouse, branch, owed, cur) => {
+            form(`Settle ${branch} → ${warehouse}`, `Owed ${money(cur, owed)}. Recorded in both branches’ books.`,
+                `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">${field('stAmt', 'Amount', `<input id="stAmt" type="number" min="0" step="0.001" class="field" value="${owed}" required>`)}
+                    ${field('stMethod', 'Method', '<select id="stMethod" class="field"><option value="bank">Bank</option><option value="cash">Cash</option><option value="card">Card</option></select>')}${field('stRef', 'Reference', '<input id="stRef" class="field">')}</div>`,
+                async () => { await api('/api/accounts', { method: 'POST', body: { action: 'internal_settle', warehouse, branch_code: branch, amount: $('stAmt').value, method: $('stMethod').value, reference: $('stRef').value } }); toast(true, 'Settled.'); }, 'Settle');
+        };
         document.addEventListener('click', (e) => {
+            const p = e.target.closest('[data-party]'); if (p) return editSupplier(+p.dataset.party);
             const inv = e.target.closest('[data-inv]'); if (inv) return openInvoice(inv.dataset.inv).catch(err => toast(false, err.message));
             const r = e.target.closest('[data-rate]'); if (r) return editRate(r.dataset.rate);
             const pk = e.target.closest('[data-pkg]'); if (pk) return editPackage(pk.dataset.pkg);

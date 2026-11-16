@@ -543,7 +543,55 @@ window.UI = (() => {
         return api_;
     }
 
-    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup, phoneField, splitPhone };
+    /**
+     * Which boxes of a shipment? Shows every box ticked; staff untick the ones not here.
+     *   const r = await UI.pickBoxes('311000041', { title: 'Add to MAWB' })
+     *   → { awb, pieces: null (all boxes) | [1,2], total }   or null when cancelled / not found
+     * One-box shipments return straight away without asking.
+     */
+    async function pickBoxes(awb, { title = 'Which boxes?', confirmText = 'Continue', only = null } = {}) {
+        let d;
+        try { d = await api(`/api/status?boxes=${encodeURIComponent(awb)}`); } catch (e) { toast(false, e.message); return null; }
+        d.boxes = d.boxes || [];
+        const boxes = only ? d.boxes.filter(b => only.includes(b.piece_no)) : d.boxes;
+        if (boxes.length <= 1) return { awb: d.booking.awb, pieces: only && boxes.length ? boxes.map(b => b.piece_no) : null, total: d.boxes.length };
+        return new Promise((resolve) => {
+            const m = document.createElement('div');
+            m.className = 'ui-modal open';
+            const dims = (b) => b.l && b.w && b.h ? `${+b.l}×${+b.w}×${+b.h} cm` : '';
+            m.innerHTML = `
+                <div class="panel max-w-md" role="dialog" aria-modal="true" aria-labelledby="pbTitle">
+                    <div class="flex items-start justify-between gap-3"><div>
+                        <h3 id="pbTitle" class="text-lg font-extrabold">${esc(title)}</h3>
+                        <p class="text-xs text-gray-500 mt-0.5"><b class="font-mono">${esc(d.booking.awb)}</b> · ${esc(d.booking.consignee || '')} · ${d.boxes.length} boxes. Untick boxes that are not here.</p></div>
+                        <span class="pill-tag pill-dark" data-count></span></div>
+                    <div class="flex gap-2 mt-4"><button type="button" class="btn btn-light btn-sm" data-all>All</button><button type="button" class="btn btn-light btn-sm" data-none>None</button></div>
+                    <div class="mt-3 space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar">${boxes.map(b => `
+                        <label class="flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-4 py-2.5 cursor-pointer has-[:checked]:bg-[#FFF5F3] has-[:checked]:ring-1 has-[:checked]:ring-[#FFD0C7]">
+                            <input type="checkbox" class="w-4 h-4 accent-[#E86D58]" value="${b.piece_no}" checked>
+                            <span class="font-extrabold text-sm w-16">Box ${b.piece_no}</span>
+                            <span class="text-[11px] text-gray-500 flex-1">${b.weight ? `${+b.weight} kg` : ''} ${dims(b)}</span>
+                            <span class="text-[10px] font-bold text-gray-400 text-right">${esc(b.status || '')}</span></label>`).join('')}</div>
+                    <div class="flex justify-end gap-2 mt-5"><button type="button" class="btn btn-light" data-cancel>Cancel</button><button type="button" class="btn btn-dark" data-ok>${esc(confirmText)}</button></div>
+                </div>`;
+            const ticks = () => [...m.querySelectorAll('input[type=checkbox]')];
+            const count = () => { const n = ticks().filter(x => x.checked).length; m.querySelector('[data-count]').textContent = `${n} of ${boxes.length}`; m.querySelector('[data-ok]').disabled = !n; };
+            const done = (v) => { m.remove(); resolve(v); };
+            m.addEventListener('change', count);
+            m.querySelector('[data-all]').onclick = () => { ticks().forEach(x => x.checked = true); count(); };
+            m.querySelector('[data-none]').onclick = () => { ticks().forEach(x => x.checked = false); count(); };
+            m.querySelector('[data-cancel]').onclick = () => done(null);
+            m.addEventListener('click', (e) => { if (e.target === m) done(null); });
+            m.querySelector('[data-ok]').onclick = () => {
+                const sel = ticks().filter(x => x.checked).map(x => +x.value);
+                done({ awb: d.booking.awb, pieces: sel.length === d.boxes.length ? null : sel, total: d.boxes.length });
+            };
+            document.body.appendChild(m); count();
+            m.querySelector('[data-ok]').focus();
+        });
+    }
+
+    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup, phoneField, splitPhone, pickBoxes };
 })();
 
 // Smooth page switches for browsers without cross-document view transitions (see ui.css "Motion").

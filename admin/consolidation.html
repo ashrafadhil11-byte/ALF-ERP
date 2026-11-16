@@ -131,7 +131,7 @@
                         <button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-cfilter="closed" aria-pressed="false">Closed</button>
                         <button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-cfilter="all" aria-pressed="false">All</button>
                     </div>
-                    <button id="newCons" type="button" class="btn btn-coral"><span data-icon="plus"></span>New MAWB / bag</button>
+                    <button id="newCons" type="button" class="btn btn-coral"><span data-icon="plus"></span>New MAWB / container / bag</button>
                 </div>
                 <div id="consList" class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4"></div>
             </section>
@@ -146,13 +146,19 @@
                 <button type="button" onclick="UI.closeModal('consModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5 overflow-y-auto custom-scrollbar">
-                <div class="sm:col-span-2 grid grid-cols-2 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full">
+                <div class="sm:col-span-2 grid grid-cols-3 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full">
                     <button type="button" class="opt py-2 rounded-full text-xs font-extrabold" data-kind="mawb" aria-pressed="true">MAWB (air)</button>
+                    <button type="button" class="opt py-2 rounded-full text-xs font-extrabold" data-kind="container" aria-pressed="false">Container (sea)</button>
                     <button type="button" class="opt py-2 rounded-full text-xs font-extrabold" data-kind="bag" aria-pressed="false">Bag / sack</button>
                 </div>
                 <div class="sm:col-span-2"><label class="ui-label" for="cNo" id="cNoLabel">MAWB number <span class="req">*</span></label><input id="cNo" class="field font-mono uppercase" placeholder="e.g. 176-12345675" required></div>
-                <div><label class="ui-label" for="cCarrier">Airline / agent</label><input id="cCarrier" class="field" placeholder="e.g. Emirates SkyCargo"></div>
-                <div><label class="ui-label" for="cFlight">Flight / vessel</label><input id="cFlight" class="field" placeholder="e.g. EK 0861"></div>
+                <div><label class="ui-label" for="cCarrier" id="cCarrierLabel">Airline / agent</label><input id="cCarrier" class="field" placeholder="e.g. Emirates SkyCargo"></div>
+                <div><label class="ui-label" for="cFlight" id="cFlightLabel">Flight no.</label><input id="cFlight" class="field" placeholder="e.g. EK 0861"></div>
+                <div data-sea class="hidden"><label class="ui-label" for="cSize">Container size</label><select id="cSize" class="field"><option>20GP</option><option>40GP</option><option>40HC</option><option>45HC</option><option>LCL</option></select></div>
+                <div data-sea class="hidden"><label class="ui-label" for="cSeal">Seal no.</label><input id="cSeal" class="field"></div>
+                <div data-sea class="hidden"><label class="ui-label" for="cVoy">Voyage</label><input id="cVoy" class="field"></div>
+                <div data-sea class="hidden"><label class="ui-label" for="cBl">B/L no.</label><input id="cBl" class="field"></div>
+                <div data-sea class="hidden"><label class="ui-label" for="cEta">ETA</label><input id="cEta" type="date" class="field"></div>
                 <div><label class="ui-label" for="cDate">Departure</label><input id="cDate" type="date" class="field"></div>
                 <div><label class="ui-label" for="cDest">Destination country</label><input id="cDest" class="field" placeholder="Select"></div>
                 <div class="sm:col-span-2"><label class="ui-label" for="cNotes">Notes</label><input id="cNotes" class="field" placeholder="Optional"></div>
@@ -184,22 +190,39 @@
                 <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
                     <table class="rtable w-full text-xs">
                         <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
-                            <th class="p-3 pl-4 font-extrabold">AWB</th><th class="p-3 font-extrabold">Receiver</th><th class="p-3 font-extrabold">Dest.</th><th class="p-3 font-extrabold">Pcs / kg</th><th class="p-3 font-extrabold">Status</th><th class="p-3 w-10"></th>
+                            <th class="p-3 pl-4 font-extrabold">AWB</th><th class="p-3 font-extrabold">Receiver</th><th class="p-3 font-extrabold">Dest.</th><th class="p-3 font-extrabold">Boxes / kg</th><th class="p-3 font-extrabold">Status</th><th class="p-3 w-10"></th>
                         </tr></thead>
                         <tbody id="dRows" class="divide-y divide-gray-100"></tbody>
                     </table>
                 </div>
                 <details id="bulkBox" class="bg-[#F8F8FA] rounded-[1.5rem] p-4">
-                    <summary class="cursor-pointer text-xs font-extrabold">Update status of everything inside</summary>
+                    <summary class="cursor-pointer text-xs font-extrabold">Update status — everything inside, or one shipment</summary>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                        <div class="sm:col-span-2"><label class="ui-label" for="bTarget">Apply to</label><select id="bTarget" class="field"></select></div>
+                        <div id="bBoxes" class="sm:col-span-2 hidden flex flex-wrap gap-2"></div>
                         <div class="sm:col-span-2"><label class="ui-label" for="bStatus">New status</label><select id="bStatus" class="field"></select></div>
                         <div data-need="agent_docket"><label class="ui-label" for="bAgent">Forwarding agent</label><input id="bAgent" class="field"></div>
                         <div data-need="agent_docket"><label class="ui-label" for="bDocket">Agent docket no.</label><input id="bDocket" class="field"></div>
                         <div><label class="ui-label" for="bLoc">Location</label><input id="bLoc" class="field" placeholder="Optional"></div>
                         <div><label class="ui-label" for="bRemark">Remark</label><input id="bRemark" class="field" placeholder="Optional"></div>
-                        <button id="bApply" type="button" class="btn btn-dark sm:col-span-2"><span data-icon="refresh"></span>Update all</button>
+                        <button id="bApply" type="button" class="btn btn-dark sm:col-span-2"><span data-icon="refresh"></span>Update</button>
                     </div>
                 </details>
+                <section id="costBox" class="hidden bg-white rounded-[1.5rem] border border-gray-100 p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-2"><span class="sd-label">Costs · split by <span id="costBasis"></span></span>
+                        <button id="costAdd" type="button" class="btn btn-light btn-sm"><span data-icon="plus"></span>Add cost</button></div>
+                    <form id="costForm" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[#F8F8FA] rounded-2xl p-3">
+                        <div><label class="ui-label" for="kType">Cost</label><select id="kType" class="field"><option value="freight">Freight (airline / shipping line)</option><option value="customs">Customs & clearance</option><option value="trucking">Trucking / transport</option><option value="handling">Handling / terminal</option><option value="other">Other</option></select></div>
+                        <div><label class="ui-label" for="kParty">Agent / supplier</label><select id="kParty" class="field"></select></div>
+                        <div><label class="ui-label" for="kAmt">Amount</label><input id="kAmt" type="number" min="0" step="0.001" class="field" required></div>
+                        <div><label class="ui-label" for="kPay">Paid by</label><select id="kPay" class="field"><option value="credit">On credit (pay agent later)</option><option value="bank">Bank</option><option value="cash">Cash</option><option value="card">Card</option></select></div>
+                        <div><label class="ui-label" for="kRef">Their bill no.</label><input id="kRef" class="field"></div>
+                        <div><label class="ui-label" for="kDesc">Note</label><input id="kDesc" class="field"></div>
+                        <div class="sm:col-span-3 flex justify-end gap-2"><button type="button" class="btn btn-light btn-sm" id="costCancel">Cancel</button><button class="btn btn-dark btn-sm">Save cost</button></div>
+                    </form>
+                    <div id="costList" class="space-y-1.5"></div>
+                    <div id="allocBox"></div>
+                </section>
             </div>
             <div class="flex flex-wrap justify-between gap-2 pt-4 border-t border-gray-100">
                 <button id="dPrint" type="button" class="btn btn-light"><span data-icon="clipboard"></span>Print manifest</button>
@@ -367,14 +390,15 @@
         });
 
         // ---------- consolidation ----------
+        const KIND_NAME = { mawb: 'MAWB', bag: 'Bag', container: 'Container' };
         function renderCons() {
             const list = cons.filter(c => cfilter === 'all' || (cfilter === 'open' ? !c.closed : c.closed));
             $('consList').innerHTML = list.map(c => `<button type="button" data-cons="${c.id}" class="ui-lift text-left bg-[#F8F8FA] rounded-[2rem] p-5 border border-transparent hover:border-gray-200">
                 <div class="flex items-start justify-between gap-2">
-                    <div class="min-w-0"><p class="sd-label">${c.kind === 'bag' ? 'Bag' : 'MAWB'}</p><p class="font-extrabold font-mono text-base truncate">${esc(c.mawb)}</p></div>
+                    <div class="min-w-0"><p class="sd-label">${KIND_NAME[c.kind] || 'MAWB'}${c.container_size ? ' · ' + esc(c.container_size) : ''}</p><p class="font-extrabold font-mono text-base truncate">${esc(c.mawb)}</p></div>
                     <span class="pill-tag ${c.closed ? 'pill-gray' : 'pill-coral'}">${c.closed ? 'Closed' : 'Open'}</span>
                 </div>
-                <p class="text-[11px] text-gray-500 mt-1 truncate">${esc([c.carrier, c.flight_no, c.dest_country].filter(Boolean).join(' · ') || 'No flight details')}</p>
+                <p class="text-[11px] text-gray-500 mt-1 truncate">${esc([c.carrier, c.flight_no || c.vessel, c.dest_country].filter(Boolean).join(' · ') || 'No carrier details')}</p>
                 <div class="grid grid-cols-3 gap-2 mt-4">
                     <div class="bg-white rounded-xl p-2 text-center"><p class="text-lg font-extrabold">${c.shipments}</p><p class="text-[9px] font-bold text-gray-400 uppercase">AWBs</p></div>
                     <div class="bg-white rounded-xl p-2 text-center"><p class="text-lg font-extrabold">${c.pieces}</p><p class="text-[9px] font-bold text-gray-400 uppercase">Pieces</p></div>
@@ -393,15 +417,19 @@
         document.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
             kind = b.dataset.kind;
             document.querySelectorAll('[data-kind]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-            $('cNoLabel').innerHTML = `${kind === 'bag' ? 'Bag number' : 'MAWB number'} <span class="req">*</span>`;
-            $('cNo').placeholder = kind === 'bag' ? 'e.g. BAG-SLL-0012' : 'e.g. 176-12345675';
+            $('cNoLabel').innerHTML = `${kind === 'bag' ? 'Bag number' : kind === 'container' ? 'Container number' : 'MAWB number'} <span class="req">*</span>`;
+            $('cNo').placeholder = kind === 'bag' ? 'e.g. BAG-SLL-0012' : kind === 'container' ? 'e.g. MSKU1234567' : 'e.g. 176-12345675';
+            $('cCarrierLabel').textContent = kind === 'container' ? 'Shipping line / agent' : 'Airline / agent';
+            $('cFlightLabel').textContent = kind === 'container' ? 'Vessel' : 'Flight no.';
+            document.querySelectorAll('[data-sea]').forEach(x => x.classList.toggle('hidden', kind !== 'container'));
         });
         UI.combobox($('cDest'), { load: () => UI.countryItems() });
         $('newCons').onclick = () => { $('consForm').reset(); openModal('consModal'); };
         $('consForm').onsubmit = async (e) => {
             e.preventDefault();
             try {
-                const r = await api('/api/consolidation', { method: 'POST', body: { action: 'create', kind, mawb: $('cNo').value, carrier: $('cCarrier').value, flight_no: $('cFlight').value, departure_date: $('cDate').value || null, dest_country: $('cDest').value, notes: $('cNotes').value } });
+                const r = await api('/api/consolidation', { method: 'POST', body: { action: 'create', kind, mawb: $('cNo').value, carrier: $('cCarrier').value, flight_no: $('cFlight').value, departure_date: $('cDate').value || null, dest_country: $('cDest').value, notes: $('cNotes').value,
+                    ...(kind === 'container' ? { container_size: $('cSize').value, seal_no: $('cSeal').value, vessel: $('cFlight').value, voyage: $('cVoy').value, bl_no: $('cBl').value, eta: $('cEta').value || null } : {}) } });
                 closeModal('consModal'); toast(true, `${r.consolidation.mawb} created — scan shipments into it.`);
                 await loadCons(); openDetail(r.consolidation.id);
             } catch (err) { toast(false, err.message); }
@@ -410,31 +438,42 @@
         async function openDetail(id, keepOpen) {
             try { detail = await api(`/api/consolidation?id=${encodeURIComponent(id)}`); } catch (e) { return toast(false, e.message); }
             const c = detail.consolidation, items = detail.items;
-            $('dKind').textContent = c.kind === 'bag' ? 'Bag' : 'Master airway bill';
+            $('dKind').textContent = c.kind === 'bag' ? 'Bag' : c.kind === 'container' ? `Container${c.container_size ? ' · ' + c.container_size : ''}` : 'Master airway bill';
             $('dNo').textContent = c.mawb;
-            $('dMeta').textContent = [c.carrier, c.flight_no, c.departure_date, c.dest_country, c.origin_branch].filter(Boolean).join(' · ') || '—';
+            $('dMeta').textContent = [c.carrier, c.flight_no || c.vessel, c.voyage && 'Voy ' + c.voyage, c.bl_no && 'B/L ' + c.bl_no, c.seal_no && 'Seal ' + c.seal_no, c.departure_date, c.eta && 'ETA ' + c.eta, c.dest_country, c.origin_branch].filter(Boolean).join(' · ') || '—';
             $('dShip').textContent = items.length;
-            $('dPcs').textContent = items.reduce((s, i) => s + (+i.pieces || 0), 0);
-            $('dKg').textContent = `${Math.round(items.reduce((s, i) => s + (+i.weight || 0), 0) * 100) / 100} kg`;
+            $('dPcs').textContent = items.reduce((s, i) => s + (+i.in_pieces || 0), 0);
+            $('dKg').textContent = `${Math.round(items.reduce((s, i) => s + (+i.in_weight || 0), 0) * 100) / 100} kg`;
             $('dRows').innerHTML = items.map(i => `<tr>
                 <td class="p-3 pl-4 font-extrabold font-mono" data-label="AWB">${esc(i.awb)}</td>
                 <td class="p-3" data-label="Receiver">${esc(i.consignee || '—')}</td>
                 <td class="p-3" data-label="Dest.">${esc(i.dest_city || i.dest_country || '—')}</td>
-                <td class="p-3" data-label="Pcs / kg">${esc(i.pieces ?? '—')} / ${esc(i.weight ?? '—')}</td>
+                <td class="p-3" data-label="Boxes / kg"><span class="${i.boxes_in ? 'text-[#D55C48] font-extrabold' : ''}">${i.in_pieces}${i.boxes_in ? ` of ${i.boxes_total}` : ''}</span> / ${esc(i.in_weight || i.weight || '—')}${i.boxes_in ? `<span class="block text-[10px] text-gray-400">Box ${i.boxes_in.join(', ')}</span>` : ''}</td>
                 <td class="p-3" data-label="Status"><span class="pill-tag pill-gray">${esc(i.current_status || '')}</span></td>
-                <td class="p-3 pr-4 text-right" data-label="">${c.closed ? '' : `<button type="button" class="icon-btn" title="Remove" data-remove="${esc(i.awb)}">${UI.icon('x', 'w-3.5 h-3.5')}</button>`}</td></tr>`).join('')
+                <td class="p-3 pr-4 text-right whitespace-nowrap" data-label=""><button type="button" class="btn btn-light btn-sm" data-row-update="${esc(i.awb)}">Update</button>${c.closed ? '' : ` <button type="button" class="icon-btn" title="Remove" data-remove="${esc(i.awb)}">${UI.icon('x', 'w-3.5 h-3.5')}</button>`}</td></tr>`).join('')
                 || '<tr><td colspan="6" class="p-8 text-center text-gray-400">Empty — scan shipments to add them.</td></tr>';
             $('dScan').classList.toggle('hidden', c.closed);
-            $('dClose').innerHTML = c.closed ? `${UI.icon('refresh')}Reopen` : `${UI.icon('check')}Close ${c.kind === 'bag' ? 'bag' : 'MAWB'}`;
+            $('dClose').innerHTML = c.closed ? `${UI.icon('refresh')}Reopen` : `${UI.icon('check')}Close ${(KIND_NAME[c.kind] || 'MAWB').toLowerCase()}`;
             $('bulkBox').classList.toggle('hidden', !items.length);
+            $('bTarget').innerHTML = `<option value="">Everything inside (${items.length} shipments)</option>` + items.map(i => `<option value="${esc(i.awb)}">${esc(i.awb)} only · ${esc(i.consignee || '')}</option>`).join('');
+            $('bBoxes').innerHTML = ''; $('bBoxes').classList.add('hidden');
+            renderCosts();
             if (!keepOpen) { openModal('detailModal'); setTimeout(() => !c.closed && $('dInput').focus(), 50); }
         }
         $('dScan').onsubmit = async (e) => {
             e.preventDefault();
-            const awbs = UI.clean($('dInput').value).split(/[,\s]+/).filter(Boolean); $('dInput').value = '';
+            const list = UI.clean($('dInput').value).split(/[,\s]+/).filter(Boolean); $('dInput').value = '';
+            if (!list.length) return;
+            const awbs = [], pieces = {};
+            for (const a of list) {
+                const pick = await UI.pickBoxes(a, { title: `Add to ${detail.consolidation.mawb}`, confirmText: 'Add boxes' });
+                if (!pick) continue;
+                awbs.push(pick.awb);
+                if (pick.pieces) pieces[pick.awb] = pick.pieces;
+            }
             if (!awbs.length) return;
             try {
-                const r = await api('/api/consolidation', { method: 'POST', body: { action: 'add', id: detail.consolidation.id, awbs } });
+                const r = await api('/api/consolidation', { method: 'POST', body: { action: 'add', id: detail.consolidation.id, awbs, pieces } });
                 UI.beep(true); toast(true, r.added ? `${awbs.join(', ')} added.` : 'Already inside.');
                 await openDetail(detail.consolidation.id, true); loadCons();
             } catch (err) { UI.beep(false); toast(false, err.message); }
@@ -447,9 +486,9 @@
         };
         $('dPrint').onclick = () => {
             const c = detail.consolidation;
-            printManifest(`${c.kind === 'bag' ? 'Bag' : 'MAWB'} manifest — ${c.mawb}`,
-                [['Carrier', c.carrier], ['Flight / vessel', c.flight_no], ['Departure', c.departure_date], ['Destination', c.dest_country], ['Origin branch', c.origin_branch], ['Status', c.closed ? 'Closed' : 'Open']],
-                detail.items);
+            printManifest(`${KIND_NAME[c.kind] || 'MAWB'} manifest — ${c.mawb}`,
+                [['Carrier', c.carrier], [c.kind === 'container' ? 'Vessel' : 'Flight', c.flight_no || c.vessel], ['Voyage', c.voyage], ['B/L', c.bl_no], ['Size', c.container_size], ['Seal', c.seal_no], ['Departure', c.departure_date], ['ETA', c.eta], ['Destination', c.dest_country], ['Origin branch', c.origin_branch], ['Status', c.closed ? 'Closed' : 'Open']],
+                detail.items.map(i => ({ ...i, pieces: i.boxes_in ? `${i.in_pieces} of ${i.boxes_total}` : i.in_pieces, weight: i.in_weight || i.weight })));
         };
 
         // bulk status for everything inside
@@ -459,13 +498,66 @@
             const sync = () => { const s = statuses.find(x => x.code === $('bStatus').value) || { requires: [] }; document.querySelectorAll('[data-need]').forEach(el => el.classList.toggle('hidden', !s.requires.includes(el.dataset.need))); };
             $('bStatus').onchange = sync; sync();
         }
+        // one shipment: show its boxes (the ones inside this MAWB / container ticked)
+        $('bTarget').onchange = () => {
+            const it = detail.items.find(i => i.awb === $('bTarget').value);
+            $('bBoxes').classList.toggle('hidden', !it || it.boxes_total <= 1);
+            $('bBoxes').innerHTML = it && it.boxes_total > 1 ? it.boxes.map(b => `<label class="flex items-center gap-2 bg-white rounded-xl px-3 py-2 text-xs font-bold border border-gray-100 cursor-pointer"><input type="checkbox" class="w-4 h-4 accent-[#E86D58]" value="${b.piece_no}" ${!it.boxes_in || it.boxes_in.includes(b.piece_no) ? 'checked' : ''}>Box ${b.piece_no}<span class="text-[10px] text-gray-400 font-medium">${esc(b.status || '')}</span></label>`).join('') : '';
+        };
+        document.addEventListener('click', (e) => {
+            const u = e.target.closest('[data-row-update]'); if (!u) return;
+            $('bTarget').value = u.dataset.rowUpdate; $('bTarget').onchange();
+            $('bulkBox').open = true; $('bulkBox').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
         $('bApply').onclick = async () => {
             const s = statuses.find(x => x.code === $('bStatus').value); if (!s) return;
-            const awbs = detail.items.map(i => i.awb);
-            if (!await UI.confirm({ title: `Set ${awbs.length} shipment(s) to “${esc(s.label)}”?`, message: `Everything in ${esc(detail.consolidation.mawb)}.`, confirmText: 'Update all' })) return;
+            const target = $('bTarget').value;
+            const items = target ? detail.items.filter(i => i.awb === target) : detail.items;
+            const awbs = items.map(i => i.awb), pieces = {};
+            if (target) {
+                const ticked = [...$('bBoxes').querySelectorAll('input:checked')].map(x => +x.value);
+                if (items[0].boxes_total > 1) { if (!ticked.length) return toast(false, 'Tick at least one box.'); if (ticked.length < items[0].boxes_total) pieces[target] = ticked; }
+            } else items.forEach(i => { if (i.boxes_in) pieces[i.awb] = i.boxes_in; });   // only the boxes inside move
+            if (!await UI.confirm({ title: `Set ${target ? esc(target) : awbs.length + ' shipment(s)'} to “${esc(s.label)}”?`, message: target ? (pieces[target] ? `Boxes ${pieces[target].join(', ')} only.` : 'All boxes.') : `Everything in ${esc(detail.consolidation.mawb)}.`, confirmText: 'Update' })) return;
             try {
-                const r = await api('/api/status', { method: 'POST', body: { awbs, code: s.code, location: $('bLoc').value, remark: [$('bRemark').value, `${detail.consolidation.kind.toUpperCase()}: ${detail.consolidation.mawb}`].filter(Boolean).join(' • '), fwd_agent: $('bAgent').value, fwd_docket: $('bDocket').value, mawb: detail.consolidation.mawb } });
+                const r = await api('/api/status', { method: 'POST', body: { awbs, pieces, code: s.code, location: $('bLoc').value, remark: [$('bRemark').value, `${detail.consolidation.kind.toUpperCase()}: ${detail.consolidation.mawb}`].filter(Boolean).join(' • '), fwd_agent: $('bAgent').value, fwd_docket: $('bDocket').value, mawb: detail.consolidation.mawb } });
                 toast(true, `${r.updated ?? awbs.length} updated to ${s.label}.`);
+                await openDetail(detail.consolidation.id, true);
+            } catch (err) { toast(false, err.message); }
+        };
+
+        // ---------- costs (cost center) ----------
+        let parties = null;
+        const canCost = UI.role() !== 'staff';
+        function renderCosts() {
+            const c = detail.consolidation;
+            detail.costs = detail.costs || []; detail.allocation = detail.allocation || [];
+            $('costBox').classList.toggle('hidden', !canCost);
+            if (!canCost) return;
+            $('costBasis').textContent = c.kind === 'container' ? 'CBM (box dimensions)' : 'chargeable weight';
+            const money = (cur, v) => `${cur} ${(+v || 0).toFixed(3)}`;
+            $('costList').innerHTML = detail.costs.map(k => `<div class="flex items-center justify-between gap-3 text-xs bg-[#F8F8FA] rounded-xl px-3 py-2">
+                <span><b>${esc(k.bill_no)}</b> · ${esc(k.cost_type)}${k.suppliers?.name ? ' · ' + esc(k.suppliers.name) : ''}${k.bill_ref ? ' · bill ' + esc(k.bill_ref) : ''}${k.description ? ' · ' + esc(k.description) : ''}</span>
+                <span class="font-extrabold tabular-nums whitespace-nowrap">${money(k.currency, k.amount)} <span class="pill-tag ${k.status === 'paid' ? 'pill-green' : 'pill-amber'}">${k.status === 'unpaid' ? 'owed' : k.status}</span></span></div>`).join('')
+                || '<p class="text-xs text-gray-400">No costs yet — add the airline / shipping line, customs, trucking bills here.</p>';
+            const total = detail.costs.reduce((s, k) => s + +k.amount, 0);
+            $('allocBox').innerHTML = detail.allocation.length ? `<p class="sd-label mt-2 mb-1">Cost per shipment (total ${money(detail.costs[0]?.currency || '', total)})</p>
+                <table class="w-full text-xs"><tbody>${detail.allocation.map(a => `<tr class="border-t border-gray-100"><td class="py-1.5 font-mono font-bold">${esc(a.awb)}</td>
+                <td class="py-1.5 text-gray-500">${(+a.basis).toFixed(c.kind === 'container' ? 3 : 2)} ${c.kind === 'container' ? 'CBM' : 'kg'}</td><td class="py-1.5 text-gray-500">${(a.share * 100).toFixed(1)}%</td>
+                <td class="py-1.5 text-right font-extrabold tabular-nums">${money(a.currency, a.allocated)}</td></tr>`).join('')}</tbody></table>` : '';
+        }
+        $('costAdd').onclick = async () => {
+            if (!parties) { try { parties = (await api('/api/accounts?view=parties')).parties.filter(p => p.active); } catch (e) { parties = []; } }
+            $('kParty').innerHTML = '<option value="">— none —</option>' + parties.map(p => `<option value="${p.id}">${esc(p.name)}${p.kind !== 'supplier' ? ' (agent)' : ''}</option>`).join('');
+            $('costForm').classList.remove('hidden'); $('kAmt').focus();
+        };
+        $('costCancel').onclick = () => $('costForm').classList.add('hidden');
+        $('costForm').onsubmit = async (e) => {
+            e.preventDefault();
+            try {
+                const r = await api('/api/accounts', { method: 'POST', body: { action: 'cost_bill', branch: detail.consolidation.origin_branch, consolidation_id: detail.consolidation.id, cost_type: $('kType').value, supplier_id: $('kParty').value || null, amount: $('kAmt').value, pay_method: $('kPay').value, bill_ref: $('kRef').value, description: $('kDesc').value } });
+                toast(true, `${r.bill_no} saved — split across ${detail.items.length} shipment(s).`);
+                $('costForm').reset(); $('costForm').classList.add('hidden');
                 await openDetail(detail.consolidation.id, true);
             } catch (err) { toast(false, err.message); }
         };

@@ -212,6 +212,7 @@
                     <div><label class="ui-label" for="b_taxRate">Tax rate %</label><input id="b_taxRate" class="field" type="number" min="0" max="100" step="0.01" placeholder="0 = no tax"></div>
                     <div><label class="ui-label">Hub</label>
                         <label class="field flex items-center gap-2 cursor-pointer"><input id="b_hub" type="checkbox" class="w-4 h-4"><span class="text-xs font-bold">Hub branch</span></label></div>
+                    <div class="sm:col-span-2"><label class="ui-label" for="b_type">Type</label><select id="b_type" class="field"><option value="branch">Branch (customer counter)</option><option value="warehouse">Central warehouse (stocks materials for branches, gathers & consolidates)</option></select></div>
                 </fieldset>
             </div>
 
@@ -321,7 +322,7 @@
                                 <div class="flex flex-wrap items-center gap-1.5 mt-1">
                                     <span class="pill-tag pill-dark font-mono">${esc(b.branch_code)}</span>
                                     <span class="pill-tag pill-coral" title="AWB digit">AWB ${esc(b.booking_code || '—')}</span>
-                                    ${b.is_hub ? '<span class="pill-tag pill-amber">Hub</span>' : ''}
+                                    ${b.is_hub ? '<span class="pill-tag pill-amber">Hub</span>' : ''}${b.branch_type === 'warehouse' ? '<span class="pill-tag pill-dark">Central warehouse</span>' : ''}
                                 </div>
                             </div>
                         </div>
@@ -414,6 +415,7 @@
             $('b_taxName').value = b.tax_name || 'VAT';
             $('b_taxRate').value = b.tax_rate ?? 0;
             $('b_hub').checked = Boolean(b.is_hub);
+            $('b_type').value = b.branch_type || 'branch';
             $('pvDest').innerHTML = destinations.filter(d => d.active).map(d => `<option value="${esc(d.code)}">${esc(d.code)} · ${esc(d.country_name)}</option>`).join('')
                 + '<option value="DE">DE · any other country</option>';
             $('pvCargo').innerHTML = cargoTypes.filter(t => t.active).map(t => `<option value="${esc(t.code)}">${esc(t.code)} · ${esc(t.name)}</option>`).join('');
@@ -498,7 +500,7 @@
                 country: c.n, postalCode: $('b_postal').value.trim(), postOffice: $('b_po').value.trim(), state: $('b_state').value.trim(),
                 location: $('b_city').value.trim(), address: $('b_address').textContent === '—' ? $('b_city').value.trim() : $('b_address').textContent,
                 phoneNumber: branchPh.value, managerId: mgr ? mgr.id : null, managerName: mgr ? (mgr.full_name || mgr.username) : 'Unassigned',
-                currency: $('b_currency').value, taxName: $('b_taxName').value.trim(), taxRate: $('b_taxRate').value, isHub: $('b_hub').checked,
+                currency: $('b_currency').value, taxName: $('b_taxName').value.trim(), taxRate: $('b_taxRate').value, isHub: $('b_hub').checked, branchType: $('b_type').value,
                 status: editing?.status
             };
             if (!await UI.confirm({ title: editing ? `Save changes to ${body.branchName}?` : 'Create this branch?',
