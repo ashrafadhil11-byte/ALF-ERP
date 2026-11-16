@@ -16,7 +16,7 @@ import { pickCard, priceFor, quoteShipment, cleanLines, PAY_MAP } from '../_lib/
 const enc = encodeURIComponent;
 const FULL = ADMIN_ROLES;                         // super_admin, head_office
 const OPS = [...FULL, 'branch_manager'];
-const METHODS = ['per_kg', 'vol_band', 'per_package', 'per_box', 'per_cbm', 'box_size'];
+const METHODS = ['per_kg', 'vol_band', 'per_package', 'per_box', 'per_cbm', 'box_size', 'doc_slab'];
 const BASES = ['per_shipment', 'per_box', 'per_kg'];
 const str = (v, n = 120) => String(v ?? '').trim().slice(0, n);
 class UserError extends Error { constructor(m, s = 400) { super(m); this.status = s; } }
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
                 const dest = String(q.dest || '').toUpperCase();
                 const [packages, charges, materials, commodities] = await Promise.all([
                     get(`package_rates?branch_code=eq.${enc(branch)}&active=is.true&dest_country_code=in.(%22*%22,%22${enc(dest || '*')}%22)&select=id,name,price,includes,dest_country_code&order=name`),
-                    get(`charge_items?branch_code=eq.${enc(branch)}&active=is.true&select=id,name,basis,price&order=name`),
+                    get(`charge_items?branch_code=eq.${enc(branch)}&active=is.true&dest_country_code=in.(%22*%22,%22${enc(dest || '*')}%22)&select=id,name,basis,price,cargo_type_code,dest_country_code,auto_add&order=name`),
                     get(`branch_products?branch_code=eq.${enc(branch)}&sell_price=gt.0&select=product_id,sell_price,qty,products!inner(name,unit,track_stock,active)&products.active=is.true`),
                     get('commodities?active=is.true&select=code,name&order=sort,name')
                 ]);
@@ -281,11 +281,14 @@ export default async function handler(req, res) {
                     : [];
                 if (b.method === 'vol_band' && !bands.length) throw new UserError('Add at least one weight band.');
                 if (b.method === 'box_size' && !sizes.length) throw new UserError('Add at least one box size (name, L × W × H cm, price).');
-                if (!['vol_band', 'box_size'].includes(b.method) && !(num(b.rate) > 0)) throw new UserError('Enter the rate.');
+                const slab = b.method === 'doc_slab' ? { base_kg: num(b.slab?.base_kg), base_price: num(b.slab?.base_price), step_kg: num(b.slab?.step_kg) || 0, step_price: num(b.slab?.step_price) || 0 } : {};
+                if (b.method === 'doc_slab' && !(slab.base_kg > 0 && slab.base_price >= 0 && b.slab?.base_price !== '')) throw new UserError('Enter the first slab weight and its price.');
+                if (b.method === 'doc_slab' && slab.step_price > 0 && !(slab.step_kg > 0)) throw new UserError('Enter the weight of each extra step.');
+                if (!['vol_band', 'box_size', 'doc_slab'].includes(b.method) && !(num(b.rate) > 0)) throw new UserError('Enter the rate.');
                 const dest = b.dest_country_code ? String(b.dest_country_code).toUpperCase() : '*';
                 if (dest !== '*' && !/^[A-Z]{2}$/.test(dest)) throw new UserError('Destination must be a 2-letter country code or "any".');
                 const row = {
-                    branch_code: branch, dest_country_code: dest, cargo_type_code: b.cargo_type_code || '*', commodity: b.commodity || '*', method: b.method, sizes,
+                    branch_code: branch, dest_country_code: dest, cargo_type_code: b.cargo_type_code || '*', commodity: b.commodity || '*', method: b.method, sizes, slab,
                     currency: br.currency || 'OMR', rate: num(b.rate) || 0, min_charge: num(b.min_charge) || 0, bands,
                     extra_per_kg: num(b.extra_per_kg) || 0, note: b.note || null, active: b.active !== false,
                     updated_at: new Date().toISOString(), updated_by_name: userName
@@ -314,10 +317,12 @@ export default async function handler(req, res) {
                 const table = isPkg ? 'package_rates' : 'charge_items';
                 const row = isPkg
                     ? { branch_code: branch, dest_country_code: /^[A-Z]{2}$/.test(String(b.dest_country_code || '').toUpperCase()) ? String(b.dest_country_code).toUpperCase() : '*', name, price: num(b.price), includes: str(b.includes, 200) || null, active: b.active !== false, updated_at: new Date().toISOString() }
-                    : { branch_code: branch, name, basis: b.basis, price: num(b.price), active: b.active !== false };
+                    : { branch_code: branch, name, basis: b.basis, price: num(b.price), active: b.active !== false, auto_add: Boolean(b.auto_add),
+                        cargo_type_code: str(b.cargo_type_code, 10) || '*',
+                        dest_country_code: /^[A-Z]{2}$/.test(String(b.dest_country_code || '').toUpperCase()) ? String(b.dest_country_code).toUpperCase() : '*' };
                 if (b.id) own((await get(`${table}?id=eq.${enc(b.id)}&select=id,branch_code`))[0]);
                 const r = await fetch(`${rest}/${table}${b.id ? `?id=eq.${enc(b.id)}` : ''}`, { method: b.id ? 'PATCH' : 'POST', headers: serviceHeaders(), body: JSON.stringify(row) });
-                if (!r.ok) { const out = await r.json().catch(() => ({})); throw new UserError(/duplicate|unique/i.test(out.message || '') ? 'That name already exists for this branch.' : out.message || 'Could not save.'); }
+                if (!r.ok) { const out = await r.json().catch(() => ({})); throw new UserError(/duplicate|unique/i.test(out.message || '') ? (isPkg ? 'That name already exists for this branch.' : 'This charge already exists for the same cargo type and destination.') : out.message || 'Could not save.'); }
                 return res.status(200).json({ success: true });
             }
             case 'package_delete':

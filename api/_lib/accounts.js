@@ -36,9 +36,10 @@ export function fitSize(sizes, box) {
  *   per_box      rate × boxes                    vol_band     band price for the chargeable kg (+ extra_per_kg above the last band)
  *   per_cbm      rate × cubic metres (L×W×H cm ÷ 1,000,000)
  *   box_size     each box priced by the smallest size it fits ("per dimension")
+ *   doc_slab     documents: first slab (e.g. 0.5 kg) at a fixed price + each extra step — actual weight, no volumetric
  * The minimum charge applies to every method.
  */
-export function priceFor(card, { kg = 0, pieces = 1, boxes = 1, dims = [] } = {}) {
+export function priceFor(card, { kg = 0, pieces = 1, boxes = 1, dims = [], actualKg } = {}) {
     if (!card) return null;
     const w = Math.max(0, Number(kg) || 0);
     let amount = 0, detail = '', unmatched = 0;
@@ -55,6 +56,13 @@ export function priceFor(card, { kg = 0, pieces = 1, boxes = 1, dims = [] } = {}
         dims.forEach(d => { const s = fitSize(card.sizes, d); if (s) { amount += +s.price; names.push(s.name); } else unmatched++; });
         const count = names.reduce((m, n) => ((m[n] = (m[n] || 0) + 1), m), {});
         detail = Object.entries(count).map(([n, c]) => `${c} × ${n}`).join(', ') || 'no box sizes matched';
+    }
+    else if (card.method === 'doc_slab') {
+        const s = card.slab || {}, baseKg = +s.base_kg || 0, base = +s.base_price || 0, stepKg = +s.step_kg || 0, step = +s.step_price || 0;
+        const aw = Math.max(0, Number(actualKg ?? kg) || 0);
+        const extraSteps = aw > baseKg && stepKg > 0 ? Math.ceil(Math.round((aw - baseKg) / stepKg * 1e6) / 1e6) : 0;
+        amount = base + extraSteps * step;
+        detail = extraSteps ? `${aw} kg: first ${baseKg} kg ${base} + ${extraSteps} × ${stepKg} kg × ${step}` : `${aw} kg: up to ${baseKg} kg`;
     }
     else if (card.method === 'vol_band') {
         const bands = [...(card.bands || [])].map(b => ({ upto: +b.upto, price: +b.price })).filter(b => b.upto > 0).sort((a, b) => a.upto - b.upto);
@@ -88,12 +96,26 @@ export function quoteShipment(cards, { dest, cargo, boxes = [], commodityNames =
         const actual = list.reduce((s, b) => s + (+b.weight || 0), 0);
         const vol = list.reduce((s, b) => s + ((+b.l || 0) * (+b.w || 0) * (+b.h || 0)) / VOL_DIVISOR, 0);
         const kg = Math.round(Math.max(actual, vol) * 100) / 100;
-        const p = priceFor(card, { kg, pieces: list.length, boxes: list.length, dims: list });
+        const p = priceFor(card, { kg, actualKg: Math.round(actual * 100) / 100, pieces: list.length, boxes: list.length, dims: list });
         currency = card.currency;
         unmatched += p.unmatched || 0;
         lines.push({ commodity: com, description: `Freight${Object.keys(groups).length > 1 || com !== 'GEN' ? ' · ' + name : ''} (${p.detail})`, amount: p.amount });
     }
     return { amount: r3(lines.reduce((s, l) => s + l.amount, 0)), currency, lines, missing, unmatched };
+}
+
+/**
+ * Extra charge price for this shipment: among items with the same name, the most specific one wins
+ * (cargo + destination → cargo → destination → any). Returns null when the charge doesn't apply.
+ */
+export function matchCharge(items, { name, cargo, dest }) {
+    const c = String(cargo || ''), d = String(dest || '').toUpperCase();
+    const same = (items || []).filter(x => x.active !== false && x.name === name);
+    for (const [cc, dd] of [[c, d], [c, '*'], ['*', d], ['*', '*']]) {
+        const hit = same.find(x => (x.cargo_type_code || '*') === cc && (x.dest_country_code || '*') === dd);
+        if (hit) return hit;
+    }
+    return null;
 }
 
 // Booking-form payment choice → invoice terms

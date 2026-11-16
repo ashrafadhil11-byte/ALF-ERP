@@ -276,7 +276,38 @@
         const basisQty = (basis) => basis === 'per_box' ? shipment().boxes : basis === 'per_kg' ? shipment().kg : 1;
         const KIND_TAG = { freight: ['Freight', 'pill-dark'], package: ['Package', 'pill-coral'], charge: ['Charge', 'pill-amber'], material: ['Material', 'pill-green'] };
 
+        // Extra charges depend on cargo type / destination: same name, most specific price wins
+        const removedCharges = new Set();
+        function matchCharge(name) {
+            const c = (cargo() || {}).code || '', d = (dest() || {}).c || '';
+            const same = (options.charges || []).filter(x => x.name === name);
+            for (const [cc, dd] of [[c, d], [c, '*'], ['*', d], ['*', '*']]) {
+                const hit = same.find(x => (x.cargo_type_code || '*') === cc && (x.dest_country_code || '*') === dd);
+                if (hit) return hit;
+            }
+            return null;
+        }
+        const chargeNames = () => [...new Set((options.charges || []).map(x => x.name))];
+        function syncCharges() {
+            // re-price (unless typed by hand), drop charges that don't apply to this cargo, add the automatic ones
+            charges = charges.filter(l => {
+                if (!l.chargeName) return true;
+                const m = matchCharge(l.chargeName);
+                if (!m) return false;
+                if (!l.manual) l.rate = +m.price;
+                l.basis = m.basis === 'per_shipment' ? null : m.basis;
+                return true;
+            });
+            chargeNames().forEach(n => {
+                const m = matchCharge(n);
+                if (m && m.auto_add && !removedCharges.has(n) && !charges.some(l => l.chargeName === n))
+                    charges.push({ kind: 'charge', description: n, chargeName: n, qty: basisQty(m.basis) || 1, rate: +m.price, basis: m.basis === 'per_shipment' ? null : m.basis });
+            });
+            const avail = chargeNames().map(n => matchCharge(n)).filter(Boolean);
+            $('addCharge').innerHTML = `<option value="">+ Extra charge${avail.length ? '' : ' (none for this cargo)'}</option>` + avail.map(x => `<option value="${esc(x.name)}">${esc(x.name)} — ${(+x.price).toFixed(3)} ${x.basis === 'per_box' ? 'per box' : x.basis === 'per_kg' ? 'per kg' : ''}</option>`).join('');
+        }
         function renderCharges() {
+            syncCharges();
             charges.forEach(l => { if (l.basis) l.qty = basisQty(l.basis) || 1; });
             $('chargeRows').innerHTML = charges.map((l, i) => `<tr data-ci="${i}">
                 <td class="p-2 pl-4 w-full"><div class="flex items-center gap-1.5"><span class="pill-tag ${KIND_TAG[l.kind][1]} flex-shrink-0">${KIND_TAG[l.kind][0]}</span>
@@ -295,6 +326,7 @@
             const l = charges[+tr.dataset.ci], f = e.target.dataset.f;
             l[f] = f === 'description' ? e.target.value : (+e.target.value || 0);
             if (l.auto && f === 'rate') l.auto = false;   // a typed freight price is kept
+            if (l.chargeName && f === 'rate') l.manual = true;
             tr.children[3].textContent = r3(l.qty * l.rate).toFixed(3);
             $('amount').value = totalCharges().toFixed(3); $('chargeTotal').textContent = `${cur()} ${totalCharges().toFixed(3)}`; $('sumAmount').textContent = `${cur()} ${totalCharges().toFixed(3)}`;
         });
@@ -302,6 +334,7 @@
             const d = e.target.closest('[data-cdel]'); if (!d) return;
             const l = charges[+d.dataset.cdel];
             if (l.kind === 'freight' && l.auto) { freightOff = true; $('quoteHint').innerHTML = 'Freight removed. <button type="button" class="font-bold text-[#D55C48]" onclick="useRateCard()">Add freight from the rate card</button>'; }
+            if (l.chargeName) removedCharges.add(l.chargeName);
             charges.splice(+d.dataset.cdel, 1); renderCharges();
         });
         window.useRateCard = () => { freightOff = false; quoteKey = ''; charges = charges.filter(l => !(l.kind === 'freight')); refresh(); };
@@ -314,15 +347,20 @@
             optionsKey = key;
             try { options = await api(`/api/accounts?view=booking_options&branch=${encodeURIComponent(b.branch_code)}&dest=${c ? c.c : ''}`); } catch (e) { return; }
             $('addPackage').innerHTML = `<option value="">+ Package rate${options.packages.length ? '' : ' (none set)'}</option>` + options.packages.map(p => `<option value="${p.id}">${esc(p.name)} — ${cur()} ${(+p.price).toFixed(3)}${p.includes ? ' · ' + esc(p.includes) : ''}</option>`).join('');
-            $('addCharge').innerHTML = `<option value="">+ Extra charge${options.charges.length ? '' : ' (none set)'}</option>` + options.charges.map(x => `<option value="${x.id}">${esc(x.name)} — ${(+x.price).toFixed(3)} ${x.basis === 'per_box' ? 'per box' : x.basis === 'per_kg' ? 'per kg' : ''}</option>`).join('');
             $('addMaterial').innerHTML = `<option value="">+ Packing material${options.materials.length ? '' : ' (none priced)'}</option>` + options.materials.map(m => `<option value="${m.product_id}">${esc(m.name)} — ${(+m.price).toFixed(3)}/${esc(m.unit)}${m.qty !== null ? ` · ${+m.qty} in stock` : ''}</option>`).join('');
             const coms = options.commodities.length ? options.commodities : [{ code: 'GEN', name: 'General' }];
-            document.querySelectorAll('[data-box] select[data-k="commodity"]').forEach(s => { const v = s.value; s.innerHTML = commodityOptions(v); });
             window._commodities = coms;
+            document.querySelectorAll('[data-box] select[data-k="commodity"]').forEach(s => { const v = s.value; s.innerHTML = commodityOptions(v); });
+            renderCharges();
         }
         const commodityOptions = (v = 'GEN') => (window._commodities || [{ code: 'GEN', name: 'General' }]).map(c => `<option value="${esc(c.code)}" ${c.code === v ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
         $('addPackage').onchange = (e) => { const p = options.packages.find(x => String(x.id) === e.target.value); if (p) { charges.push({ kind: 'package', description: p.name + (p.includes ? ` (${p.includes})` : ''), qty: 1, rate: +p.price }); renderCharges(); } e.target.value = ''; };
-        $('addCharge').onchange = (e) => { const x = options.charges.find(y => String(y.id) === e.target.value); if (x) { charges.push({ kind: 'charge', description: x.name, qty: basisQty(x.basis) || 1, rate: +x.price, basis: x.basis === 'per_shipment' ? null : x.basis }); renderCharges(); } e.target.value = ''; };
+        $('addCharge').onchange = (e) => {
+            const x = matchCharge(e.target.value);
+            if (x && !charges.some(l => l.chargeName === x.name)) { removedCharges.delete(x.name); charges.push({ kind: 'charge', description: x.name, chargeName: x.name, qty: basisQty(x.basis) || 1, rate: +x.price, basis: x.basis === 'per_shipment' ? null : x.basis }); }
+            else if (x) toast(false, `${x.name} is already added.`);
+            renderCharges(); e.target.value = '';
+        };
         $('addMaterial').onchange = (e) => { const m = options.materials.find(y => String(y.product_id) === e.target.value); if (m) { charges.push({ kind: 'material', description: m.name, qty: 1, rate: +m.price, product_id: m.product_id }); renderCharges(); } e.target.value = ''; };
         $('addOther').onclick = () => { charges.push({ kind: 'charge', description: 'Other charge', qty: 1, rate: 0 }); renderCharges(); document.querySelector('#chargeRows tr:last-child [data-f="description"]').select(); };
 

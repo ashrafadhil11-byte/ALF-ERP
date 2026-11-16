@@ -92,7 +92,7 @@
         const day = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
         const iso = (d) => d.toISOString().slice(0, 10);
         const METHOD_LABEL = { cash: 'Cash', card: 'Card', bank: 'Bank', payable: 'On account (payable)' };
-        const PRICE_LABEL = { per_kg: 'Per kg', per_box: 'Per box', box_size: 'By box size', per_cbm: 'Per CBM', vol_band: 'Weight band', per_package: 'Per package' };
+        const PRICE_LABEL = { per_kg: 'Per kg', per_box: 'Per box', box_size: 'By box size', per_cbm: 'Per CBM', doc_slab: 'Documents (slab)', vol_band: 'Weight band', per_package: 'Per package' };
         const STATUS_PILL = { paid: 'pill-green', partial: 'pill-amber', unpaid: 'pill-coral', void: 'pill-gray' };
         let ctx = { full: false, branches: [], my_branch: null }, tab = new URLSearchParams(location.search).get('tab') || 'overview';
         let cache = {};
@@ -244,6 +244,7 @@
                 const comName = (c) => !c || c === '*' ? 'General' : (d.commodities.find(x => x.code === c)?.name || c);
                 const price = (r) => r.method === 'vol_band' ? r.bands.map(b => `≤${b.upto}kg ${fmt(r.currency, b.price)}`).join(' · ') + (+r.extra_per_kg ? ` · +${fmt(r.currency, r.extra_per_kg)}/kg` : '')
                     : r.method === 'box_size' ? (r.sizes || []).map(s => `${s.name} ${s.l}×${s.w}×${s.h} ${fmt(r.currency, s.price)}`).join(' · ')
+                    : r.method === 'doc_slab' ? `First ${r.slab?.base_kg} kg ${fmt(r.currency, r.slab?.base_price)}${+r.slab?.step_price ? ` + ${fmt(r.currency, r.slab.step_price)} per extra ${r.slab.step_kg} kg` : ''}`
                     : `${money(r.currency, r.rate)} ${PRICE_LABEL[r.method].toLowerCase()}`;
                 const sub = cache.pricingSub || 'freight';
                 const subs = [['freight', 'Freight rate cards'], ['packages', 'Package rates'], ['charges', 'Extra charges'], ...(ctx.full ? [['commodities', 'Commodities']] : [])];
@@ -271,12 +272,13 @@
                 } else if (sub === 'charges') {
                     const BL = { per_shipment: 'Per shipment', per_box: 'Per box', per_kg: 'Per kg' };
                     const rows = d.charges.map(c => `<tr class="${c.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-chg="${c.id}">
-                        <td class="p-3 pl-4 font-extrabold" data-label="Branch">${esc(c.branch_code)}</td><td class="p-3 font-bold" data-label="Charge">${esc(c.name)}</td>
+                        <td class="p-3 pl-4 font-extrabold" data-label="Branch">${esc(c.branch_code)}</td><td class="p-3 font-bold" data-label="Charge">${esc(c.name)}${c.auto_add ? ' <span class="pill-tag pill-dark">Auto</span>' : ''}</td>
+                        <td class="p-3" data-label="Applies to">${esc(cargoName(c.cargo_type_code || '*'))} · ${esc(destName(c.dest_country_code || '*'))}</td>
                         <td class="p-3" data-label="Counted"><span class="pill-tag pill-gray">${BL[c.basis]}</span></td>
                         <td class="p-3 pr-4 text-right money font-extrabold" data-label="Price">${fmt(ctx.branches.find(b => b.branch_code === c.branch_code)?.currency, c.price)}</td></tr>`).join('');
-                    body = toolbar('<p class="text-xs text-gray-500">Handling, packing, documentation… ticked in the booking form. Per box / per kg follow the boxes entered.</p>',
+                    body = toolbar('<p class="text-xs text-gray-500">Handling, packing, documentation… Use the same name with a different cargo type for different prices (e.g. Handling Air 2.000 / Sea 2.500 per box). “Auto” charges are added to every matching booking.</p>',
                         `<button type="button" class="btn btn-coral" onclick="editCharge()"><span data-icon="plus"></span>New charge</button>`)
-                        + table([['Branch'], ['Charge'], ['Counted'], ['Price', 'right']], rows, 'No extra charges yet.');
+                        + table([['Branch'], ['Charge'], ['Applies to'], ['Counted'], ['Price', 'right']], rows, 'No extra charges yet.');
                 } else {
                     const rows = d.commodities.map(c => `<tr class="${c.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-com="${esc(c.code)}">
                         <td class="p-3 pl-4 font-mono font-extrabold" data-label="Code">${esc(c.code)}</td><td class="p-3" data-label="Name">${esc(c.name)}</td><td class="p-3 pr-4" data-label="">${c.active ? '' : 'Inactive'}</td></tr>`).join('');
@@ -514,7 +516,7 @@
         };
 
         window.editRate = (id) => {
-            const d = cache.rates, r = (id && d.cards.find(x => String(x.id) === String(id))) || { method: 'per_kg', dest_country_code: '*', cargo_type_code: '*', commodity: '*', bands: [], sizes: [], active: true, branch_code: curBranch() };
+            const d = cache.rates, r = (id && d.cards.find(x => String(x.id) === String(id))) || { method: 'per_kg', dest_country_code: '*', cargo_type_code: '*', commodity: '*', bands: [], sizes: [], slab: {}, active: true, branch_code: curBranch() };
             const destOpts = `<option value="*">Any destination</option>` + d.destinations.map(x => `<option value="${x.country_code}" ${x.country_code === r.dest_country_code ? 'selected' : ''}>${esc(x.country_name)} (${x.country_code})</option>`).join('')
                 + ((window.ALF_COUNTRIES || []).filter(c => !d.destinations.some(x => x.country_code === c.c)).map(c => `<option value="${c.c}" ${c.c === r.dest_country_code ? 'selected' : ''}>${esc(c.n)} (${c.c})</option>`).join(''));
             const band = (b = {}) => `<div class="grid grid-cols-[1fr_1fr_32px] gap-2" data-band><input class="field" type="number" min="0" step="any" placeholder="Up to kg" value="${b.upto ?? ''}" data-k="upto" aria-label="Up to kg"><input class="field" type="number" min="0" step="0.001" placeholder="Price" value="${b.price ?? ''}" data-k="price" aria-label="Price"><button type="button" class="icon-btn self-center" onclick="this.closest('[data-band]').remove()" aria-label="Remove band">${UI.icon('x', 'w-3.5 h-3.5')}</button></div>`;
@@ -527,12 +529,18 @@
                     ${field('rDest', 'Destination', `<select id="rDest" class="field">${destOpts}</select>`)}
                     ${field('rCargo', 'Cargo type', `<select id="rCargo" class="field"><option value="*">Any cargo</option>${d.cargo_types.map(c => `<option value="${c.code}" ${c.code === r.cargo_type_code ? 'selected' : ''}>${c.code} · ${esc(c.name)}</option>`).join('')}</select>`)}
                     ${field('rCom', 'Contents', `<select id="rCom" class="field"><option value="*">General (any contents)</option>${d.commodities.filter(c => c.code !== 'GEN').map(c => `<option value="${c.code}" ${c.code === r.commodity ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>`)}
-                    <div class="sm:col-span-2"><p class="ui-label">Pricing method</p><div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-[1.25rem]">${Object.entries(PRICE_LABEL).map(([k, v]) => `<button type="button" class="opt py-2 rounded-full text-[11px] font-extrabold" data-method="${k}" aria-pressed="${k === r.method}">${v}</button>`).join('')}</div></div>
+                    <div class="sm:col-span-2"><p class="ui-label">Pricing method</p><div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-[1.25rem]">${Object.entries(PRICE_LABEL).map(([k, v]) => `<button type="button" class="opt py-2 rounded-full text-[11px] font-extrabold" data-method="${k}" aria-pressed="${k === r.method}">${v}</button>`).join('')}</div></div>
                     <div data-for="simple">${field('rRate', '<span id="rRateLabel">Rate</span>', `<input id="rRate" type="number" min="0" step="0.001" class="field" value="${r.rate ?? ''}">`)}</div>
                     ${field('rMin', 'Minimum charge', `<input id="rMin" type="number" min="0" step="0.001" class="field" value="${r.min_charge ?? ''}">`)}
                     <div data-for="vol_band" class="sm:col-span-2"><p class="ui-label">Weight bands (chargeable kg)</p><div id="rBands" class="space-y-2">${(r.bands.length ? r.bands : [{}]).map(band).join('')}</div>
                         <button type="button" class="btn btn-light btn-sm mt-2" onclick="document.getElementById('rBands').insertAdjacentHTML('beforeend', _bandHtml())"><span data-icon="plus"></span>Add band</button>
                         <div class="mt-3 max-w-xs">${field('rExtra', 'Each kg above the last band', `<input id="rExtra" type="number" min="0" step="0.001" class="field" value="${r.extra_per_kg ?? ''}">`)}</div></div>
+                    <div data-for="doc_slab" class="sm:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        ${field('sBaseKg', 'First slab (kg)', `<input id="sBaseKg" type="number" min="0" step="any" class="field" value="${r.slab?.base_kg ?? 0.5}">`)}
+                        ${field('sBase', 'Price of first slab', `<input id="sBase" type="number" min="0" step="0.001" class="field" value="${r.slab?.base_price ?? ''}">`)}
+                        ${field('sStepKg', 'Each extra (kg)', `<input id="sStepKg" type="number" min="0" step="any" class="field" value="${r.slab?.step_kg ?? 0.5}">`)}
+                        ${field('sStep', 'Price per extra step', `<input id="sStep" type="number" min="0" step="0.001" class="field" value="${r.slab?.step_price ?? ''}">`)}
+                        <p class="col-span-full text-[11px] text-gray-400">Actual weight only (no volumetric). E.g. first 0.5 kg = 5.000, each extra 0.5 kg = 2.000 → 1.2 kg = 5 + 2 × 2 = 9.000. For one price per envelope, set a large first slab and no extra price.</p></div>
                     <div data-for="box_size" class="sm:col-span-2"><p class="ui-label">Box sizes (cm) — each box is charged at the smallest size it fits</p><div id="rSizes" class="space-y-2">${(r.sizes?.length ? r.sizes : [{}]).map(sizeRow).join('')}</div>
                         <button type="button" class="btn btn-light btn-sm mt-2" onclick="document.getElementById('rSizes').insertAdjacentHTML('beforeend', _sizeHtml())"><span data-icon="plus"></span>Add size</button></div>
                     <div class="sm:col-span-2">${field('rNote', 'Note', `<input id="rNote" class="field" value="${esc(r.note || '')}">`)}</div>
@@ -540,13 +548,15 @@
                 async () => {
                     const bands = [...document.querySelectorAll('#rBands [data-band]')].map(x => Object.fromEntries([...x.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
                     const sizes = [...document.querySelectorAll('#rSizes [data-size]')].map(x => Object.fromEntries([...x.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
-                    await api('/api/accounts', { method: 'POST', body: { action: 'rate_save', id: id || null, branch_code: ctx.full ? $('xBranch').value : ctx.my_branch, dest_country_code: $('rDest').value, cargo_type_code: $('rCargo').value, commodity: $('rCom').value, sizes, method: cache.rateMethod, rate: $('rRate').value, min_charge: $('rMin').value, bands, extra_per_kg: $('rExtra').value, note: $('rNote').value, active: $('rActive').checked } });
+                    await api('/api/accounts', { method: 'POST', body: { action: 'rate_save', id: id || null, branch_code: ctx.full ? $('xBranch').value : ctx.my_branch, dest_country_code: $('rDest').value, cargo_type_code: $('rCargo').value, commodity: $('rCom').value, sizes, slab: { base_kg: $('sBaseKg').value, base_price: $('sBase').value, step_kg: $('sStepKg').value, step_price: $('sStep').value }, method: cache.rateMethod, rate: $('rRate').value, min_charge: $('rMin').value, bands, extra_per_kg: $('rExtra').value, note: $('rNote').value, active: $('rActive').checked } });
                     toast(true, 'Rate card saved.');
                 }, 'Save', id ? `<button type="button" class="btn btn-danger" onclick="deleteRate(${id})">Delete</button>` : '');
             const setMethod = (m) => {
                 cache.rateMethod = m;
                 document.querySelectorAll('[data-method]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.method === m)));
-                document.querySelector('[data-for=simple]').classList.toggle('hidden', ['vol_band', 'box_size'].includes(m));
+                document.querySelector('[data-for=simple]').classList.toggle('hidden', ['vol_band', 'box_size', 'doc_slab'].includes(m));
+                document.querySelector('[data-for=doc_slab]').classList.toggle('hidden', m !== 'doc_slab');
+                if (m === 'doc_slab' && $('rCom').value === '*' && [...$('rCom').options].some(o => o.value === 'DOC')) $('rCom').value = 'DOC';
                 document.querySelector('[data-for=box_size]').classList.toggle('hidden', m !== 'box_size');
                 document.querySelector('[data-for=vol_band]').classList.toggle('hidden', m !== 'vol_band');
                 $('rRateLabel').textContent = { per_kg: 'Price per kg', per_package: 'Price per package', per_box: 'Price per box', per_cbm: 'Price per CBM (m³)' }[m] || 'Rate';
@@ -617,14 +627,17 @@
                 'Save', id ? delBtn('package_delete', id) : '');
         };
         window.editCharge = (id) => {
-            const c = (id && cache.rates.charges.find(x => String(x.id) === String(id))) || { basis: 'per_shipment', active: true };
+            const d = cache.rates, c = (id && d.charges.find(x => String(x.id) === String(id))) || { basis: 'per_shipment', active: true, cargo_type_code: '*', dest_country_code: '*' };
             form(id ? 'Edit extra charge' : 'New extra charge', 'Offered in the booking form.',
                 `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${branchPick('chBranch', c.branch_code, id)}
                     ${field('chName', 'Name <span class="req">*</span>', `<input id="chName" class="field" required value="${esc(c.name || '')}" placeholder="Handling, Packing…">`)}
                     ${field('chBasis', 'Counted', `<select id="chBasis" class="field">${[['per_shipment', 'Per shipment'], ['per_box', 'Per box'], ['per_kg', 'Per kg (chargeable)']].map(([k, l]) => `<option value="${k}" ${k === c.basis ? 'selected' : ''}>${l}</option>`).join('')}</select>`)}
                     ${field('chPrice', 'Price <span class="req">*</span>', `<input id="chPrice" type="number" min="0" step="0.001" class="field" required value="${c.price ?? ''}">`)}
+                    ${field('chCargo', 'Cargo type', `<select id="chCargo" class="field"><option value="*">Any cargo</option>${d.cargo_types.map(t => `<option value="${t.code}" ${t.code === c.cargo_type_code ? 'selected' : ''}>${t.code} · ${esc(t.name)}</option>`).join('')}</select>`)}
+                    ${field('chDest', 'Destination', `<select id="chDest" class="field">${destOptions(d, c.dest_country_code || '*')}</select>`)}
+                    <label class="sm:col-span-2 flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100 cursor-pointer"><input id="chAuto" type="checkbox" class="w-4 h-4" ${c.auto_add ? 'checked' : ''}><span class="text-xs font-bold">Add automatically</span><span class="text-[11px] text-gray-400">— to every booking with this cargo type / destination (staff can still remove it)</span></label>
                     <label class="flex items-center gap-2 text-xs font-bold"><input id="chActive" type="checkbox" class="w-4 h-4" ${c.active ? 'checked' : ''}>Active</label></div>`,
-                async () => { await api('/api/accounts', { method: 'POST', body: { action: 'charge_save', id: id || null, branch_code: pickedBranch('chBranch') || c.branch_code, name: $('chName').value, basis: $('chBasis').value, price: $('chPrice').value, active: $('chActive').checked } }); toast(true, 'Charge saved.'); },
+                async () => { await api('/api/accounts', { method: 'POST', body: { action: 'charge_save', id: id || null, branch_code: pickedBranch('chBranch') || c.branch_code, name: $('chName').value, basis: $('chBasis').value, price: $('chPrice').value, cargo_type_code: $('chCargo').value, dest_country_code: $('chDest').value, auto_add: $('chAuto').checked, active: $('chActive').checked } }); toast(true, 'Charge saved.'); },
                 'Save', id ? delBtn('charge_delete', id) : '');
         };
         window.editCommodity = (code) => {

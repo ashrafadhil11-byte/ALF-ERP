@@ -211,3 +211,40 @@ test('accounts: commodities are admin-only; box-size cards need sizes', async ()
     await accounts(req('POST', { body: { action: 'rate_save', branch_code: 'ALFSLL', method: 'box_size', sizes: [{ name: 'S', l: 0 }] } }), r);
     assert.match(r.body.error, /box size/);
 });
+
+import { matchCharge } from '../api/_lib/accounts.js';
+
+test('documents slab: first 0.5 kg + each extra 0.5 kg, actual weight only', () => {
+    const doc = { dest_country_code: '*', cargo_type_code: '*', commodity: 'DOC', method: 'doc_slab', slab: { base_kg: 0.5, base_price: 5, step_kg: 0.5, step_price: 2 }, currency: 'OMR' };
+    const gen = { dest_country_code: '*', cargo_type_code: '*', commodity: '*', method: 'per_kg', rate: 1.8, currency: 'OMR' };
+    const p = (kg) => priceFor(doc, { kg: 99, actualKg: kg }).amount;
+    assert.deepEqual([p(0.3), p(0.5), p(0.6), p(1.0), p(1.2)], [5, 5, 7, 7, 9]);
+    // envelope with big dimensions: volumetric is ignored for documents, not for parcels
+    const q = quoteShipment([doc, gen], { dest: 'IN', boxes: [{ weight: 0.4, l: 40, w: 30, h: 5, commodity: 'DOC' }, { weight: 3, l: 40, w: 40, h: 40, commodity: 'GEN' }], commodityNames: { DOC: 'Documents' } });
+    assert.deepEqual(q.lines.map(l => [l.commodity, l.amount]), [['DOC', 5], ['GEN', 23.04]]);
+});
+
+test('extra charges: price by cargo type, most specific wins, missing = not applicable', () => {
+    const items = [
+        { name: 'Handling', basis: 'per_box', price: 2, cargo_type_code: '1', dest_country_code: '*' },
+        { name: 'Handling', basis: 'per_box', price: 2.5, cargo_type_code: '2', dest_country_code: '*' },
+        { name: 'Handling', basis: 'per_box', price: 3, cargo_type_code: '2', dest_country_code: 'NP' },
+        { name: 'Insurance', basis: 'per_shipment', price: 1, cargo_type_code: '1', dest_country_code: '*' }
+    ];
+    assert.equal(matchCharge(items, { name: 'Handling', cargo: '1', dest: 'IN' }).price, 2);
+    assert.equal(matchCharge(items, { name: 'Handling', cargo: '2', dest: 'IN' }).price, 2.5);
+    assert.equal(matchCharge(items, { name: 'Handling', cargo: '2', dest: 'np' }).price, 3);
+    assert.equal(matchCharge(items, { name: 'Insurance', cargo: '2', dest: 'IN' }), null);
+});
+
+test('accounts: charge saved with cargo / destination / auto; doc slab needs its first slab', async () => {
+    const calls = fake(ADMIN, { '/rest/v1/branches?branch_code=eq.ALFSLL': () => [{ branch_code: 'ALFSLL', currency: 'OMR' }] });
+    let r = res();
+    await accounts(req('POST', { body: { action: 'charge_save', branch_code: 'ALFSLL', name: 'Handling', basis: 'per_box', price: '2.5', cargo_type_code: '2', dest_country_code: 'xx1', auto_add: true } }), r);
+    assert.equal(r.body.success, true);
+    const row = calls.find(c => c.url.includes('/rest/v1/charge_items') && c.opts.method === 'POST').body;
+    assert.deepEqual([row.cargo_type_code, row.dest_country_code, row.auto_add, row.price], ['2', '*', true, 2.5]);
+    r = res();
+    await accounts(req('POST', { body: { action: 'rate_save', branch_code: 'ALFSLL', method: 'doc_slab', slab: { base_kg: '', base_price: '' } } }), r);
+    assert.match(r.body.error, /first slab/);
+});
