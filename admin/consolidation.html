@@ -281,13 +281,27 @@
         $('actBranch').onchange = () => { batch.clear(); loadTransfers(); };
 
         // ---------- outbound ----------
+        const obPieces = {};   // AWB → [boxes] when not all boxes go
+        async function addOutbound(awb) {
+            const h = T.held.find(x => x.awb === awb);
+            if (h && +h.pieces > 1) {
+                const pick = await UI.pickBoxes(awb, { title: 'Boxes to send', confirmText: 'Add' });
+                if (!pick) return false;
+                if (pick.pieces) obPieces[awb] = pick.pieces; else delete obPieces[awb];
+            }
+            batch.add(awb); return true;
+        }
+        window.reBoxOut = async (awb) => {
+            const pick = await UI.pickBoxes(awb, { title: 'Boxes to send', confirmText: 'Save' });
+            if (pick) { if (pick.pieces) obPieces[awb] = pick.pieces; else delete obPieces[awb]; renderOutbound(); }
+        };
         function renderOutbound() {
             const q = $('obFilter').value.trim().toLowerCase();
             const rows = T.held.filter(b => !q || [b.awb, b.consignee, b.dest_city, b.dest_country].some(v => String(v || '').toLowerCase().includes(q)));
             $('obRows').innerHTML = rows.map(b => `<tr class="${batch.has(b.awb) ? 'bg-[#FFF5F3]' : ''}">
                 <td class="p-3 pl-4" data-label=""><input type="checkbox" class="w-4 h-4" data-ob="${esc(b.awb)}" ${batch.has(b.awb) ? 'checked' : ''} aria-label="Select ${esc(b.awb)}"></td>
                 <td class="p-3 font-extrabold font-mono" data-label="AWB">${esc(b.awb)}</td>
-                <td class="p-3" data-label="Receiver">${esc(b.consignee || '—')}</td>
+                <td class="p-3" data-label="Receiver">${esc(b.consignee || '—')}${+b.pieces > 1 ? `<button type="button" onclick="reBoxOut('${esc(b.awb)}')" class="block text-[10px] font-extrabold ${obPieces[b.awb] ? 'text-[#D55C48]' : 'text-gray-400'} hover:underline">${obPieces[b.awb] ? `Boxes ${obPieces[b.awb].join(', ')} of ${b.pieces}` : `${b.pieces} boxes`}${batch.has(b.awb) ? ' · change' : ''}</button>` : ''}</td>
                 <td class="p-3" data-label="Destination">${esc([b.dest_city, b.dest_country].filter(Boolean).join(', ') || '—')}</td>
                 <td class="p-3" data-label="Status"><span class="pill-tag pill-gray">${esc(b.current_status || '')}</span></td></tr>`).join('')
                 || `<tr><td colspan="5" class="p-8 text-center text-gray-400">${q ? 'No match.' : 'No shipments held at this branch.'}</td></tr>`;
@@ -301,22 +315,26 @@
                 return `<button type="button" data-print-tr="${m.id}" class="w-full flex items-center justify-between gap-3 p-3 rounded-2xl hover:bg-[#F8F8FA] text-left">
                     <span class="min-w-0"><span class="block text-xs font-extrabold font-mono truncate">${esc(m.manifest_no)}</span>
                     <span class="block text-[10px] text-gray-400">→ ${esc(bname(m.to_branch))} · ${fmt(m.created_at)}</span></span>
-                    <span class="pill-tag ${pill}">${got}/${total} ${m.status === 'in_transit' ? 'in transit' : m.status}</span></button>`;
+                    <span class="text-right"><span class="pill-tag ${pill}">${got}/${total} ${m.status === 'in_transit' ? 'in transit' : m.status}</span>${m.transfers.some(t => t.missing_pieces) ? '<span class="block pill-tag pill-coral mt-1">boxes missing</span>' : ''}</span></button>`;
             }).join('') || '<p class="text-xs text-gray-400 text-center py-4">Nothing sent yet.</p>';
             UI.paintIcons();
         }
         $('obFilter').oninput = renderOutbound;
-        $('obRows').addEventListener('change', (e) => { const a = e.target.dataset.ob; if (!a) return; e.target.checked ? batch.add(a) : batch.delete(a); renderOutbound(); });
+        $('obRows').addEventListener('change', async (e) => {
+            const a = e.target.dataset.ob; if (!a) return;
+            if (e.target.checked) { if (!await addOutbound(a)) e.target.checked = false; } else { batch.delete(a); delete obPieces[a]; }
+            renderOutbound();
+        });
         $('obAll').onchange = (e) => {
             const q = $('obFilter').value.trim().toLowerCase();
             T.held.filter(b => !q || [b.awb, b.consignee, b.dest_city, b.dest_country].some(v => String(v || '').toLowerCase().includes(q))).forEach(b => e.target.checked ? batch.add(b.awb) : batch.delete(b.awb));
             renderOutbound();
         };
-        $('obScan').onsubmit = (e) => {
+        $('obScan').onsubmit = async (e) => {
             e.preventDefault();
             const a = UI.clean($('obInput').value); $('obInput').value = '';
             if (!a) return;
-            if (T.held.some(h => h.awb === a)) { batch.add(a); UI.beep(true); toast(true, `${a} added`); }
+            if (T.held.some(h => h.awb === a)) { if (await addOutbound(a)) { UI.beep(true); toast(true, `${a} added${obPieces[a] ? ` (boxes ${obPieces[a].join(', ')})` : ''}`); } }
             else { UI.beep(false); toast(false, `${a} is not held at ${bname(T.branch)} (or is already in transit).`); }
             renderOutbound();
         };
@@ -327,9 +345,9 @@
             if (!await UI.confirm({ title: `Send ${batch.size} shipment(s) to ${esc(bname(to))}?`, message: 'A transfer manifest is created. The receiving branch scans them in on arrival.', confirmText: 'Send' })) return;
             $('obSend').disabled = true;
             try {
-                const r = await api('/api/transfers', { method: 'POST', body: { action: 'outbound', branch: T.branch, awbs: [...batch], to_branch: to, vehicle: $('obVehicle').value, driver: $('obDriver').value, seal: $('obSeal').value, notes: $('obNotes').value } });
+                const r = await api('/api/transfers', { method: 'POST', body: { action: 'outbound', branch: T.branch, awbs: [...batch], pieces: Object.fromEntries([...batch].filter(a => obPieces[a]).map(a => [a, obPieces[a]])), to_branch: to, vehicle: $('obVehicle').value, driver: $('obDriver').value, seal: $('obSeal').value, notes: $('obNotes').value } });
                 toast(true, `${r.manifest_no}: ${r.count} shipment(s) sent.`);
-                batch.clear(); ['obVehicle', 'obDriver', 'obSeal', 'obNotes'].forEach(id => $(id).value = '');
+                batch.clear(); Object.keys(obPieces).forEach(k => delete obPieces[k]); ['obVehicle', 'obDriver', 'obSeal', 'obNotes'].forEach(id => $(id).value = '');
                 await loadTransfers();
                 printTransfer(r.id);
             } catch (err) { toast(false, err.message); $('obSend').disabled = false; }
@@ -346,7 +364,7 @@
                         <span class="pill-tag ${left.length ? 'pill-amber' : 'pill-green'}">${items.length - left.length}/${items.length} received</span>
                     </div>
                     <div class="w-full h-1.5 bg-white rounded-full mt-3 overflow-hidden"><div class="h-full bg-coral-500 rounded-full transition-all duration-500" style="width:${items.length ? Math.round((items.length - left.length) / items.length * 100) : 0}%"></div></div>
-                    <div class="flex flex-wrap gap-1.5 mt-3">${items.map(t => `<span class="pill-tag ${t.status === 'received' ? 'pill-green' : 'pill-gray'} font-mono">${t.status === 'received' ? '✓ ' : ''}${esc(t.bookings?.awb)}</span>`).join('')}</div>
+                    <div class="flex flex-wrap gap-1.5 mt-3">${items.map(t => `<span class="pill-tag ${t.missing_pieces ? 'pill-coral' : t.status === 'received' ? 'pill-green' : 'pill-gray'} font-mono">${t.status === 'received' ? '✓ ' : ''}${esc(t.bookings?.awb)}${t.pieces ? ` · box ${t.pieces.join(',')}` : +t.bookings?.pieces > 1 ? ` · ${t.bookings.pieces} boxes` : ''}${t.missing_pieces ? ` · missing ${t.missing_pieces.join(',')}` : ''}</span>`).join('')}</div>
                     <div class="flex flex-wrap gap-2 mt-4">
                         ${left.length ? `<button type="button" class="btn btn-dark btn-sm" data-recv-all="${m.id}"><span data-icon="checkCircle"></span>Receive all ${left.length}</button>` : ''}
                         <button type="button" class="btn btn-light btn-sm" data-print-tr="${m.id}"><span data-icon="clipboard"></span>Manifest</button>
@@ -355,24 +373,39 @@
             UI.paintIcons();
         }
         const RESULT = {
-            received: [true, 'Received'], already_here: [false, 'Already at this branch'], not_found: [false, 'AWB not found'],
+            received: [true, 'Received'], received_short: [true, 'Received — boxes missing'], no_boxes: [false, 'No boxes ticked'], already_here: [false, 'Already at this branch'], not_found: [false, 'AWB not found'],
             not_expected: [false, 'Not on any manifest to this branch'], wrong_branch: [false, 'Going to another branch']
         };
-        async function receive(awbs) {
+        async function receive(awbs, pieces = {}) {
             try {
-                const r = await api('/api/transfers', { method: 'POST', body: { action: 'inbound', branch: T.branch, awbs, note: $('ibNote').value } });
+                const r = await api('/api/transfers', { method: 'POST', body: { action: 'inbound', branch: T.branch, awbs, pieces, note: $('ibNote').value } });
                 r.results.forEach(x => {
                     const [ok, label] = RESULT[x.result] || [false, x.result];
                     UI.beep(ok);
                     $('ibLast').insertAdjacentHTML('afterbegin', `<div class="ui-fade flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${ok ? 'bg-emerald-500/15' : 'bg-coral-500/20'}">
-                        <span class="font-mono text-xs font-extrabold">${esc(x.awb)}</span><span class="text-[11px] font-bold ${ok ? 'text-emerald-300' : 'text-coral-200'}">${esc(label)}${x.result === 'wrong_branch' && x.to_branch ? ' (' + esc(bname(x.to_branch)) + ')' : ''}</span></div>`);
+                        <span class="font-mono text-xs font-extrabold">${esc(x.awb)}</span><span class="text-[11px] font-bold ${ok ? 'text-emerald-300' : 'text-coral-200'}">${esc(label)}${x.result === 'wrong_branch' && x.to_branch ? ' (' + esc(bname(x.to_branch)) + ')' : ''}${x.missing ? ': box ' + esc(x.missing.join(', ')) : ''}</span></div>`);
+                    if (x.result === 'received_short') toast(false, `${x.awb}: box ${x.missing.join(', ')} not received — recorded as missing.`);
                 });
-                const got = r.results.filter(x => x.result === 'received').length;
+                const got = r.results.filter(x => x.result === 'received' || x.result === 'received_short').length;
                 if (awbs.length > 1) toast(got > 0, `${got} of ${awbs.length} received.`);
                 await loadTransfers();
             } catch (err) { UI.beep(false); toast(false, err.message); }
         }
-        $('ibScan').onsubmit = (e) => { e.preventDefault(); const a = UI.clean($('ibInput').value); $('ibInput').value = ''; if (a) receive([a]); };
+        // scanned / typed AWB: show the boxes that were sent, all ticked; untick what did not arrive
+        $('ibScan').onsubmit = async (e) => {
+            e.preventDefault();
+            const a = UI.clean($('ibInput').value); $('ibInput').value = '';
+            if (!a) return;
+            const t = T.incoming.flatMap(m => m.transfers).find(x => x.status === 'pending' && x.bookings?.awb === a);
+            const sent = t ? (t.pieces || (+t.bookings.pieces > 1 ? Array.from({ length: +t.bookings.pieces }, (_, i) => i + 1) : null)) : null;
+            if (sent && sent.length > 1) {
+                const pick = await UI.pickBoxes(a, { title: 'Boxes that arrived', confirmText: 'Receive', only: sent });
+                if (!pick) return;
+                const got = pick.pieces || sent;
+                return receive([a], got.length < sent.length ? { [a]: got } : {});
+            }
+            receive([a]);
+        };
         document.addEventListener('click', async (e) => {
             const all = e.target.closest('[data-recv-all]');
             if (all) {

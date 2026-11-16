@@ -116,3 +116,15 @@ test('notifications: "seen" stamps the employee row', async () => {
     const patch = calls.find(c => c.opts.method === 'PATCH');
     assert.ok(patch.url.includes('employees?id=eq.u1') && patch.body.notif_seen_at);
 });
+
+test('transfers: boxes sent / boxes received are passed to the database', async () => {
+    let calls = fake(STAFF, { 'rpc/transfer_outbound': () => ({ id: 1, manifest_no: 'TR-ALFSNY-00001', count: 1 }) });
+    let r = res();
+    await transfers(req('POST', { body: { action: 'outbound', awbs: ['a1'], to_branch: 'ALFSLL', pieces: { a1: [1, '2'] } } }), r);
+    assert.deepEqual(calls.find(c => c.url.includes('transfer_outbound')).body.p_pieces, { A1: [1, 2] });
+    calls = fake(STAFF, { 'rpc/transfer_inbound': () => [{ awb: 'A1', result: 'received_short', missing: [2] }] });
+    r = res();
+    await transfers(req('POST', { body: { action: 'inbound', awbs: ['A1'], pieces: { A1: [1] } } }), r);
+    assert.deepEqual(calls.find(c => c.url.includes('transfer_inbound')).body.p_pieces, { A1: [1] });
+    assert.deepEqual(r.body.results[0].missing, [2]);
+});
