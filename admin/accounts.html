@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
+    <title>Accounts - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/countries.js"></script>
+    <script src="components/ui.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
+    </script>
+    <style>
+        .tab[aria-selected="true"] { background: #111827; color: #fff; }
+        .opt[aria-pressed="true"] { background: #111827; color: #fff; }
+        .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .rep td, .rep th { padding: .55rem .75rem; }
+        .rep tr.total td { font-weight: 800; border-top: 2px solid #111827; }
+    </style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar pb-24 lg:pb-4">
+            <section class="flex flex-col xl:flex-row xl:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center"><span data-icon="cash"></span></div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Accounts</span><span id="scopePill" class="pill-tag pill-gray"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Invoices • receipts • expenses • cash • reports — per currency</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-end gap-2">
+                    <div id="branchWrap" class="hidden"><label class="ui-label" for="fBranch">Branch</label><select id="fBranch" class="field !py-2 !w-52"></select></div>
+                    <div><label class="ui-label" for="fFrom">From</label><input id="fFrom" type="date" class="field !py-2 !w-40"></div>
+                    <div><label class="ui-label" for="fTo">To</label><input id="fTo" type="date" class="field !py-2 !w-40"></div>
+                    <div class="flex gap-1 bg-[#F8F8FA] p-1 rounded-full">
+                        <button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-range="today">Today</button>
+                        <button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-range="month" aria-pressed="true">Month</button>
+                        <button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-range="year">Year</button>
+                    </div>
+                </div>
+            </section>
+
+            <div id="tabs" class="flex flex-wrap gap-1.5 bg-[#F8F8FA] p-1.5 rounded-[1.5rem] w-fit mb-5" role="tablist"></div>
+            <div id="panel"></div>
+        </div>
+    </main>
+
+    <!-- Generic form modal -->
+    <div id="formModal" class="ui-modal">
+        <form id="form" class="panel max-w-2xl">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 id="formTitle" class="text-lg font-extrabold"></h3><p id="formSub" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('formModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div id="formBody" class="my-5 overflow-y-auto custom-scrollbar pr-1"></div>
+            <div class="flex flex-wrap justify-between gap-2 pt-4 border-t border-gray-100">
+                <div id="formExtra" class="flex flex-wrap gap-2"></div>
+                <div class="flex gap-2"><button type="button" class="btn btn-light" onclick="UI.closeModal('formModal')">Close</button><button id="formOk" class="btn btn-dark">Save</button></div>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const { api, esc, toast, openModal, closeModal } = UI;
+        const $ = (id) => document.getElementById(id);
+        const THREE = ['OMR', 'BHD', 'KWD', 'JOD', 'TND', 'LYD', 'IQD'];
+        const money = (cur, v) => `${cur ? cur + ' ' : ''}${(Number(v) || 0).toLocaleString('en', { minimumFractionDigits: THREE.includes(cur) ? 3 : 2, maximumFractionDigits: THREE.includes(cur) ? 3 : 2 })}`;
+        const fmt = (cur, v) => money(cur, v).replace(/^[A-Z]{3} /, '');
+        const day = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        const iso = (d) => d.toISOString().slice(0, 10);
+        const METHOD_LABEL = { cash: 'Cash', card: 'Card', bank: 'Bank', payable: 'On account (payable)' };
+        const PRICE_LABEL = { per_kg: 'Per kg', vol_band: 'Weight band', per_package: 'Per package', per_box: 'Per box' };
+        const STATUS_PILL = { paid: 'pill-green', partial: 'pill-amber', unpaid: 'pill-coral', void: 'pill-gray' };
+        let ctx = { full: false, branches: [], my_branch: null }, tab = new URLSearchParams(location.search).get('tab') || 'overview';
+        let cache = {};
+
+        const TABS = [
+            ['overview', 'Overview'], ['invoices', 'Invoices'], ['payments', 'Receipts'], ['expenses', 'Expenses'],
+            ['cash', 'Cash closing'], ['balances', 'Customer balances'], ['rates', 'Rate cards'],
+            ['reports', 'Reports', true], ['journal', 'Journal', true], ['chart', 'Chart of accounts', true]
+        ];
+
+        // ---------- filters ----------
+        const setRange = (r) => {
+            const now = new Date(), t = iso(now);
+            $('fTo').value = t;
+            $('fFrom').value = r === 'today' ? t : r === 'year' ? `${t.slice(0, 4)}-01-01` : `${t.slice(0, 8)}01`;
+            document.querySelectorAll('[data-range]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.range === r)));
+        };
+        document.querySelectorAll('[data-range]').forEach(b => b.onclick = () => { setRange(b.dataset.range); show(); });
+        ['fFrom', 'fTo', 'fBranch'].forEach(id => $(id).onchange = () => { document.querySelectorAll('[data-range]').forEach(b => b.setAttribute('aria-pressed', 'false')); show(); });
+        const qs = (extra = {}) => new URLSearchParams({ from: $('fFrom').value, to: $('fTo').value, ...(ctx.full && $('fBranch').value ? { branch: $('fBranch').value } : {}), ...extra }).toString();
+        const curBranch = () => (ctx.full ? $('fBranch').value : ctx.my_branch) || '';
+        const needBranch = () => { if (!curBranch()) { toast(false, 'Choose a branch first (top right).'); return false; } return true; };
+
+        function drawTabs() {
+            $('tabs').innerHTML = TABS.filter(([, , fullOnly]) => !fullOnly || ctx.full)
+                .map(([k, l]) => `<button type="button" class="tab px-4 py-2 rounded-full text-xs font-extrabold" data-tab="${k}" aria-selected="${k === tab}">${l}</button>`).join('');
+            $('tabs').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; history.replaceState(null, '', `?tab=${tab}`); drawTabs(); show(); });
+        }
+        const panel = (html) => { $('panel').innerHTML = `<div class="ui-fade">${html}</div>`; UI.paintIcons(); };
+        const table = (head, rows, empty) => `<div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden"><table class="rtable w-full text-xs">
+            <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">${head.map((h, i) => `<th class="p-3 ${i === 0 ? 'pl-4' : ''} font-extrabold ${/right/.test(h[1] || '') ? 'text-right' : ''}">${h[0]}</th>`).join('')}</tr></thead>
+            <tbody class="divide-y divide-gray-100">${rows || `<tr><td colspan="${head.length}" class="p-8 text-center text-gray-400">${empty}</td></tr>`}</tbody></table></div>`;
+        const toolbar = (left, right) => `<div class="flex flex-wrap items-center justify-between gap-3 mb-4"><div class="flex flex-wrap gap-2 items-center">${left || ''}</div><div class="flex flex-wrap gap-2">${right || ''}</div></div>`;
+
+        // ---------- views ----------
+        async function show() {
+            $('panel').innerHTML = '<div class="h-40 flex items-center justify-center text-xs font-bold text-gray-300 animate-pulse">Loading…</div>';
+            try { await (VIEWS[tab] || VIEWS.overview)(); } catch (e) { panel(`<p class="p-6 text-xs text-coral-600 bg-[#FFF5F3] rounded-2xl">${esc(e.message)}</p>`); }
+        }
+        const VIEWS = {
+            async overview() {
+                const d = await api(`/api/accounts?view=overview&${qs()}`);
+                const cards = d.currencies.map(c => `
+                    <div class="bg-[#F8F8FA] rounded-[2rem] p-5 space-y-4">
+                        <div class="flex items-center justify-between"><span class="pill-tag pill-dark">${esc(c.currency)}</span><span class="text-[10px] font-bold text-gray-400">${day(d.from)} – ${day(d.to)}</span></div>
+                        <div class="grid grid-cols-2 gap-3">
+                            ${[['Invoiced', c.invoiced], ['Collected', c.collected], ['Expenses', c.expenses], ['Profit', c.profit]].map(([l, v]) => `<div class="bg-white rounded-2xl p-3"><p class="sd-label">${l}</p><p class="text-lg font-extrabold money ${l === 'Profit' ? (v < 0 ? 'text-[#D55C48]' : 'text-emerald-600') : ''}">${fmt(c.currency, v)}</p></div>`).join('')}
+                        </div>
+                        <div class="flex flex-wrap gap-1.5 text-[11px]">${['cash', 'card', 'bank'].map(m => `<span class="pill-tag pill-gray">${METHOD_LABEL[m]} ${fmt(c.currency, c[m])}</span>`).join('')}</div>
+                        <div class="flex items-center justify-between bg-white rounded-2xl p-3"><div><p class="sd-label">Owed by customers</p><p class="text-base font-extrabold money">${money(c.currency, c.receivable)}</p></div>
+                        ${c.overdue ? `<span class="pill-tag pill-coral">${fmt(c.currency, c.overdue)} overdue</span>` : '<span class="pill-tag pill-green">Nothing overdue</span>'}</div>
+                    </div>`).join('');
+                panel(toolbar('', `<button type="button" class="btn btn-coral" onclick="newInvoice()"><span data-icon="plus"></span>New invoice</button><button type="button" class="btn btn-light" onclick="newExpense()"><span data-icon="plus"></span>Expense</button>`)
+                    + `<div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">${cards || '<p class="col-span-full p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">No money movements in this period yet. Invoices are created automatically when a booking with a charge is saved.</p>'}</div>`);
+            },
+            async invoices() {
+                const status = cache.invStatus || 'open', q = cache.invQ || '';
+                const d = await api(`/api/accounts?view=invoices&${qs({ status, q })}`);
+                const rows = d.invoices.map(i => `<tr class="hover:bg-[#F8F8FA] cursor-pointer" data-inv="${i.id}">
+                    <td class="p-3 pl-4 font-extrabold font-mono" data-label="Invoice">${esc(i.invoice_no)}${i.awb ? `<span class="block text-[10px] text-gray-400 font-sans">${esc(i.awb)}</span>` : ''}</td>
+                    <td class="p-3" data-label="Customer">${esc(i.customer_name || '—')}<span class="block text-[10px] text-gray-400">${esc(i.customer_phone || '')}</span></td>
+                    <td class="p-3" data-label="Date">${day(i.issued_at)}${i.terms !== 'cash' ? `<span class="block text-[10px] text-gray-400">${i.terms === 'credit' ? 'Credit · due ' + day(i.due_date) : 'Pay on delivery'}</span>` : ''}</td>
+                    <td class="p-3 text-right money" data-label="Total">${money(i.currency, i.total)}</td>
+                    <td class="p-3 text-right money" data-label="Balance">${+i.balance ? money(i.currency, i.balance) : '—'}</td>
+                    <td class="p-3 pr-4" data-label="Status"><span class="pill-tag ${STATUS_PILL[i.status]}">${i.status}</span></td></tr>`).join('');
+                panel(toolbar(
+                    `<div class="flex gap-1 bg-[#F8F8FA] p-1 rounded-full">${[['open', 'Open'], ['paid', 'Paid'], ['void', 'Void'], ['all', 'All']].map(([k, l]) => `<button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-inv-status="${k}" aria-pressed="${k === status}">${l}</button>`).join('')}</div>
+                     <input id="invQ" class="field !py-2 !w-56 text-xs" placeholder="Search invoice, AWB, customer…" value="${esc(q)}">`,
+                    `<button type="button" class="btn btn-coral" onclick="newInvoice()"><span data-icon="plus"></span>New invoice</button>`)
+                    + table([['Invoice'], ['Customer'], ['Date'], ['Total', 'right'], ['Balance', 'right'], ['Status']], rows, 'No invoices for this filter.'));
+                document.querySelectorAll('[data-inv-status]').forEach(b => b.onclick = () => { cache.invStatus = b.dataset.invStatus; show(); });
+                let t; $('invQ').oninput = () => { clearTimeout(t); t = setTimeout(() => { cache.invQ = $('invQ').value; show().then(() => { const el = $('invQ'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }); }, 350); };
+            },
+            async payments() {
+                const d = await api(`/api/accounts?view=payments&${qs()}`);
+                const rows = d.payments.map(p => `<tr class="${p.void ? 'opacity-50' : ''}">
+                    <td class="p-3 pl-4 font-extrabold font-mono" data-label="Receipt">${esc(p.receipt_no)}</td>
+                    <td class="p-3" data-label="For">${esc(p.invoices?.invoice_no || 'On account')}${p.invoices?.awb ? `<span class="block text-[10px] text-gray-400">${esc(p.invoices.awb)}</span>` : ''}</td>
+                    <td class="p-3" data-label="Customer">${esc(p.customer_name || '—')}</td>
+                    <td class="p-3" data-label="Method">${METHOD_LABEL[p.method]}${p.reference ? ` · ${esc(p.reference)}` : ''}</td>
+                    <td class="p-3" data-label="Date">${day(p.received_at)}<span class="block text-[10px] text-gray-400">${esc(p.received_by_name || '')}</span></td>
+                    <td class="p-3 text-right money font-extrabold" data-label="Amount">${money(p.currency, p.amount)}</td>
+                    <td class="p-3 pr-4 text-right" data-label="">${p.void ? `<span class="pill-tag pill-gray" title="${esc(p.void_reason || '')}">Void</span>` : `<button type="button" class="btn btn-light btn-sm" onclick="voidDoc('payment_void', ${p.id}, '${esc(p.receipt_no)}')">Void</button>`}</td></tr>`).join('');
+                panel(table([['Receipt'], ['For'], ['Customer'], ['Method'], ['Date'], ['Amount', 'right'], ['']], rows, 'No receipts in this period.'));
+            },
+            async expenses() {
+                const d = await api(`/api/accounts?view=expenses&${qs()}`);
+                cache.categories = d.categories;
+                const rows = d.expenses.map(e => `<tr class="${e.void ? 'opacity-50' : ''}">
+                    <td class="p-3 pl-4 font-extrabold font-mono" data-label="No.">${esc(e.expense_no)}</td>
+                    <td class="p-3" data-label="Date">${day(e.expense_date)}</td>
+                    <td class="p-3" data-label="Category">${esc(e.accounts?.name || e.account_code)}</td>
+                    <td class="p-3" data-label="Paid to">${esc(e.paid_to || '—')}${e.notes ? `<span class="block text-[10px] text-gray-400">${esc(e.notes)}</span>` : ''}</td>
+                    <td class="p-3" data-label="Method">${METHOD_LABEL[e.method]}</td>
+                    <td class="p-3 text-right money font-extrabold" data-label="Amount">${money(e.currency, e.amount)}</td>
+                    <td class="p-3 pr-4 text-right" data-label="">${e.void ? '<span class="pill-tag pill-gray">Void</span>' : `<button type="button" class="btn btn-light btn-sm" onclick="voidDoc('expense_void', ${e.id}, '${esc(e.expense_no)}')">Void</button>`}</td></tr>`).join('');
+                panel(toolbar('', `<button type="button" class="btn btn-coral" onclick="newExpense()"><span data-icon="plus"></span>Add expense</button>`)
+                    + table([['No.'], ['Date'], ['Category'], ['Paid to'], ['Method'], ['Amount', 'right'], ['']], rows, 'No expenses in this period.'));
+            },
+            async cash() {
+                if (!curBranch()) return panel('<p class="p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">Choose a branch (top right) to close its cash.</p>');
+                const date = cache.cashDate || $('fTo').value;
+                const d = await api(`/api/accounts?view=cash&branch=${encodeURIComponent(curBranch())}&date=${date}`);
+                const closed = (c) => d.closings.find(x => x.currency === c && x.close_date === date);
+                const cards = d.days.map(c => {
+                    const done = closed(c.currency);
+                    return `<form class="bg-[#F8F8FA] rounded-[2rem] p-5 space-y-3" data-close="${esc(c.currency)}">
+                        <div class="flex items-center justify-between"><span class="pill-tag pill-dark">${esc(c.currency)}</span>${done ? `<span class="pill-tag ${+done.difference === 0 ? 'pill-green' : 'pill-amber'}">Closed by ${esc(done.closed_by_name || '')}</span>` : ''}</div>
+                        <div class="bg-white rounded-2xl p-4 text-xs space-y-1.5">
+                            <div class="flex justify-between"><span class="text-gray-500">Opening (last count${c.last_closed ? ' ' + day(c.last_closed) : ''})</span><span class="money font-bold">${fmt(c.currency, c.opening)}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500">+ Cash received</span><span class="money font-bold text-emerald-600">${fmt(c.currency, c.cash_in)}</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500">− Cash paid out</span><span class="money font-bold text-[#D55C48]">${fmt(c.currency, c.cash_out)}</span></div>
+                            <div class="flex justify-between border-t border-gray-100 pt-1.5"><span class="font-extrabold">Should be in the drawer</span><span class="money font-extrabold">${money(c.currency, c.expected)}</span></div>
+                        </div>
+                        ${done ? `<p class="text-xs">Counted <b class="money">${money(c.currency, done.counted)}</b> · difference <b class="money ${+done.difference ? 'text-[#D55C48]' : 'text-emerald-600'}">${fmt(c.currency, done.difference)}</b>${done.notes ? ` · ${esc(done.notes)}` : ''}</p>`
+                        : `<div class="grid grid-cols-2 gap-2"><input name="counted" type="number" step="0.001" min="0" class="field" placeholder="Counted" required aria-label="Counted cash"><input name="notes" class="field" placeholder="Note (optional)" aria-label="Note"></div>
+                           <button class="btn btn-dark w-full"><span data-icon="check"></span>Close ${esc(c.currency)} for ${day(date)}</button>`}
+                    </form>`;
+                }).join('');
+                const hist = d.closings.map(c => `<tr><td class="p-3 pl-4" data-label="Date">${day(c.close_date)}</td><td class="p-3" data-label="Currency">${esc(c.currency)}</td>
+                    <td class="p-3 text-right money" data-label="Expected">${fmt(c.currency, c.expected)}</td><td class="p-3 text-right money" data-label="Counted">${fmt(c.currency, c.counted)}</td>
+                    <td class="p-3 text-right money font-extrabold ${+c.difference ? 'text-[#D55C48]' : 'text-emerald-600'}" data-label="Difference">${fmt(c.currency, c.difference)}</td><td class="p-3 pr-4" data-label="By">${esc(c.closed_by_name || '')}</td></tr>`).join('');
+                panel(toolbar(`<label class="text-xs font-bold text-gray-500" for="cashDate">Day</label><input id="cashDate" type="date" class="field !py-2 !w-40" value="${date}" max="${iso(new Date())}">`, '')
+                    + `<div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4 mb-6">${cards}</div><p class="sd-label mb-2">History</p>`
+                    + table([['Date'], ['Currency'], ['Expected', 'right'], ['Counted', 'right'], ['Difference', 'right'], ['By']], hist, 'No closings yet.'));
+                $('cashDate').onchange = () => { cache.cashDate = $('cashDate').value; show(); };
+                document.querySelectorAll('[data-close]').forEach(f => f.onsubmit = async (e) => {
+                    e.preventDefault();
+                    const counted = f.counted.value;
+                    if (!await UI.confirm({ title: `Close ${esc(f.dataset.close)} cash for ${day(date)}?`, message: 'Any difference is booked as cash over / short. This cannot be undone.', confirmText: 'Close day' })) return;
+                    try { const r = await api('/api/accounts', { method: 'POST', body: { action: 'cash_close', branch: curBranch(), currency: f.dataset.close, date, counted, notes: f.notes.value } }); toast(true, +r.difference ? `Closed with a difference of ${fmt(c.currency, r.difference)}.` : 'Closed — cash matches.'); show(); }
+                    catch (err) { toast(false, err.message); }
+                });
+            },
+            async balances() {
+                const d = await api(`/api/accounts?view=balances&${qs()}`);
+                const rows = d.customers.map((c, i) => `<tr>
+                    <td class="p-3 pl-4" data-label="Customer"><span class="font-extrabold">${esc(c.customer_name || 'Unknown')}</span><span class="block text-[10px] text-gray-400">${esc(c.customer_phone || '')}</span></td>
+                    <td class="p-3" data-label="Invoices">${c.invoices.map(x => `<button type="button" class="pill-tag pill-gray font-mono mr-1 mb-1" data-inv="${x.id}">${esc(x.invoice_no)}</button>`).join('')}</td>
+                    <td class="p-3 text-right money" data-label="Overdue">${c.overdue ? `<span class="text-[#D55C48] font-bold">${fmt(c.currency, c.overdue)}</span>` : '—'}</td>
+                    <td class="p-3 pr-4 text-right money font-extrabold" data-label="Balance">${money(c.currency, c.balance)}</td></tr>`).join('');
+                panel(table([['Customer'], ['Open invoices'], ['Overdue', 'right'], ['Balance', 'right']], rows, 'Nobody owes anything right now.'));
+            },
+            async rates() {
+                const d = await api(`/api/accounts?view=rates&${qs()}`);
+                cache.rates = d;
+                const destName = (c) => c === '*' ? 'Any destination' : (d.destinations.find(x => x.country_code === c)?.country_name || (window.ALF_COUNTRIES || []).find(x => x.c === c)?.n || c);
+                const cargoName = (c) => c === '*' ? 'Any cargo' : (d.cargo_types.find(x => x.code === c)?.name || c);
+                const price = (r) => r.method === 'vol_band' ? r.bands.map(b => `≤${b.upto}kg ${fmt(r.currency, b.price)}`).join(' · ') + (+r.extra_per_kg ? ` · +${fmt(r.currency, r.extra_per_kg)}/kg` : '') : `${money(r.currency, r.rate)} ${PRICE_LABEL[r.method].toLowerCase()}`;
+                const rows = d.cards.map(r => `<tr class="${r.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-rate="${r.id}">
+                    <td class="p-3 pl-4 font-extrabold" data-label="Branch">${esc(r.branch_code)}</td>
+                    <td class="p-3" data-label="Destination">${esc(destName(r.dest_country_code))}</td>
+                    <td class="p-3" data-label="Cargo">${esc(cargoName(r.cargo_type_code))}</td>
+                    <td class="p-3" data-label="Method"><span class="pill-tag pill-gray">${PRICE_LABEL[r.method]}</span></td>
+                    <td class="p-3" data-label="Price">${esc(price(r))}</td>
+                    <td class="p-3 pr-4 text-right money" data-label="Minimum">${+r.min_charge ? money(r.currency, r.min_charge) : '—'}</td></tr>`).join('');
+                panel(toolbar('<p class="text-xs text-gray-500">The booking form fills the charge from the most specific card: destination + cargo, then destination, then cargo, then “any”.</p>',
+                    `<button type="button" class="btn btn-coral" onclick="editRate()"><span data-icon="plus"></span>New rate card</button>`)
+                    + table([['Branch'], ['Destination'], ['Cargo'], ['Method'], ['Price'], ['Minimum', 'right']], rows, 'No rate cards yet — the charge is typed by hand until you add one.'));
+            },
+            async reports() {
+                const d = await api(`/api/accounts?view=ledger&${qs()}`);
+                const kind = cache.report || 'pl';
+                const byCur = (rows) => rows.reduce((m, r) => ((m[r.currency] ||= []).push(r), m), {});
+                const amt = (r, natural) => natural === 'debit' ? r.debit - r.credit : r.credit - r.debit;
+                const section = (title, rows, natural, cur) => {
+                    const t = rows.reduce((s, r) => s + amt(r, natural), 0);
+                    return { html: `<tr><td colspan="2" class="pt-4 sd-label">${title}</td></tr>` + rows.map(r => `<tr><td>${esc(r.account_code)} · ${esc(r.name)}</td><td class="text-right money">${fmt(cur, amt(r, natural))}</td></tr>`).join('')
+                        + `<tr class="font-bold"><td>Total ${title.toLowerCase()}</td><td class="text-right money">${fmt(cur, t)}</td></tr>`, total: t };
+                };
+                let html = '';
+                if (kind === 'tb') {
+                    Object.entries(byCur(d.to_date)).forEach(([cur, rows]) => {
+                        const dr = rows.reduce((s, r) => s + Math.max(0, r.debit - r.credit), 0), cr = rows.reduce((s, r) => s + Math.max(0, r.credit - r.debit), 0);
+                        html += `<div class="bg-white rounded-[1.5rem] border border-gray-100 p-5"><p class="font-extrabold mb-2">Trial balance · ${esc(cur)} · to ${day(d.to)}</p><table class="rep w-full text-xs"><thead><tr class="sd-label text-left"><th>Account</th><th class="text-right">Debit</th><th class="text-right">Credit</th></tr></thead><tbody>
+                            ${rows.map(r => { const n = r.debit - r.credit; return `<tr><td>${esc(r.account_code)} · ${esc(r.name)}</td><td class="text-right money">${n > 0 ? fmt(cur, n) : ''}</td><td class="text-right money">${n < 0 ? fmt(cur, -n) : ''}</td></tr>`; }).join('')}
+                            <tr class="total"><td>Total ${Math.abs(dr - cr) < 0.0005 ? '✓ balanced' : '⚠ out of balance'}</td><td class="text-right money">${fmt(cur, dr)}</td><td class="text-right money">${fmt(cur, cr)}</td></tr></tbody></table></div>`;
+                    });
+                } else if (kind === 'pl') {
+                    Object.entries(byCur(d.period)).forEach(([cur, rows]) => {
+                        const inc = section('Income', rows.filter(r => r.type === 'income'), 'credit', cur), exp = section('Expenses', rows.filter(r => r.type === 'expense'), 'debit', cur);
+                        html += `<div class="bg-white rounded-[1.5rem] border border-gray-100 p-5"><p class="font-extrabold mb-2">Profit & loss · ${esc(cur)} · ${day(d.from)} – ${day(d.to)}</p><table class="rep w-full text-xs"><tbody>${inc.html}${exp.html}
+                            <tr class="total"><td>Net ${inc.total - exp.total >= 0 ? 'profit' : 'loss'}</td><td class="text-right money ${inc.total - exp.total < 0 ? 'text-[#D55C48]' : 'text-emerald-600'}">${money(cur, inc.total - exp.total)}</td></tr></tbody></table></div>`;
+                    });
+                } else {
+                    Object.entries(byCur(d.to_date)).forEach(([cur, rows]) => {
+                        const a = section('Assets', rows.filter(r => r.type === 'asset'), 'debit', cur), l = section('Liabilities', rows.filter(r => r.type === 'liability'), 'credit', cur);
+                        const eqRows = rows.filter(r => r.type === 'equity'), earnings = rows.filter(r => ['income', 'expense'].includes(r.type)).reduce((s, r) => s + r.credit - r.debit, 0);
+                        const e = section('Equity', [...eqRows, { account_code: '—', name: 'Retained earnings (profit to date)', debit: 0, credit: earnings }], 'credit', cur);
+                        html += `<div class="bg-white rounded-[1.5rem] border border-gray-100 p-5"><p class="font-extrabold mb-2">Balance sheet · ${esc(cur)} · at ${day(d.to)}</p><table class="rep w-full text-xs"><tbody>${a.html}${l.html}${e.html}
+                            <tr class="total"><td>Liabilities + equity ${Math.abs(a.total - l.total - e.total) < 0.0005 ? '✓' : '⚠'}</td><td class="text-right money">${money(cur, l.total + e.total)}</td></tr></tbody></table></div>`;
+                    });
+                }
+                panel(toolbar(`<div class="flex gap-1 bg-[#F8F8FA] p-1 rounded-full">${[['pl', 'Profit & loss'], ['bs', 'Balance sheet'], ['tb', 'Trial balance']].map(([k, l]) => `<button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-report="${k}" aria-pressed="${k === kind}">${l}</button>`).join('')}</div>`,
+                    `<button type="button" class="btn btn-light" onclick="window.print()"><span data-icon="clipboard"></span>Print</button>`)
+                    + `<p class="text-[11px] text-gray-400 mb-3">${d.branch ? 'Branch ' + esc(d.branch) : 'All branches'} · each currency is reported on its own.</p>`
+                    + `<div class="grid grid-cols-1 xl:grid-cols-2 gap-4">${html || '<p class="col-span-full p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">No postings yet.</p>'}</div>`);
+                document.querySelectorAll('[data-report]').forEach(b => b.onclick = () => { cache.report = b.dataset.report; show(); });
+            },
+            async journal() {
+                const d = await api(`/api/accounts?view=journal&${qs(cache.jAcct ? { account: cache.jAcct } : {})}`);
+                cache.accounts = d.accounts;
+                const name = (c) => d.accounts.find(a => a.code === c)?.name || c;
+                const rows = d.entries.map(e => `<tr>
+                    <td class="p-3 pl-4" data-label="Date">${day(e.entry_date)}<span class="block text-[10px] text-gray-400">#${e.id} · ${esc(e.branch_code)}</span></td>
+                    <td class="p-3" data-label="Memo"><span class="font-bold">${esc(e.memo || '')}</span><span class="block text-[10px] text-gray-400">${esc(e.source)} · ${esc(e.created_by_name || '')}</span></td>
+                    <td class="p-3" data-label="Lines">${e.journal_lines.map(l => `<div class="flex justify-between gap-4"><span class="${+l.credit ? 'pl-4 text-gray-500' : ''}">${esc(l.account_code)} ${esc(name(l.account_code))}</span><span class="money">${+l.debit ? 'Dr ' + fmt(e.currency, l.debit) : 'Cr ' + fmt(e.currency, l.credit)}</span></div>`).join('')}</td>
+                    <td class="p-3 pr-4" data-label="Currency"><span class="pill-tag pill-gray">${esc(e.currency)}</span></td></tr>`).join('');
+                panel(toolbar(`<select id="jAcct" class="field !py-2 !w-64 text-xs"><option value="">All accounts</option>${d.accounts.map(a => `<option value="${a.code}" ${a.code === cache.jAcct ? 'selected' : ''}>${a.code} · ${esc(a.name)}</option>`).join('')}</select>`,
+                    `<button type="button" class="btn btn-coral" onclick="newJournal()"><span data-icon="plus"></span>Manual journal</button>`)
+                    + table([['Date'], ['Memo'], ['Lines'], ['Cur.']], rows, 'No journal entries in this period.'));
+                $('jAcct').onchange = () => { cache.jAcct = $('jAcct').value; show(); };
+            },
+            async chart() {
+                const d = await api(`/api/accounts?view=journal&${qs({ from: '1900-01-01' })}`).catch(() => ({ accounts: [] }));
+                cache.accounts = d.accounts;
+                const rows = d.accounts.map(a => `<tr class="${a.active ? '' : 'opacity-50'} hover:bg-[#F8F8FA] cursor-pointer" data-acct="${a.code}">
+                    <td class="p-3 pl-4 font-mono font-extrabold" data-label="Code">${a.code}</td><td class="p-3" data-label="Name">${esc(a.name)}</td>
+                    <td class="p-3" data-label="Type"><span class="pill-tag pill-gray">${a.type}</span></td><td class="p-3 pr-4" data-label="">${a.active ? '' : 'Inactive'}</td></tr>`).join('');
+                panel(toolbar('<p class="text-xs text-gray-500">Codes: 1xxx assets · 2xxx liabilities · 3xxx equity · 4xxx income · 5xxx expenses.</p>', `<button type="button" class="btn btn-coral" onclick="editAccount()"><span data-icon="plus"></span>New account</button>`)
+                    + table([['Code'], ['Name'], ['Type'], ['']], rows, 'No accounts.'));
+            }
+        };
+
+        // ---------- forms ----------
+        let onSave = null;
+        function form(title, sub, body, save, okText = 'Save', extra = '') {
+            $('formTitle').textContent = title; $('formSub').textContent = sub || '';
+            $('formBody').innerHTML = body; $('formExtra').innerHTML = extra;
+            $('formOk').textContent = okText; $('formOk').classList.toggle('hidden', !save);
+            onSave = save; openModal('formModal'); UI.paintIcons();
+        }
+        $('form').onsubmit = async (e) => {
+            e.preventDefault(); if (!onSave) return;
+            $('formOk').disabled = true;
+            try { if (await onSave() !== false) { closeModal('formModal'); show(); } } catch (err) { toast(false, err.message); }
+            $('formOk').disabled = false;
+        };
+        const field = (id, label, input) => `<div><label class="ui-label" for="${id}">${label}</label>${input}</div>`;
+        const branchSelect = () => ctx.full ? field('xBranch', 'Branch <span class="req">*</span>', `<select id="xBranch" class="field">${ctx.branches.map(b => `<option value="${b.branch_code}" ${b.branch_code === curBranch() ? 'selected' : ''}>${esc(b.branch_name)} · ${esc(b.currency || '')}</option>`).join('')}</select>`) : '';
+        const xb = () => ctx.full ? $('xBranch').value : ctx.my_branch;
+
+        function lineRow(l = {}) {
+            return `<div class="grid grid-cols-[1fr_70px_110px_32px] gap-2" data-line>
+                <input class="field" placeholder="Description" value="${esc(l.description || '')}" data-k="description" aria-label="Description">
+                <input class="field" type="number" min="0" step="any" value="${l.qty || 1}" data-k="qty" aria-label="Qty">
+                <input class="field" type="number" min="0" step="0.001" value="${l.rate || ''}" placeholder="Rate" data-k="rate" aria-label="Rate">
+                <button type="button" class="icon-btn self-center" onclick="this.closest('[data-line]').remove()" aria-label="Remove line">${UI.icon('x', 'w-3.5 h-3.5')}</button></div>`;
+        }
+        window.newInvoice = () => {
+            if (!ctx.full && !ctx.my_branch) return toast(false, 'No branch on your account.');
+            form('New invoice', 'For extra charges or customers without a booking. Bookings are invoiced automatically.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${branchSelect()}
+                    ${field('iName', 'Customer', '<input id="iName" class="field">')}${field('iPhone', 'Phone', '<input id="iPhone" class="field" placeholder="+968 …">')}
+                    ${field('iAwb', 'AWB (optional)', '<input id="iAwb" class="field font-mono">')}
+                    ${field('iPay', 'Payment', '<select id="iPay" class="field"><option value="cash">Paid now — cash</option><option value="card">Paid now — card</option><option value="bank">Paid now — bank transfer</option><option value="credit">Credit (pay later)</option></select>')}
+                </div>
+                <p class="sd-label mt-5 mb-2">Lines</p><div id="iLines" class="space-y-2">${lineRow({ description: 'Freight charges' })}</div>
+                <button type="button" class="btn btn-light btn-sm mt-2" onclick="document.getElementById('iLines').insertAdjacentHTML('beforeend', lineRowHtml())"><span data-icon="plus"></span>Add line</button>`,
+                async () => {
+                    const lines = [...document.querySelectorAll('#iLines [data-line]')].map(r => Object.fromEntries([...r.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
+                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'invoice', branch: xb(), customer_name: $('iName').value, customer_phone: $('iPhone').value, awb: $('iAwb').value, pay_method: $('iPay').value, lines } });
+                    toast(true, `${r.invoice_no} created${r.payment ? ' and paid (' + r.payment.receipt_no + ')' : ''}.`);
+                    setTimeout(() => openInvoice(r.id), 300);
+                }, 'Create invoice');
+        };
+        window.lineRowHtml = () => lineRow();
+
+        window.newExpense = async () => {
+            if (!cache.categories) cache.categories = (await api(`/api/accounts?view=expenses&${qs()}`)).categories;
+            form('Add expense', 'Posted to the ledger straight away.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${branchSelect()}
+                    ${field('eCat', 'Category <span class="req">*</span>', `<select id="eCat" class="field">${cache.categories.map(c => `<option value="${c.code}">${esc(c.name)}</option>`).join('')}</select>`)}
+                    ${field('eAmt', 'Amount <span class="req">*</span>', '<input id="eAmt" type="number" min="0" step="0.001" class="field" required>')}
+                    ${field('eMethod', 'Paid by', `<select id="eMethod" class="field">${Object.entries(METHOD_LABEL).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>`)}
+                    ${field('eDate', 'Date', `<input id="eDate" type="date" class="field" value="${iso(new Date())}">`)}
+                    ${field('eTo', 'Paid to', '<input id="eTo" class="field" placeholder="e.g. Shell, landlord">')}
+                    ${field('eRef', 'Bill / reference no.', '<input id="eRef" class="field">')}
+                    <div class="sm:col-span-2">${field('eNotes', 'Notes', '<input id="eNotes" class="field">')}</div></div>`,
+                async () => {
+                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'expense', branch: xb(), account_code: $('eCat').value, amount: $('eAmt').value, method: $('eMethod').value, date: $('eDate').value, paid_to: $('eTo').value, reference: $('eRef').value, notes: $('eNotes').value } });
+                    toast(true, `${r.expense_no} saved.`);
+                });
+        };
+
+        window.voidDoc = (action, id, no) => {
+            form(`Void ${no}?`, 'The ledger entry is reversed. This cannot be undone.', field('vReason', 'Reason <span class="req">*</span>', '<input id="vReason" class="field" required placeholder="e.g. entered twice">'),
+                async () => { await api('/api/accounts', { method: 'POST', body: { action, id, reason: $('vReason').value } }); toast(true, `${no} voided.`); }, 'Void');
+            $('formOk').className = 'btn btn-coral';
+            setTimeout(() => $('vReason').focus(), 50);
+        };
+
+        async function openInvoice(id) {
+            const { invoice: i, payments, branch } = await api(`/api/accounts?view=invoice&id=${id}`);
+            cache.invoice = { i, payments, branch };
+            const lines = i.lines.map(l => `<tr><td class="py-1.5">${esc(l.description)}</td><td class="text-right">${l.qty}</td><td class="text-right money">${fmt(i.currency, l.rate)}</td><td class="text-right money">${fmt(i.currency, l.amount)}</td></tr>`).join('');
+            const pays = payments.map(p => `<div class="flex justify-between text-xs ${p.void ? 'line-through opacity-50' : ''}"><span>${esc(p.receipt_no)} · ${METHOD_LABEL[p.method]} · ${day(p.received_at)}</span><span class="money">${fmt(i.currency, p.amount)}</span></div>`).join('');
+            const open = ['unpaid', 'partial'].includes(i.status);
+            form(i.invoice_no, `${day(i.issued_at)} · ${i.branch_code}${i.awb ? ' · ' + i.awb : ''}`,
+                `<div class="flex flex-wrap justify-between gap-3 mb-4"><div><p class="sd-label">Bill to</p><p class="font-extrabold">${esc(i.customer_name || '—')}</p><p class="text-xs text-gray-500">${esc(i.customer_phone || '')}</p></div>
+                    <div class="text-right"><span class="pill-tag ${STATUS_PILL[i.status]}">${i.status}</span>${i.due_date ? `<p class="text-[11px] text-gray-500 mt-1">Due ${day(i.due_date)}</p>` : ''}${i.void_reason ? `<p class="text-[11px] text-gray-500 mt-1">${esc(i.void_reason)}</p>` : ''}</div></div>
+                 <table class="w-full text-xs"><thead><tr class="sd-label text-left border-b border-gray-100"><th class="py-1.5">Description</th><th class="text-right">Qty</th><th class="text-right">Rate</th><th class="text-right">Amount</th></tr></thead><tbody>${lines}</tbody></table>
+                 <div class="mt-3 ml-auto max-w-xs text-xs space-y-1">
+                    <div class="flex justify-between"><span>Subtotal</span><span class="money">${fmt(i.currency, i.subtotal)}</span></div>
+                    ${+i.tax ? `<div class="flex justify-between"><span>Tax ${i.tax_rate}%</span><span class="money">${fmt(i.currency, i.tax)}</span></div>` : ''}
+                    <div class="flex justify-between font-extrabold text-sm border-t border-gray-200 pt-1"><span>Total</span><span class="money">${money(i.currency, i.total)}</span></div>
+                    <div class="flex justify-between"><span>Paid</span><span class="money">${fmt(i.currency, i.paid)}</span></div>
+                    <div class="flex justify-between font-extrabold ${+i.balance ? 'text-[#D55C48]' : ''}"><span>Balance due</span><span class="money">${money(i.currency, i.balance)}</span></div></div>
+                 ${pays ? `<p class="sd-label mt-4 mb-1">Receipts</p><div class="space-y-1">${pays}</div>` : ''}
+                 ${open ? `<div class="bg-[#F8F8FA] rounded-2xl p-4 mt-4 grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                    <div class="sm:col-span-1">${field('pAmt', 'Amount', `<input id="pAmt" type="number" step="0.001" min="0" class="field" value="${i.balance}">`)}</div>
+                    <div>${field('pMethod', 'Method', '<select id="pMethod" class="field"><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank</option></select>')}</div>
+                    <div>${field('pRef', 'Reference', '<input id="pRef" class="field" placeholder="Optional">')}</div>
+                    <button type="button" class="btn btn-dark" onclick="takePayment(${i.id})"><span data-icon="cash"></span>Receive</button></div>` : ''}`,
+                null, '',
+                `<button type="button" class="btn btn-light" onclick="printInvoice()"><span data-icon="clipboard"></span>Print</button>
+                 ${i.customer_phone ? `<a class="btn btn-light" target="_blank" rel="noopener" href="https://wa.me/${String(i.customer_phone).replace(/\D/g, '')}?text=${encodeURIComponent(`Al-Farha Cargo invoice ${i.invoice_no}${i.awb ? ' (' + i.awb + ')' : ''}: ${money(i.currency, i.total)}. Balance due: ${money(i.currency, i.balance)}. Thank you.`)}"><span data-icon="message"></span>WhatsApp</a>` : ''}
+                 ${i.status !== 'void' && !payments.some(p => !p.void) ? `<button type="button" class="btn btn-danger" onclick="voidDoc('invoice_void', ${i.id}, '${esc(i.invoice_no)}')">Void</button>` : ''}`);
+        }
+        window.takePayment = async (id) => {
+            try {
+                const r = await api('/api/accounts', { method: 'POST', body: { action: 'payment', invoice_id: id, amount: $('pAmt').value, method: $('pMethod').value, reference: $('pRef').value } });
+                toast(true, `${r.receipt_no}: ${money(r.currency, r.amount)} received.`);
+                await openInvoice(id); if (tab !== 'overview') VIEWS[tab]?.();
+            } catch (e) { toast(false, e.message); }
+        };
+        window.printInvoice = () => {
+            const { i, payments, branch } = cache.invoice;
+            const w = window.open('', '_blank'); if (!w) return toast(false, 'Allow pop-ups to print.');
+            w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(i.invoice_no)}</title><style>
+                body{font-family:Arial,sans-serif;margin:36px;color:#111;font-size:13px}h1{margin:0;font-size:22px}.muted{color:#666}table{width:100%;border-collapse:collapse;margin-top:18px}
+                th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}th{background:#f4f4f4;font-size:11px;text-transform:uppercase}.r{text-align:right}.tot td{border:0;padding:4px 8px}.big td{font-weight:bold;font-size:15px;border-top:2px solid #111}
+                .stamp{display:inline-block;border:2px solid ${i.status === 'paid' ? '#047857' : '#D55C48'};color:${i.status === 'paid' ? '#047857' : '#D55C48'};padding:4px 12px;border-radius:6px;font-weight:bold;text-transform:uppercase}</style></head><body>
+                <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><h1>Al-Farha Cargo</h1><div class="muted">${esc(branch?.branch_name || i.branch_code)}<br>${esc(branch?.address || '')}<br>${esc(branch?.phone_number || '')}</div></div>
+                <div style="text-align:right"><h1>INVOICE</h1><div><b>${esc(i.invoice_no)}</b></div><div class="muted">${esc(day(i.issued_at))}${i.due_date ? '<br>Due ' + esc(day(i.due_date)) : ''}</div><div style="margin-top:8px"><span class="stamp">${esc(i.status)}</span></div></div></div>
+                <p style="margin-top:22px"><b>Bill to:</b> ${esc(i.customer_name || '')} ${esc(i.customer_phone || '')}${i.awb ? `<br><b>AWB:</b> ${esc(i.awb)}` : ''}</p>
+                <table><thead><tr><th>Description</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead><tbody>
+                ${i.lines.map(l => `<tr><td>${esc(l.description)}</td><td class="r">${l.qty}</td><td class="r">${fmt(i.currency, l.rate)}</td><td class="r">${fmt(i.currency, l.amount)}</td></tr>`).join('')}</tbody></table>
+                <table style="width:300px;margin-left:auto" class="tot"><tr><td>Subtotal</td><td class="r">${fmt(i.currency, i.subtotal)}</td></tr>${+i.tax ? `<tr><td>Tax ${i.tax_rate}%</td><td class="r">${fmt(i.currency, i.tax)}</td></tr>` : ''}
+                <tr class="big"><td>Total</td><td class="r">${money(i.currency, i.total)}</td></tr><tr><td>Paid</td><td class="r">${fmt(i.currency, i.paid)}</td></tr><tr><td><b>Balance due</b></td><td class="r"><b>${money(i.currency, i.balance)}</b></td></tr></table>
+                ${payments.filter(p => !p.void).length ? `<p class="muted">Receipts: ${payments.filter(p => !p.void).map(p => `${esc(p.receipt_no)} (${METHOD_LABEL[p.method]}, ${fmt(i.currency, p.amount)})`).join(', ')}</p>` : ''}
+                <p class="muted" style="margin-top:40px">Thank you for shipping with Al-Farha Cargo.</p></body></html>`);
+            w.document.close(); w.onload = () => setTimeout(() => w.print(), 300);
+        };
+
+        window.editRate = (id) => {
+            const d = cache.rates, r = (id && d.cards.find(x => String(x.id) === String(id))) || { method: 'per_kg', dest_country_code: '*', cargo_type_code: '*', bands: [], active: true, branch_code: curBranch() };
+            const destOpts = `<option value="*">Any destination</option>` + d.destinations.map(x => `<option value="${x.country_code}" ${x.country_code === r.dest_country_code ? 'selected' : ''}>${esc(x.country_name)} (${x.country_code})</option>`).join('')
+                + ((window.ALF_COUNTRIES || []).filter(c => !d.destinations.some(x => x.country_code === c.c)).map(c => `<option value="${c.c}" ${c.c === r.dest_country_code ? 'selected' : ''}>${esc(c.n)} (${c.c})</option>`).join(''));
+            const band = (b = {}) => `<div class="grid grid-cols-[1fr_1fr_32px] gap-2" data-band><input class="field" type="number" min="0" step="any" placeholder="Up to kg" value="${b.upto ?? ''}" data-k="upto" aria-label="Up to kg"><input class="field" type="number" min="0" step="0.001" placeholder="Price" value="${b.price ?? ''}" data-k="price" aria-label="Price"><button type="button" class="icon-btn self-center" onclick="this.closest('[data-band]').remove()" aria-label="Remove band">${UI.icon('x', 'w-3.5 h-3.5')}</button></div>`;
+            window._bandHtml = band;
+            form(id ? 'Edit rate card' : 'New rate card', 'Prices are in the branch currency.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    ${ctx.full ? field('xBranch', 'Branch', `<select id="xBranch" class="field" ${id ? 'disabled' : ''}>${ctx.branches.map(b => `<option value="${b.branch_code}" ${b.branch_code === r.branch_code ? 'selected' : ''}>${esc(b.branch_name)} · ${esc(b.currency || '')}</option>`).join('')}</select>`) : ''}
+                    ${field('rDest', 'Destination', `<select id="rDest" class="field">${destOpts}</select>`)}
+                    ${field('rCargo', 'Cargo type', `<select id="rCargo" class="field"><option value="*">Any cargo</option>${d.cargo_types.map(c => `<option value="${c.code}" ${c.code === r.cargo_type_code ? 'selected' : ''}>${c.code} · ${esc(c.name)}</option>`).join('')}</select>`)}
+                    <div class="sm:col-span-2"><p class="ui-label">Pricing method</p><div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-[1.25rem]">${Object.entries(PRICE_LABEL).map(([k, v]) => `<button type="button" class="opt py-2 rounded-full text-[11px] font-extrabold" data-method="${k}" aria-pressed="${k === r.method}">${v}</button>`).join('')}</div></div>
+                    <div data-for="simple">${field('rRate', '<span id="rRateLabel">Rate</span>', `<input id="rRate" type="number" min="0" step="0.001" class="field" value="${r.rate ?? ''}">`)}</div>
+                    ${field('rMin', 'Minimum charge', `<input id="rMin" type="number" min="0" step="0.001" class="field" value="${r.min_charge ?? ''}">`)}
+                    <div data-for="vol_band" class="sm:col-span-2"><p class="ui-label">Weight bands (chargeable kg)</p><div id="rBands" class="space-y-2">${(r.bands.length ? r.bands : [{}]).map(band).join('')}</div>
+                        <button type="button" class="btn btn-light btn-sm mt-2" onclick="document.getElementById('rBands').insertAdjacentHTML('beforeend', _bandHtml())"><span data-icon="plus"></span>Add band</button>
+                        <div class="mt-3 max-w-xs">${field('rExtra', 'Each kg above the last band', `<input id="rExtra" type="number" min="0" step="0.001" class="field" value="${r.extra_per_kg ?? ''}">`)}</div></div>
+                    <div class="sm:col-span-2">${field('rNote', 'Note', `<input id="rNote" class="field" value="${esc(r.note || '')}">`)}</div>
+                    <label class="flex items-center gap-2 text-xs font-bold"><input id="rActive" type="checkbox" class="w-4 h-4" ${r.active ? 'checked' : ''}>Active</label></div>`,
+                async () => {
+                    const bands = [...document.querySelectorAll('#rBands [data-band]')].map(x => Object.fromEntries([...x.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
+                    await api('/api/accounts', { method: 'POST', body: { action: 'rate_save', id: id || null, branch_code: ctx.full ? $('xBranch').value : ctx.my_branch, dest_country_code: $('rDest').value, cargo_type_code: $('rCargo').value, method: cache.rateMethod, rate: $('rRate').value, min_charge: $('rMin').value, bands, extra_per_kg: $('rExtra').value, note: $('rNote').value, active: $('rActive').checked } });
+                    toast(true, 'Rate card saved.');
+                }, 'Save', id ? `<button type="button" class="btn btn-danger" onclick="deleteRate(${id})">Delete</button>` : '');
+            const setMethod = (m) => {
+                cache.rateMethod = m;
+                document.querySelectorAll('[data-method]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.method === m)));
+                document.querySelector('[data-for=simple]').classList.toggle('hidden', m === 'vol_band');
+                document.querySelector('[data-for=vol_band]').classList.toggle('hidden', m !== 'vol_band');
+                $('rRateLabel').textContent = { per_kg: 'Price per kg', per_package: 'Price per package', per_box: 'Price per box' }[m] || 'Rate';
+            };
+            document.querySelectorAll('[data-method]').forEach(b => b.onclick = () => setMethod(b.dataset.method));
+            setMethod(r.method);
+        };
+        window.deleteRate = async (id) => {
+            if (!await UI.confirm({ title: 'Delete this rate card?', message: 'Bookings already made keep their charge.', confirmText: 'Delete', danger: true })) return;
+            try { await api('/api/accounts', { method: 'POST', body: { action: 'rate_delete', id } }); closeModal('formModal'); toast(true, 'Deleted.'); show(); } catch (e) { toast(false, e.message); }
+        };
+
+        window.editAccount = (code) => {
+            const a = (code && cache.accounts.find(x => x.code === code)) || { type: 'expense', active: true };
+            form(code ? `Account ${code}` : 'New account', 'Used by expenses, journals and reports.',
+                `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${field('aCode', 'Code (4 digits)', `<input id="aCode" class="field font-mono" value="${a.code || ''}" ${code ? 'readonly' : ''} pattern="\\d{4}" required>`)}
+                    ${field('aType', 'Type', `<select id="aType" class="field" ${code ? 'disabled' : ''}>${['asset', 'liability', 'equity', 'income', 'expense'].map(t => `<option ${t === a.type ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
+                    <div class="sm:col-span-2">${field('aName', 'Name', `<input id="aName" class="field" value="${esc(a.name || '')}" required>`)}</div>
+                    <label class="flex items-center gap-2 text-xs font-bold"><input id="aActive" type="checkbox" class="w-4 h-4" ${a.active ? 'checked' : ''}>Active</label></div>`,
+                async () => { await api('/api/accounts', { method: 'POST', body: { action: 'account_save', code: $('aCode').value, type: $('aType').value, name: $('aName').value, active: $('aActive').checked } }); toast(true, 'Account saved.'); });
+        };
+
+        window.newJournal = () => {
+            const opts = cache.accounts.filter(a => a.active).map(a => `<option value="${a.code}">${a.code} · ${esc(a.name)}</option>`).join('');
+            const jl = () => `<div class="grid grid-cols-[1fr_100px_100px_32px] gap-2" data-jl><select class="field text-xs" data-k="account" aria-label="Account">${opts}</select>
+                <input class="field" type="number" min="0" step="0.001" placeholder="Debit" data-k="debit" aria-label="Debit"><input class="field" type="number" min="0" step="0.001" placeholder="Credit" data-k="credit" aria-label="Credit">
+                <button type="button" class="icon-btn self-center" onclick="this.closest('[data-jl]').remove()" aria-label="Remove">${UI.icon('x', 'w-3.5 h-3.5')}</button></div>`;
+            window._jl = jl;
+            form('Manual journal', 'Debits must equal credits. Use for opening balances, owner cash in/out, corrections.',
+                `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">${branchSelect()}${field('jDate', 'Date', `<input id="jDate" type="date" class="field" value="${iso(new Date())}">`)}
+                    <div class="sm:col-span-3">${field('jMemo', 'Memo', '<input id="jMemo" class="field" required>')}</div></div>
+                 <div id="jLines" class="space-y-2 mt-4">${jl()}${jl()}</div>
+                 <div class="flex justify-between items-center mt-2"><button type="button" class="btn btn-light btn-sm" onclick="document.getElementById('jLines').insertAdjacentHTML('beforeend', _jl())"><span data-icon="plus"></span>Add line</button><span id="jDiff" class="text-xs font-bold"></span></div>`,
+                async () => {
+                    const lines = [...document.querySelectorAll('#jLines [data-jl]')].map(x => Object.fromEntries([...x.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
+                    const br = ctx.branches.find(b => b.branch_code === xb());
+                    await api('/api/accounts', { method: 'POST', body: { action: 'journal', branch: xb(), currency: br?.currency, date: $('jDate').value, memo: $('jMemo').value, lines } });
+                    toast(true, 'Journal posted.');
+                }, 'Post');
+            $('jLines').oninput = () => {
+                let d = 0; document.querySelectorAll('#jLines [data-jl]').forEach(x => { d += (+x.querySelector('[data-k=debit]').value || 0) - (+x.querySelector('[data-k=credit]').value || 0); });
+                $('jDiff').textContent = Math.abs(d) < 0.0005 ? '✓ Balanced' : `Difference ${money('', d)}`;
+                $('jDiff').className = `text-xs font-bold ${Math.abs(d) < 0.0005 ? 'text-emerald-600' : 'text-[#D55C48]'}`;
+            };
+        };
+
+        document.addEventListener('click', (e) => {
+            const inv = e.target.closest('[data-inv]'); if (inv) return openInvoice(inv.dataset.inv).catch(err => toast(false, err.message));
+            const r = e.target.closest('[data-rate]'); if (r) return editRate(r.dataset.rate);
+            const a = e.target.closest('[data-acct]'); if (a) return editAccount(a.dataset.acct);
+        });
+
+        // ---------- start ----------
+        (async () => {
+            setRange('month');
+            try {
+                const d = await api(`/api/accounts?view=overview&${qs()}`);
+                ctx = { full: d.full, branches: d.branches, my_branch: d.my_branch, role: d.role };
+            } catch (e) { return panel(`<p class="p-10 text-center text-sm text-gray-500 bg-[#F8F8FA] rounded-[2rem]">${esc(e.message)}</p>`); }
+            $('scopePill').textContent = ctx.full ? 'Full accounting' : `Branch ${ctx.my_branch || ''}`;
+            if (ctx.full) {
+                $('fBranch').innerHTML = '<option value="">All branches</option>' + ctx.branches.map(b => `<option value="${b.branch_code}">${esc(b.branch_name)} · ${esc(b.currency || '')}</option>`).join('');
+                $('branchWrap').classList.remove('hidden');
+            }
+            if (!TABS.some(([k, , f]) => k === tab && (!f || ctx.full))) tab = 'overview';
+            drawTabs(); show();
+        })();
+    </script>
+</body>
+</html>

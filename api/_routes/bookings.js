@@ -8,6 +8,7 @@
 //   PATCH  { awb, fields }                edit details (logged on the timeline)
 //   DELETE ?awb=XXX                       delete (managers and admins only)
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
+import { autoInvoice } from '../_lib/accounts.js';
 import { callApi, loadIntegration } from '../_lib/integrations/http.js';
 import CONNECTORS from '../_lib/integrations/connectors.js';
 import { cleanOrderNo, cleanFields } from '../_lib/booking-map.js';
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
     const loadBranch = async (requested) => {
         const code = isAdmin ? requested : session.branch;
         if (!code) throw new UserError(isAdmin ? 'Choose the branch for this shipment.' : 'Your account has no branch assigned.');
-        const r = await fetch(`${rest}/branches?branch_code=eq.${enc(code)}&select=branch_code,branch_name,location&limit=1`, { headers: serviceHeaders() });
+        const r = await fetch(`${rest}/branches?branch_code=eq.${enc(code)}&select=branch_code,branch_name,location,currency,tax_rate&limit=1`, { headers: serviceHeaders() });
         const branch = (r.ok ? await r.json() : [])[0];
         if (!branch) throw new UserError(`Branch ${code} does not exist.`);
         return branch;
@@ -139,7 +140,9 @@ export default async function handler(req, res) {
                 source: fromApi ? 'alfarhaonline' : 'manual',
                 raw: fromApi && body.raw && typeof body.raw === 'object' ? body.raw : null
             }, fields.intake_mode);
-            return res.status(200).json(out);
+            // Counter bookings with a charge get an invoice (+ receipt when paid now). Imports are paid online.
+            const acc = fromApi ? {} : await autoInvoice({ awb: out.awb || awb, branch, fields, userName });
+            return res.status(200).json({ ...out, invoice: acc.invoice || null, invoice_error: acc.error || null });
         }
 
         // ---------------- CREATE MANY (CSV, after review) ----------------

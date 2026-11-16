@@ -1,6 +1,7 @@
 // File: api/router.js — the ONLY Vercel function (Hobby plan allows 12).
 // vercel.json rewrites /api/<name> → /api/router?__route=<name>; each handler lives in api/_routes/<name>.js.
 // To add an endpoint: create api/_routes/<name>.js, import it below, add it to ROUTES.
+import accounts from './_routes/accounts.js';
 import bookings from './_routes/bookings.js';
 import branches from './_routes/branches.js';
 import codes from './_routes/codes.js';
@@ -22,6 +23,7 @@ import transfers from './_routes/transfers.js';
 import users from './_routes/users.js';
 
 const ROUTES = {
+    accounts,
     bookings,
     branches,
     codes,

@@ -161,7 +161,7 @@
                                 <select id="payment" class="field"><option value="cash">Cash</option><option value="card">Card</option><option value="bank_transfer">Bank transfer</option><option value="credit">Credit account</option><option value="pay_on_delivery">Pay on delivery</option></select></div>
                             <div class="sm:col-span-3"><label class="ui-label" for="notes">Notes</label><input id="notes" class="field" placeholder="Internal note (optional)"></div>
                         </div>
-                        <p class="text-[10px] text-gray-400">Charges will come from rate cards when Accounts (Phase C) is ready; enter them manually for now.</p>
+                        <p id="quoteHint" class="text-[11px] text-gray-400">The charge fills in from the branch rate card once destination, cargo and weight are set. You can always change it.</p>
                     </section>
                 </div>
 
@@ -250,6 +250,30 @@
         });
         $('boxRows').addEventListener('input', refresh);
 
+        // ---------- rate-card quote (Accounts) ----------
+        let quoteTimer, quoteKey = '', amountTyped = false;
+        $('amount').addEventListener('input', () => { amountTyped = true; $('quoteHint').innerHTML = 'Charge entered by hand. <button type="button" class="font-bold text-[#D55C48]" onclick="useRateCard()">Use rate card</button>'; });
+        window.useRateCard = () => { amountTyped = false; quoteKey = ''; refresh(); };
+        function scheduleQuote(kg, boxes) {
+            const b = branch(), c = dest(), t = cargo();
+            if (!b.branch_code || !c || !t || !(kg > 0)) return;
+            const key = [b.branch_code, c.c, t.code, kg, boxes].join('|');
+            if (key === quoteKey || amountTyped) return;
+            clearTimeout(quoteTimer);
+            quoteTimer = setTimeout(async () => {
+                quoteKey = key;
+                try {
+                    const r = await api(`/api/accounts?view=quote&branch=${encodeURIComponent(b.branch_code)}&dest=${c.c}&cargo=${encodeURIComponent(t.code)}&kg=${kg}&pieces=${boxes}&boxes=${boxes}`);
+                    if (amountTyped) return;
+                    if (r.quote) {
+                        $('amount').value = r.quote.amount.toFixed(3);
+                        $('quoteHint').textContent = `From rate card: ${r.quote.detail} = ${r.quote.currency} ${r.quote.amount.toFixed(3)}. You can change it.`;
+                        $('sumAmount').textContent = `${cur()} ${r.quote.amount.toFixed(3)}`;
+                    } else $('quoteHint').textContent = r.message || 'No rate card for this route — enter the charge by hand.';
+                } catch (e) { $('quoteHint').textContent = 'Could not load the rate card — enter the charge by hand.'; }
+            }, 350);
+        }
+
         // ---------- live summary ----------
         function refresh() {
             const boxes = readBoxes();
@@ -258,6 +282,7 @@
             const vol = round2(boxes.reduce((s, b) => s + b.vol, 0));
             const charge = Math.max(actual, vol);
             $('totActual').textContent = `${actual} kg`; $('totVol').textContent = `${vol} kg`; $('totCharge').textContent = `${charge} kg`;
+            scheduleQuote(charge, boxes.length);
             const c = dest(), t = cargo(), b = branch();
             $('pvD').textContent = destCode(c); $('pvB').textContent = b.booking_code || 'B'; $('pvC').textContent = t ? t.code : 'C';
             if (c) { rcvPh?.setCountry(c.c, { soft: true }); waPh?.setCountry(c.c, { soft: true }); }
@@ -362,7 +387,9 @@
                 done = { ...fields, awb: out.awb, booked_at: new Date().toISOString(), cargo_name: t.name, shipper: fields.shipper, consignee: fields.consignee,
                          declared_value: fields.declared_value || null, amount: fields.amount || null };
                 $('doneRef').textContent = out.awb;
-                $('doneSub').textContent = `${fields.consignee} · ${fields.dest_city}, ${c.n}`;
+                $('doneSub').textContent = `${fields.consignee} · ${fields.dest_city}, ${c.n}`
+                    + (out.invoice ? ` · ${out.invoice.invoice_no}${out.invoice.payment ? ' (paid, ' + out.invoice.payment.receipt_no + ')' : ' (balance due)'}` : '');
+                if (out.invoice_error) toast(false, `Booked, but the invoice was not created: ${out.invoice_error}`);
                 $('doneView').href = `shipments.html?awb=${encodeURIComponent(out.awb)}`;
                 UI.beep(true);
                 openModal('doneModal');

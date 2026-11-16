@@ -209,7 +209,7 @@
                     <div><label class="ui-label" for="b_currency">Currency</label>
                         <select id="b_currency" class="field"><option>OMR</option><option>AED</option><option>SAR</option><option>QAR</option><option>KWD</option><option>BHD</option><option>INR</option><option>NPR</option><option>LKR</option><option>PKR</option><option>BDT</option><option>PHP</option><option>EGP</option><option>USD</option></select></div>
                     <div><label class="ui-label" for="b_taxName">Tax name</label><input id="b_taxName" class="field" placeholder="VAT"></div>
-                    <div><label class="ui-label" for="b_taxRate">Tax rate %</label><input id="b_taxRate" class="field" type="number" min="0" max="100" step="0.01" placeholder="5"></div>
+                    <div><label class="ui-label" for="b_taxRate">Tax rate %</label><input id="b_taxRate" class="field" type="number" min="0" max="100" step="0.01" placeholder="0 = no tax"></div>
                     <div><label class="ui-label">Hub</label>
                         <label class="field flex items-center gap-2 cursor-pointer"><input id="b_hub" type="checkbox" class="w-4 h-4"><span class="text-xs font-bold">Hub branch</span></label></div>
                 </fieldset>
@@ -334,7 +334,7 @@
                     </div>
                     <div class="grid grid-cols-3 gap-2 mt-auto pt-3 border-t border-gray-100 text-center">
                         <div><p class="sd-label">Currency</p><p class="text-xs font-extrabold mt-0.5">${esc(b.currency || 'OMR')}</p></div>
-                        <div><p class="sd-label">${esc(b.tax_name || 'VAT')}</p><p class="text-xs font-extrabold mt-0.5">${esc(b.tax_rate ?? 5)}%</p></div>
+                        <div><p class="sd-label">${esc(b.tax_name || 'VAT')}</p><p class="text-xs font-extrabold mt-0.5">${esc(b.tax_rate ?? 0)}%</p></div>
                         <div><p class="sd-label">Status</p><p class="text-xs font-extrabold mt-0.5 ${isDismissed(b) ? 'text-gray-500' : 'text-emerald-600'}">${isDismissed(b) ? 'Dismissed' : 'Active'}</p></div>
                     </div>
                 </article>`;
@@ -412,7 +412,7 @@
             $('b_manager').value = b.manager_id || '';
             $('b_currency').value = b.currency || 'OMR';
             $('b_taxName').value = b.tax_name || 'VAT';
-            $('b_taxRate').value = b.tax_rate ?? 5;
+            $('b_taxRate').value = b.tax_rate ?? 0;
             $('b_hub').checked = Boolean(b.is_hub);
             $('pvDest').innerHTML = destinations.filter(d => d.active).map(d => `<option value="${esc(d.code)}">${esc(d.code)} · ${esc(d.country_name)}</option>`).join('')
                 + '<option value="DE">DE · any other country</option>';

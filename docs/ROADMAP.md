@@ -52,7 +52,8 @@ Sri Lanka 7, Philippines 8, Egypt 9; code 1 free. Cargo: 1 Air, 2 Sea, 3 Road.
 - POD files in Supabase Storage (private). POD visible in shipment details and printable.
 - On delivery: review request (tracking page + WhatsApp link + email).
 
-## Phase C — Accounts (role-based)
+## Phase C — Accounts (role-based) ✅ built (Nov 2026)
+- Page: admin/accounts.html · API: /api/accounts · DB: 012_accounts.sql · no VAT for now (branch tax rate 0) · reports per currency · counter bookings invoiced automatically
 | Role | Sees |
 |---|---|
 | **Branch manager** ("Branch Admin") | **Branch operations**: rate cards, invoices/receipts, payments (cash / card / bank / credit), customer balances, expenses, daily cash closing, branch P&L — per currency |
