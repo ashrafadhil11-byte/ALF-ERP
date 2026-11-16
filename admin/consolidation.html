@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
+    <title>Consolidation & Bulk - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
+    </script>
+    <style>
+        .tab[aria-selected="true"] { background: #111827; color: #fff; }
+        .opt[aria-pressed="true"] { background: #111827; color: #fff; }
+    </style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar pb-24 lg:pb-4">
+            <section class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center"><span data-icon="layers"></span></div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Consolidation & Bulk</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Branch outbound / inbound • MAWB & bags • bulk status</p>
+                    </div>
+                </div>
+                <div id="branchPick" class="hidden items-center gap-2 self-start sm:self-auto">
+                    <label for="actBranch" class="text-[11px] font-bold text-gray-500 whitespace-nowrap">Working at</label>
+                    <select id="actBranch" class="field !py-2 !w-56"></select>
+                </div>
+            </section>
+
+            <div class="flex flex-wrap gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full w-fit mb-5" role="tablist">
+                <button type="button" class="tab px-4 py-2 rounded-full text-xs font-extrabold" data-tab="outbound" role="tab">Outbound</button>
+                <button type="button" class="tab px-4 py-2 rounded-full text-xs font-extrabold" data-tab="inbound" role="tab">Inbound <span data-count="inbound"></span></button>
+                <button type="button" class="tab px-4 py-2 rounded-full text-xs font-extrabold" data-tab="mawb" role="tab">MAWB / Bags <span data-count="mawb"></span></button>
+            </div>
+
+            <!-- ============ OUTBOUND ============ -->
+            <section data-panel="outbound" class="grid grid-cols-1 xl:grid-cols-5 gap-5">
+                <div class="xl:col-span-3 space-y-4">
+                    <div class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 space-y-4">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-[#111827] text-white text-[11px] font-extrabold flex items-center justify-center">1</span><span class="font-extrabold text-xs uppercase tracking-wider">Scan shipments to send</span></div>
+                            <span id="obCount" class="pill-tag pill-dark">0 selected</span>
+                        </div>
+                        <form id="obScan" class="flex flex-col sm:flex-row gap-2">
+                            <input id="obInput" class="field scan" placeholder="Scan or type AWB, press Enter" autocomplete="off" aria-label="AWB" data-camera="submit" data-camera-continuous>
+                            <button class="btn btn-dark">Add</button>
+                        </form>
+                        <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
+                            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                                <span class="sd-label">Held at this branch</span>
+                                <input id="obFilter" class="field !py-1.5 !w-44 text-xs" placeholder="Filter…" aria-label="Filter">
+                            </div>
+                            <div class="max-h-[420px] overflow-y-auto custom-scrollbar">
+                                <table class="rtable w-full text-xs">
+                                    <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                                        <th class="p-3 pl-4 w-10"><input id="obAll" type="checkbox" class="w-4 h-4" aria-label="Select all"></th>
+                                        <th class="p-3 font-extrabold">AWB</th><th class="p-3 font-extrabold">Receiver</th><th class="p-3 font-extrabold">Destination</th><th class="p-3 font-extrabold">Status</th>
+                                    </tr></thead>
+                                    <tbody id="obRows" class="divide-y divide-gray-100"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="xl:col-span-2 space-y-4">
+                    <form id="obForm" class="bg-[#F8F8FA] rounded-[2rem] p-5 lg:p-6 space-y-4">
+                        <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-[#111827] text-white text-[11px] font-extrabold flex items-center justify-center">2</span><span class="font-extrabold text-xs uppercase tracking-wider">Manifest details</span></div>
+                        <div><label class="ui-label" for="obTo">Send to branch <span class="req">*</span></label><select id="obTo" class="field"></select></div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="ui-label" for="obVehicle">Vehicle</label><input id="obVehicle" class="field" placeholder="e.g. Van 12"></div>
+                            <div><label class="ui-label" for="obDriver">Driver / courier</label><input id="obDriver" class="field" placeholder="Name"></div>
+                        </div>
+                        <div><label class="ui-label" for="obSeal">Seal no.</label><input id="obSeal" class="field" placeholder="Optional"></div>
+                        <div><label class="ui-label" for="obNotes">Notes</label><textarea id="obNotes" rows="2" class="field" placeholder="Optional"></textarea></div>
+                        <button id="obSend" class="btn btn-coral w-full" disabled><span data-icon="truck"></span>Send 0 shipments</button>
+                    </form>
+                    <div class="bg-white rounded-[2rem] border border-gray-100 p-5">
+                        <div class="flex items-center justify-between mb-3"><span class="sd-label">Sent in the last 30 days</span></div>
+                        <div id="obRecent" class="space-y-2"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ============ INBOUND ============ -->
+            <section data-panel="inbound" class="hidden grid grid-cols-1 xl:grid-cols-5 gap-5">
+                <div class="xl:col-span-2 space-y-4">
+                    <div class="bg-[#111827] text-white rounded-[2rem] p-5 lg:p-6 space-y-4">
+                        <p class="font-extrabold text-xs uppercase tracking-wider text-white/60">Receive at <span id="ibBranch" class="text-white"></span></p>
+                        <form id="ibScan" class="flex flex-col sm:flex-row gap-2">
+                            <input id="ibInput" class="field scan !bg-white/10 !text-white !border-white/10 placeholder:!text-white/40" placeholder="Scan arriving AWB" autocomplete="off" aria-label="AWB" data-camera="submit" data-camera-continuous>
+                            <button class="btn btn-coral">Receive</button>
+                        </form>
+                        <input id="ibNote" class="field !bg-white/10 !text-white !border-white/10 placeholder:!text-white/40 text-xs" placeholder="Note for this scan (e.g. box damaged) — optional" aria-label="Note">
+                        <div id="ibLast" class="space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar"></div>
+                    </div>
+                </div>
+                <div class="xl:col-span-3"><div id="ibManifests" class="space-y-4"></div></div>
+            </section>
+
+            <!-- ============ MAWB / BAGS ============ -->
+            <section data-panel="mawb" class="hidden space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex gap-1.5 bg-[#F8F8FA] p-1 rounded-full">
+                        <button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-cfilter="open" aria-pressed="true">Open</button>
+                        <button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-cfilter="closed" aria-pressed="false">Closed</button>
+                        <button type="button" class="opt px-3 py-1.5 rounded-full text-[11px] font-extrabold" data-cfilter="all" aria-pressed="false">All</button>
+                    </div>
+                    <button id="newCons" type="button" class="btn btn-coral"><span data-icon="plus"></span>New MAWB / bag</button>
+                </div>
+                <div id="consList" class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- New consolidation -->
+    <div id="consModal" class="ui-modal">
+        <form id="consForm" class="panel max-w-lg">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 class="text-lg font-extrabold">New MAWB / bag</h3><p class="text-xs text-gray-400 mt-0.5">Group shipments under one master airway bill or bag.</p></div>
+                <button type="button" onclick="UI.closeModal('consModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-5 overflow-y-auto custom-scrollbar">
+                <div class="sm:col-span-2 grid grid-cols-2 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full">
+                    <button type="button" class="opt py-2 rounded-full text-xs font-extrabold" data-kind="mawb" aria-pressed="true">MAWB (air)</button>
+                    <button type="button" class="opt py-2 rounded-full text-xs font-extrabold" data-kind="bag" aria-pressed="false">Bag / sack</button>
+                </div>
+                <div class="sm:col-span-2"><label class="ui-label" for="cNo" id="cNoLabel">MAWB number <span class="req">*</span></label><input id="cNo" class="field font-mono uppercase" placeholder="e.g. 176-12345675" required></div>
+                <div><label class="ui-label" for="cCarrier">Airline / agent</label><input id="cCarrier" class="field" placeholder="e.g. Emirates SkyCargo"></div>
+                <div><label class="ui-label" for="cFlight">Flight / vessel</label><input id="cFlight" class="field" placeholder="e.g. EK 0861"></div>
+                <div><label class="ui-label" for="cDate">Departure</label><input id="cDate" type="date" class="field"></div>
+                <div><label class="ui-label" for="cDest">Destination country</label><input id="cDest" class="field" placeholder="Select"></div>
+                <div class="sm:col-span-2"><label class="ui-label" for="cNotes">Notes</label><input id="cNotes" class="field" placeholder="Optional"></div>
+            </div>
+            <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
+                <button type="button" class="btn btn-light" onclick="UI.closeModal('consModal')">Cancel</button>
+                <button class="btn btn-dark">Create</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Consolidation detail -->
+    <div id="detailModal" class="ui-modal">
+        <div class="panel max-w-3xl">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div class="min-w-0"><p id="dKind" class="sd-label"></p><h3 id="dNo" class="text-xl font-extrabold font-mono truncate"></h3><p id="dMeta" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('detailModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div class="my-5 space-y-4 overflow-y-auto custom-scrollbar pr-1">
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-[#F8F8FA] rounded-2xl p-3"><p class="sd-label">Shipments</p><p id="dShip" class="text-xl font-extrabold">0</p></div>
+                    <div class="bg-[#F8F8FA] rounded-2xl p-3"><p class="sd-label">Pieces</p><p id="dPcs" class="text-xl font-extrabold">0</p></div>
+                    <div class="bg-[#F8F8FA] rounded-2xl p-3"><p class="sd-label">Weight</p><p id="dKg" class="text-xl font-extrabold">0 kg</p></div>
+                </div>
+                <form id="dScan" class="flex flex-col sm:flex-row gap-2">
+                    <input id="dInput" class="field scan" placeholder="Scan AWB to add" autocomplete="off" aria-label="AWB to add" data-camera="submit" data-camera-continuous>
+                    <button class="btn btn-dark">Add</button>
+                </form>
+                <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
+                    <table class="rtable w-full text-xs">
+                        <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                            <th class="p-3 pl-4 font-extrabold">AWB</th><th class="p-3 font-extrabold">Receiver</th><th class="p-3 font-extrabold">Dest.</th><th class="p-3 font-extrabold">Pcs / kg</th><th class="p-3 font-extrabold">Status</th><th class="p-3 w-10"></th>
+                        </tr></thead>
+                        <tbody id="dRows" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+                <details id="bulkBox" class="bg-[#F8F8FA] rounded-[1.5rem] p-4">
+                    <summary class="cursor-pointer text-xs font-extrabold">Update status of everything inside</summary>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                        <div class="sm:col-span-2"><label class="ui-label" for="bStatus">New status</label><select id="bStatus" class="field"></select></div>
+                        <div data-need="agent_docket"><label class="ui-label" for="bAgent">Forwarding agent</label><input id="bAgent" class="field"></div>
+                        <div data-need="agent_docket"><label class="ui-label" for="bDocket">Agent docket no.</label><input id="bDocket" class="field"></div>
+                        <div><label class="ui-label" for="bLoc">Location</label><input id="bLoc" class="field" placeholder="Optional"></div>
+                        <div><label class="ui-label" for="bRemark">Remark</label><input id="bRemark" class="field" placeholder="Optional"></div>
+                        <button id="bApply" type="button" class="btn btn-dark sm:col-span-2"><span data-icon="refresh"></span>Update all</button>
+                    </div>
+                </details>
+            </div>
+            <div class="flex flex-wrap justify-between gap-2 pt-4 border-t border-gray-100">
+                <button id="dPrint" type="button" class="btn btn-light"><span data-icon="clipboard"></span>Print manifest</button>
+                <button id="dClose" type="button" class="btn btn-dark"></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { api, esc, toast, openModal, closeModal } = UI;
+        const $ = (id) => document.getElementById(id);
+        const params = new URLSearchParams(location.search);
+        let tab = ['outbound', 'inbound', 'mawb'].includes(params.get('tab')) ? params.get('tab') : 'outbound';
+        let T = { held: [], incoming: [], outgoing: [], branches: [] }, cons = [], statuses = [], cfilter = 'open';
+        const batch = new Set();
+        let detail = null;
+        const fmt = (v) => v ? new Date(v).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+        const bname = (c) => (T.branches.find(b => b.branch_code === c) || {}).branch_name || c;
+
+        // ---------- tabs ----------
+        function showTab(t) {
+            tab = t;
+            document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+            document.querySelectorAll('[data-panel]').forEach(p => {
+                const on = p.dataset.panel === t;
+                p.classList.toggle('hidden', !on);
+                if (on) { p.classList.remove('ui-fade'); void p.offsetWidth; p.classList.add('ui-fade'); }
+            });
+            history.replaceState(null, '', `?tab=${t}`);
+        }
+        document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+        // ---------- load ----------
+        async function loadTransfers() {
+            const want = $('actBranch').value;
+            try { T = await api('/api/transfers' + (want ? `?branch=${encodeURIComponent(want)}` : '')); } catch (e) { toast(false, e.message); return; }
+            if (T.can_switch && !$('actBranch').options.length) {
+                $('actBranch').innerHTML = T.branches.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join('');
+                $('branchPick').classList.replace('hidden', 'flex');
+            }
+            $('actBranch').value = T.branch;
+            $('ibBranch').textContent = bname(T.branch);
+            $('obTo').innerHTML = '<option value="">Choose branch…</option>' + T.branches.filter(b => b.branch_code !== T.branch)
+                .map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)}${b.is_hub ? ' · hub' : ''}</option>`).join('');
+            [...batch].forEach(a => { if (!T.held.some(h => h.awb === a)) batch.delete(a); });
+            const pending = T.incoming.reduce((s, m) => s + m.transfers.filter(t => t.status === 'pending').length, 0);
+            document.querySelector('[data-count=inbound]').textContent = pending ? `· ${pending}` : '';
+            renderOutbound(); renderInbound();
+        }
+        async function loadCons() {
+            try { cons = (await api('/api/consolidation')).consolidations; } catch (e) { toast(false, e.message); return; }
+            const open = cons.filter(c => !c.closed).length;
+            document.querySelector('[data-count=mawb]').textContent = open ? `· ${open}` : '';
+            renderCons();
+        }
+        $('actBranch').onchange = () => { batch.clear(); loadTransfers(); };
+
+        // ---------- outbound ----------
+        function renderOutbound() {
+            const q = $('obFilter').value.trim().toLowerCase();
+            const rows = T.held.filter(b => !q || [b.awb, b.consignee, b.dest_city, b.dest_country].some(v => String(v || '').toLowerCase().includes(q)));
+            $('obRows').innerHTML = rows.map(b => `<tr class="${batch.has(b.awb) ? 'bg-[#FFF5F3]' : ''}">
+                <td class="p-3 pl-4" data-label=""><input type="checkbox" class="w-4 h-4" data-ob="${esc(b.awb)}" ${batch.has(b.awb) ? 'checked' : ''} aria-label="Select ${esc(b.awb)}"></td>
+                <td class="p-3 font-extrabold font-mono" data-label="AWB">${esc(b.awb)}</td>
+                <td class="p-3" data-label="Receiver">${esc(b.consignee || '—')}</td>
+                <td class="p-3" data-label="Destination">${esc([b.dest_city, b.dest_country].filter(Boolean).join(', ') || '—')}</td>
+                <td class="p-3" data-label="Status"><span class="pill-tag pill-gray">${esc(b.current_status || '')}</span></td></tr>`).join('')
+                || `<tr><td colspan="5" class="p-8 text-center text-gray-400">${q ? 'No match.' : 'No shipments held at this branch.'}</td></tr>`;
+            $('obAll').checked = rows.length > 0 && rows.every(b => batch.has(b.awb));
+            $('obCount').textContent = `${batch.size} selected`;
+            $('obSend').disabled = !batch.size;
+            $('obSend').lastChild.textContent = `Send ${batch.size} shipment${batch.size === 1 ? '' : 's'}`;
+            $('obRecent').innerHTML = T.outgoing.map(m => {
+                const total = m.transfers.length, got = m.transfers.filter(t => t.status === 'received').length;
+                const pill = m.status === 'received' ? 'pill-green' : m.status === 'partial' ? 'pill-amber' : 'pill-dark';
+                return `<button type="button" data-print-tr="${m.id}" class="w-full flex items-center justify-between gap-3 p-3 rounded-2xl hover:bg-[#F8F8FA] text-left">
+                    <span class="min-w-0"><span class="block text-xs font-extrabold font-mono truncate">${esc(m.manifest_no)}</span>
+                    <span class="block text-[10px] text-gray-400">→ ${esc(bname(m.to_branch))} · ${fmt(m.created_at)}</span></span>
+                    <span class="pill-tag ${pill}">${got}/${total} ${m.status === 'in_transit' ? 'in transit' : m.status}</span></button>`;
+            }).join('') || '<p class="text-xs text-gray-400 text-center py-4">Nothing sent yet.</p>';
+            UI.paintIcons();
+        }
+        $('obFilter').oninput = renderOutbound;
+        $('obRows').addEventListener('change', (e) => { const a = e.target.dataset.ob; if (!a) return; e.target.checked ? batch.add(a) : batch.delete(a); renderOutbound(); });
+        $('obAll').onchange = (e) => {
+            const q = $('obFilter').value.trim().toLowerCase();
+            T.held.filter(b => !q || [b.awb, b.consignee, b.dest_city, b.dest_country].some(v => String(v || '').toLowerCase().includes(q))).forEach(b => e.target.checked ? batch.add(b.awb) : batch.delete(b.awb));
+            renderOutbound();
+        };
+        $('obScan').onsubmit = (e) => {
+            e.preventDefault();
+            const a = UI.clean($('obInput').value); $('obInput').value = '';
+            if (!a) return;
+            if (T.held.some(h => h.awb === a)) { batch.add(a); UI.beep(true); toast(true, `${a} added`); }
+            else { UI.beep(false); toast(false, `${a} is not held at ${bname(T.branch)} (or is already in transit).`); }
+            renderOutbound();
+        };
+        $('obForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const to = $('obTo').value;
+            if (!to) return toast(false, 'Choose the branch to send to.');
+            if (!await UI.confirm({ title: `Send ${batch.size} shipment(s) to ${esc(bname(to))}?`, message: 'A transfer manifest is created. The receiving branch scans them in on arrival.', confirmText: 'Send' })) return;
+            $('obSend').disabled = true;
+            try {
+                const r = await api('/api/transfers', { method: 'POST', body: { action: 'outbound', branch: T.branch, awbs: [...batch], to_branch: to, vehicle: $('obVehicle').value, driver: $('obDriver').value, seal: $('obSeal').value, notes: $('obNotes').value } });
+                toast(true, `${r.manifest_no}: ${r.count} shipment(s) sent.`);
+                batch.clear(); ['obVehicle', 'obDriver', 'obSeal', 'obNotes'].forEach(id => $(id).value = '');
+                await loadTransfers();
+                printTransfer(r.id);
+            } catch (err) { toast(false, err.message); $('obSend').disabled = false; }
+        };
+
+        // ---------- inbound ----------
+        function renderInbound() {
+            $('ibManifests').innerHTML = T.incoming.map(m => {
+                const items = m.transfers || [], left = items.filter(t => t.status === 'pending');
+                return `<article class="bg-[#F8F8FA] rounded-[2rem] p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div><p class="font-extrabold font-mono">${esc(m.manifest_no)}</p>
+                        <p class="text-[11px] text-gray-500">From <b>${esc(bname(m.from_branch))}</b> · ${fmt(m.created_at)}${m.vehicle ? ' · ' + esc(m.vehicle) : ''}${m.driver ? ' · ' + esc(m.driver) : ''}${m.seal_no ? ' · seal ' + esc(m.seal_no) : ''}</p></div>
+                        <span class="pill-tag ${left.length ? 'pill-amber' : 'pill-green'}">${items.length - left.length}/${items.length} received</span>
+                    </div>
+                    <div class="w-full h-1.5 bg-white rounded-full mt-3 overflow-hidden"><div class="h-full bg-coral-500 rounded-full transition-all duration-500" style="width:${items.length ? Math.round((items.length - left.length) / items.length * 100) : 0}%"></div></div>
+                    <div class="flex flex-wrap gap-1.5 mt-3">${items.map(t => `<span class="pill-tag ${t.status === 'received' ? 'pill-green' : 'pill-gray'} font-mono">${t.status === 'received' ? '✓ ' : ''}${esc(t.bookings?.awb)}</span>`).join('')}</div>
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        ${left.length ? `<button type="button" class="btn btn-dark btn-sm" data-recv-all="${m.id}"><span data-icon="checkCircle"></span>Receive all ${left.length}</button>` : ''}
+                        <button type="button" class="btn btn-light btn-sm" data-print-tr="${m.id}"><span data-icon="clipboard"></span>Manifest</button>
+                    </div></article>`;
+            }).join('') || '<p class="p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">Nothing on the way to this branch.</p>';
+            UI.paintIcons();
+        }
+        const RESULT = {
+            received: [true, 'Received'], already_here: [false, 'Already at this branch'], not_found: [false, 'AWB not found'],
+            not_expected: [false, 'Not on any manifest to this branch'], wrong_branch: [false, 'Going to another branch']
+        };
+        async function receive(awbs) {
+            try {
+                const r = await api('/api/transfers', { method: 'POST', body: { action: 'inbound', branch: T.branch, awbs, note: $('ibNote').value } });
+                r.results.forEach(x => {
+                    const [ok, label] = RESULT[x.result] || [false, x.result];
+                    UI.beep(ok);
+                    $('ibLast').insertAdjacentHTML('afterbegin', `<div class="ui-fade flex items-center justify-between gap-2 rounded-xl px-3 py-2 ${ok ? 'bg-emerald-500/15' : 'bg-coral-500/20'}">
+                        <span class="font-mono text-xs font-extrabold">${esc(x.awb)}</span><span class="text-[11px] font-bold ${ok ? 'text-emerald-300' : 'text-coral-200'}">${esc(label)}${x.result === 'wrong_branch' && x.to_branch ? ' (' + esc(bname(x.to_branch)) + ')' : ''}</span></div>`);
+                });
+                const got = r.results.filter(x => x.result === 'received').length;
+                if (awbs.length > 1) toast(got > 0, `${got} of ${awbs.length} received.`);
+                await loadTransfers();
+            } catch (err) { UI.beep(false); toast(false, err.message); }
+        }
+        $('ibScan').onsubmit = (e) => { e.preventDefault(); const a = UI.clean($('ibInput').value); $('ibInput').value = ''; if (a) receive([a]); };
+        document.addEventListener('click', async (e) => {
+            const all = e.target.closest('[data-recv-all]');
+            if (all) {
+                const m = T.incoming.find(x => String(x.id) === all.dataset.recvAll);
+                const left = m.transfers.filter(t => t.status === 'pending').map(t => t.bookings.awb);
+                if (await UI.confirm({ title: `Receive all ${left.length} on ${esc(m.manifest_no)}?`, message: 'Only do this after counting the boxes. Scanning each one is safer.', confirmText: 'Receive all' })) receive(left);
+            }
+            const p = e.target.closest('[data-print-tr]'); if (p) printTransfer(p.dataset.printTr);
+            const c = e.target.closest('[data-cons]'); if (c) openDetail(c.dataset.cons);
+            const rm = e.target.closest('[data-remove]');
+            if (rm && await UI.confirm({ title: `Remove ${esc(rm.dataset.remove)}?`, message: `It is taken out of ${esc(detail.consolidation.mawb)}.`, confirmText: 'Remove' })) {
+                try { await api('/api/consolidation', { method: 'POST', body: { action: 'remove', id: detail.consolidation.id, awb: rm.dataset.remove } }); await openDetail(detail.consolidation.id, true); loadCons(); }
+                catch (err) { toast(false, err.message); }
+            }
+        });
+
+        // ---------- consolidation ----------
+        function renderCons() {
+            const list = cons.filter(c => cfilter === 'all' || (cfilter === 'open' ? !c.closed : c.closed));
+            $('consList').innerHTML = list.map(c => `<button type="button" data-cons="${c.id}" class="ui-lift text-left bg-[#F8F8FA] rounded-[2rem] p-5 border border-transparent hover:border-gray-200">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0"><p class="sd-label">${c.kind === 'bag' ? 'Bag' : 'MAWB'}</p><p class="font-extrabold font-mono text-base truncate">${esc(c.mawb)}</p></div>
+                    <span class="pill-tag ${c.closed ? 'pill-gray' : 'pill-coral'}">${c.closed ? 'Closed' : 'Open'}</span>
+                </div>
+                <p class="text-[11px] text-gray-500 mt-1 truncate">${esc([c.carrier, c.flight_no, c.dest_country].filter(Boolean).join(' · ') || 'No flight details')}</p>
+                <div class="grid grid-cols-3 gap-2 mt-4">
+                    <div class="bg-white rounded-xl p-2 text-center"><p class="text-lg font-extrabold">${c.shipments}</p><p class="text-[9px] font-bold text-gray-400 uppercase">AWBs</p></div>
+                    <div class="bg-white rounded-xl p-2 text-center"><p class="text-lg font-extrabold">${c.pieces}</p><p class="text-[9px] font-bold text-gray-400 uppercase">Pieces</p></div>
+                    <div class="bg-white rounded-xl p-2 text-center"><p class="text-lg font-extrabold">${c.weight}</p><p class="text-[9px] font-bold text-gray-400 uppercase">kg</p></div>
+                </div>
+                <p class="text-[10px] text-gray-400 mt-3">${esc(c.origin_branch || '')} · ${fmt(c.departure_date || c.created_at)}</p></button>`).join('')
+                || `<p class="col-span-full p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">No ${cfilter === 'all' ? '' : cfilter} consolidations.</p>`;
+        }
+        document.querySelectorAll('[data-cfilter]').forEach(b => b.onclick = () => {
+            cfilter = b.dataset.cfilter;
+            document.querySelectorAll('[data-cfilter]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+            renderCons();
+        });
+
+        let kind = 'mawb';
+        document.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => {
+            kind = b.dataset.kind;
+            document.querySelectorAll('[data-kind]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+            $('cNoLabel').innerHTML = `${kind === 'bag' ? 'Bag number' : 'MAWB number'} <span class="req">*</span>`;
+            $('cNo').placeholder = kind === 'bag' ? 'e.g. BAG-SLL-0012' : 'e.g. 176-12345675';
+        });
+        UI.combobox($('cDest'), { load: () => UI.countryItems() });
+        $('newCons').onclick = () => { $('consForm').reset(); openModal('consModal'); };
+        $('consForm').onsubmit = async (e) => {
+            e.preventDefault();
+            try {
+                const r = await api('/api/consolidation', { method: 'POST', body: { action: 'create', kind, mawb: $('cNo').value, carrier: $('cCarrier').value, flight_no: $('cFlight').value, departure_date: $('cDate').value || null, dest_country: $('cDest').value, notes: $('cNotes').value } });
+                closeModal('consModal'); toast(true, `${r.consolidation.mawb} created — scan shipments into it.`);
+                await loadCons(); openDetail(r.consolidation.id);
+            } catch (err) { toast(false, err.message); }
+        };
+
+        async function openDetail(id, keepOpen) {
+            try { detail = await api(`/api/consolidation?id=${encodeURIComponent(id)}`); } catch (e) { return toast(false, e.message); }
+            const c = detail.consolidation, items = detail.items;
+            $('dKind').textContent = c.kind === 'bag' ? 'Bag' : 'Master airway bill';
+            $('dNo').textContent = c.mawb;
+            $('dMeta').textContent = [c.carrier, c.flight_no, c.departure_date, c.dest_country, c.origin_branch].filter(Boolean).join(' · ') || '—';
+            $('dShip').textContent = items.length;
+            $('dPcs').textContent = items.reduce((s, i) => s + (+i.pieces || 0), 0);
+            $('dKg').textContent = `${Math.round(items.reduce((s, i) => s + (+i.weight || 0), 0) * 100) / 100} kg`;
+            $('dRows').innerHTML = items.map(i => `<tr>
+                <td class="p-3 pl-4 font-extrabold font-mono" data-label="AWB">${esc(i.awb)}</td>
+                <td class="p-3" data-label="Receiver">${esc(i.consignee || '—')}</td>
+                <td class="p-3" data-label="Dest.">${esc(i.dest_city || i.dest_country || '—')}</td>
+                <td class="p-3" data-label="Pcs / kg">${esc(i.pieces ?? '—')} / ${esc(i.weight ?? '—')}</td>
+                <td class="p-3" data-label="Status"><span class="pill-tag pill-gray">${esc(i.current_status || '')}</span></td>
+                <td class="p-3 pr-4 text-right" data-label="">${c.closed ? '' : `<button type="button" class="icon-btn" title="Remove" data-remove="${esc(i.awb)}">${UI.icon('x', 'w-3.5 h-3.5')}</button>`}</td></tr>`).join('')
+                || '<tr><td colspan="6" class="p-8 text-center text-gray-400">Empty — scan shipments to add them.</td></tr>';
+            $('dScan').classList.toggle('hidden', c.closed);
+            $('dClose').innerHTML = c.closed ? `${UI.icon('refresh')}Reopen` : `${UI.icon('check')}Close ${c.kind === 'bag' ? 'bag' : 'MAWB'}`;
+            $('bulkBox').classList.toggle('hidden', !items.length);
+            if (!keepOpen) { openModal('detailModal'); setTimeout(() => !c.closed && $('dInput').focus(), 50); }
+        }
+        $('dScan').onsubmit = async (e) => {
+            e.preventDefault();
+            const awbs = UI.clean($('dInput').value).split(/[,\s]+/).filter(Boolean); $('dInput').value = '';
+            if (!awbs.length) return;
+            try {
+                const r = await api('/api/consolidation', { method: 'POST', body: { action: 'add', id: detail.consolidation.id, awbs } });
+                UI.beep(true); toast(true, r.added ? `${awbs.join(', ')} added.` : 'Already inside.');
+                await openDetail(detail.consolidation.id, true); loadCons();
+            } catch (err) { UI.beep(false); toast(false, err.message); }
+        };
+        $('dClose').onclick = async () => {
+            const c = detail.consolidation, closing = !c.closed;
+            if (closing && !await UI.confirm({ title: `Close ${esc(c.mawb)}?`, message: `${detail.items.length} shipment(s). Nothing can be added or removed until it is reopened.`, confirmText: 'Close' })) return;
+            try { await api('/api/consolidation', { method: 'POST', body: { action: closing ? 'close' : 'reopen', id: c.id } }); await openDetail(c.id, true); loadCons(); toast(true, closing ? 'Closed.' : 'Reopened.'); }
+            catch (err) { toast(false, err.message); }
+        };
+        $('dPrint').onclick = () => {
+            const c = detail.consolidation;
+            printManifest(`${c.kind === 'bag' ? 'Bag' : 'MAWB'} manifest — ${c.mawb}`,
+                [['Carrier', c.carrier], ['Flight / vessel', c.flight_no], ['Departure', c.departure_date], ['Destination', c.dest_country], ['Origin branch', c.origin_branch], ['Status', c.closed ? 'Closed' : 'Open']],
+                detail.items);
+        };
+
+        // bulk status for everything inside
+        async function loadStatuses() {
+            try { statuses = (await api('/api/status')).statuses; } catch (e) { statuses = []; }
+            $('bStatus').innerHTML = statuses.map(s => `<option value="${esc(s.code)}">${s.is_exception ? '⚠ ' : ''}${esc(s.label)}</option>`).join('');
+            const sync = () => { const s = statuses.find(x => x.code === $('bStatus').value) || { requires: [] }; document.querySelectorAll('[data-need]').forEach(el => el.classList.toggle('hidden', !s.requires.includes(el.dataset.need))); };
+            $('bStatus').onchange = sync; sync();
+        }
+        $('bApply').onclick = async () => {
+            const s = statuses.find(x => x.code === $('bStatus').value); if (!s) return;
+            const awbs = detail.items.map(i => i.awb);
+            if (!await UI.confirm({ title: `Set ${awbs.length} shipment(s) to “${esc(s.label)}”?`, message: `Everything in ${esc(detail.consolidation.mawb)}.`, confirmText: 'Update all' })) return;
+            try {
+                const r = await api('/api/status', { method: 'POST', body: { awbs, code: s.code, location: $('bLoc').value, remark: [$('bRemark').value, `${detail.consolidation.kind.toUpperCase()}: ${detail.consolidation.mawb}`].filter(Boolean).join(' • '), fwd_agent: $('bAgent').value, fwd_docket: $('bDocket').value, mawb: detail.consolidation.mawb } });
+                toast(true, `${r.updated ?? awbs.length} updated to ${s.label}.`);
+                await openDetail(detail.consolidation.id, true);
+            } catch (err) { toast(false, err.message); }
+        };
+
+        // ---------- printing ----------
+        async function printTransfer(id) {
+            try {
+                const { manifest: m, items } = await api(`/api/transfers?id=${encodeURIComponent(id)}`);
+                printManifest(`Transfer manifest — ${m.manifest_no}`,
+                    [['From', bname(m.from_branch)], ['To', bname(m.to_branch)], ['Sent', fmt(m.created_at) + (m.created_by_name ? ' by ' + m.created_by_name : '')], ['Vehicle', m.vehicle], ['Driver', m.driver], ['Seal', m.seal_no], ['Notes', m.notes]],
+                    items.map(t => ({ ...t.bookings, current_status: t.status === 'received' ? 'Received' : 'In transit' })), true);
+            } catch (e) { toast(false, e.message); }
+        }
+        function printManifest(title, meta, items, sign) {
+            const w = window.open('', '_blank'); if (!w) return toast(false, 'Allow pop-ups to print.');
+            const pcs = items.reduce((s, i) => s + (+i.pieces || 0), 0), kg = Math.round(items.reduce((s, i) => s + (+i.weight || 0), 0) * 100) / 100;
+            w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>
+                body{font-family:Arial,sans-serif;margin:28px;color:#111;font-size:12px}h1{font-size:18px;margin:0 0 4px}.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:6px 18px;margin:12px 0 16px}
+                .meta b{display:block;font-size:10px;color:#666;text-transform:uppercase}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px;text-align:left}th{background:#f3f3f3;font-size:11px}
+                tfoot td{font-weight:bold}.sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:48px}.sign div{border-top:1px solid #333;padding-top:6px}</style></head><body>
+                <h1>${esc(title)}</h1><div style="color:#666">Al-Farha Cargo · printed ${esc(new Date().toLocaleString())}</div>
+                <div class="meta">${meta.filter(([, v]) => v).map(([k, v]) => `<div><b>${esc(k)}</b>${esc(v)}</div>`).join('')}</div>
+                <table><thead><tr><th>#</th><th>AWB</th><th>Shipper</th><th>Consignee</th><th>Destination</th><th>Pcs</th><th>Kg</th><th>Status</th></tr></thead><tbody>
+                ${items.map((i, n) => `<tr><td>${n + 1}</td><td>${esc(i.awb)}</td><td>${esc(i.shipper || '')}</td><td>${esc(i.consignee || '')}</td><td>${esc([i.dest_city, i.dest_country].filter(Boolean).join(', '))}</td><td>${esc(i.pieces ?? '')}</td><td>${esc(i.weight ?? '')}</td><td>${esc(i.current_status || '')}</td></tr>`).join('')}
+                </tbody><tfoot><tr><td colspan="5">${items.length} shipment(s)</td><td>${pcs}</td><td>${kg}</td><td></td></tr></tfoot></table>
+                ${sign ? '<div class="sign"><div>Sent by (name / sign)</div><div>Received by (name / sign)</div></div>' : ''}</body></html>`);
+            w.document.close();
+            w.onload = () => setTimeout(() => w.print(), 300);
+        }
+
+        showTab(tab);
+        loadTransfers(); loadCons(); loadStatuses();
+    </script>
+</body>
+</html>

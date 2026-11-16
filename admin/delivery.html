@@ -29,7 +29,7 @@
     </script>
     <style>
         .tab[aria-selected="true"] { background: #111827; color: #fff; }
-        .seg[aria-pressed="true"] { background: #111827; color: #fff; }
+        .opt[aria-pressed="true"] { background: #111827; color: #fff; }
         #sigPad { touch-action: none; }
     </style>
 </head>
@@ -121,8 +121,8 @@
             </div>
             <div class="space-y-4 my-5 overflow-y-auto custom-scrollbar">
                 <div class="grid grid-cols-2 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full">
-                    <button type="button" class="seg py-2 rounded-full text-xs font-extrabold" data-mode="driver" aria-pressed="true">Our driver</button>
-                    <button type="button" class="seg py-2 rounded-full text-xs font-extrabold" data-mode="agent" aria-pressed="false">Delivery agent (3rd party)</button>
+                    <button type="button" class="opt py-2 rounded-full text-xs font-extrabold" data-mode="driver" aria-pressed="true">Our driver</button>
+                    <button type="button" class="opt py-2 rounded-full text-xs font-extrabold" data-mode="agent" aria-pressed="false">Delivery agent (3rd party)</button>
                 </div>
                 <div data-for="driver"><label class="ui-label" for="dDriver">Driver <span class="req">*</span></label><select id="dDriver" class="field"></select>
                     <p class="text-[10px] text-gray-400 mt-1">Drivers are staff with “Driver” ticked in Staff & Users.</p></div>
@@ -147,8 +147,8 @@
             </div>
             <div class="space-y-4 my-5 overflow-y-auto custom-scrollbar pr-1">
                 <div class="grid grid-cols-2 gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full">
-                    <button type="button" class="seg py-2 rounded-full text-xs font-extrabold" data-outcome="delivered" aria-pressed="true">Delivered</button>
-                    <button type="button" class="seg py-2 rounded-full text-xs font-extrabold" data-outcome="failed" aria-pressed="false">Not delivered</button>
+                    <button type="button" class="opt py-2 rounded-full text-xs font-extrabold" data-outcome="delivered" aria-pressed="true">Delivered</button>
+                    <button type="button" class="opt py-2 rounded-full text-xs font-extrabold" data-outcome="failed" aria-pressed="false">Not delivered</button>
                 </div>
                 <div data-out="delivered" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div><label class="ui-label" for="pRcv">Received by <span class="req">*</span></label><input id="pRcv" class="field"></div>
@@ -343,13 +343,13 @@
         let outcome = 'delivered', photoData = null;
         const setOutcome = (o) => {
             outcome = o;
-            document.querySelectorAll('[data-outcome]').forEach(b => { if (b.classList.contains('seg')) b.setAttribute('aria-pressed', String(b.dataset.outcome === o)); });
+            document.querySelectorAll('[data-outcome]').forEach(b => { if (b.classList.contains("opt")) b.setAttribute('aria-pressed', String(b.dataset.outcome === o)); });
             document.querySelectorAll('[data-out]').forEach(x => x.classList.toggle('hidden', x.dataset.out !== o));
             $('pTitle').textContent = o === 'delivered' ? 'Proof of delivery' : 'Delivery attempt failed';
             $('photoHint').textContent = o === 'delivered' ? '(parcel at the door / with receiver)' : '(door / location — optional)';
             setTimeout(sizeSig, 0);
         };
-        document.querySelectorAll('.seg[data-outcome]').forEach(b => b.onclick = () => setOutcome(b.dataset.outcome));
+        document.querySelectorAll('.opt[data-outcome]').forEach(b => b.onclick = () => setOutcome(b.dataset.outcome));
 
         function openPod(awb, o, collection) {
             const d = [...data.out, ...mine].find(x => x.awb === awb);
@@ -358,7 +358,7 @@
             $('pSub').textContent = `${awb} · ${bk.consignee || ''}${collection ? ' · collected at branch' : ''}`;
             $('pRcv').value = bk.consignee || ''; $('pRel').value = 'Self'; $('pIdNo').value = ''; $('pNotes').value = '';
             photoData = null; $('pPhoto').value = ''; $('photoPrev').classList.add('hidden'); $('photoPh').classList.remove('hidden');
-            document.querySelectorAll('.seg[data-outcome]').forEach(b => b.disabled = Boolean(collection) && b.dataset.outcome === 'failed');
+            document.querySelectorAll('.opt[data-outcome]').forEach(b => b.disabled = Boolean(collection) && b.dataset.outcome === 'failed');
             openModal('podModal');
             setOutcome(o);
             clearSig();

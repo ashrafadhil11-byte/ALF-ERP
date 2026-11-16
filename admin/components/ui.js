@@ -545,3 +545,16 @@ window.UI = (() => {
 
     return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup, phoneField, splitPhone };
 })();
+
+// Smooth page switches for browsers without cross-document view transitions (see ui.css "Motion").
+(() => {
+    if (window.CSS?.supports?.('view-transition-name: none')) return;
+    document.addEventListener('click', (e) => {
+        const a = e.target.closest('a[href]');
+        if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || a.target === '_blank' || a.hasAttribute('download')) return;
+        const url = new URL(a.href, location.href);
+        if (url.origin !== location.origin || url.pathname === location.pathname || !/\.html$|\/$/.test(url.pathname)) return;
+        document.documentElement.classList.add('page-leaving');
+    });
+    window.addEventListener('pageshow', () => document.documentElement.classList.remove('page-leaving'));
+})();

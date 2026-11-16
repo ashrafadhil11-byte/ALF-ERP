@@ -4,6 +4,7 @@
 import bookings from './_routes/bookings.js';
 import branches from './_routes/branches.js';
 import codes from './_routes/codes.js';
+import consolidation from './_routes/consolidation.js';
 import carrierSync from './_routes/carrier-sync.js';
 import countries from './_routes/countries.js';
 import createUser from './_routes/create-user.js';
@@ -12,16 +13,19 @@ import dashboard from './_routes/dashboard.js';
 import delivery from './_routes/delivery.js';
 import integrations from './_routes/integrations.js';
 import login from './_routes/login.js';
+import notifications from './_routes/notifications.js';
 import postalLookup from './_routes/postal-lookup.js';
 import profile from './_routes/profile.js';
 import status from './_routes/status.js';
 import track from './_routes/track.js';
+import transfers from './_routes/transfers.js';
 import users from './_routes/users.js';
 
 const ROUTES = {
     bookings,
     branches,
     codes,
+    consolidation,
     'carrier-sync': carrierSync,
     countries,
     'create-user': createUser,
@@ -30,10 +34,12 @@ const ROUTES = {
     delivery,
     integrations,
     login,
+    notifications,
     'postal-lookup': postalLookup,
     profile,
     status,
     track,
+    transfers,
     users
 };
 

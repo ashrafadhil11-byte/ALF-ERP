@@ -75,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             </div>
 
+            <!-- Notifications (admin/components/notifications.js) -->
+            <div id="notifSlot"></div>
+
             <!-- Add Employee Shortcut -->
             <a href="create-user.html" title="Register New Employee" 
                class="w-11 h-11 bg-[#F8F8FA] rounded-full border border-gray-200/70 flex items-center justify-center text-gray-700 hover:bg-[#111827] hover:text-white hover:border-[#111827] transition-all shadow-sm flex-shrink-0">
@@ -102,6 +105,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
     </header>
     `;
+
+    // Notification bell + panel
+    if (!document.querySelector('script[src$="components/notifications.js"]')) {
+        const ns = document.createElement('script');
+        ns.src = 'components/notifications.js';
+        document.head.appendChild(ns);
+    }
 
     // Close collapsible search when clicking outside
     document.addEventListener('click', (e) => {

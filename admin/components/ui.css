@@ -121,3 +121,57 @@ input[type="checkbox"], input[type="radio"] { accent-color: #E86D58; }
 @media (min-width: 640px) and (max-width: 1023px) {
     .rtable tr { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* =====================================================================
+   Motion — page transitions, panels, modals (respects "reduce motion")
+   ===================================================================== */
+:root { --ease-out: cubic-bezier(.22, 1, .36, 1); }
+
+/* Page → page: the browser cross-fades between ERP pages (Chrome / Edge / Safari 18+).
+   The sidebar keeps its place so only the content moves. */
+@view-transition { navigation: auto; }
+#sidebar-container { view-transition-name: erp-sidebar; }
+::view-transition-group(erp-sidebar) { animation: none; }
+::view-transition-old(root) { animation: vt-out .16s ease-in both; }
+::view-transition-new(root) { animation: vt-in .38s var(--ease-out) both; }
+@keyframes vt-out { to { opacity: 0; transform: translateY(-4px); } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(12px); } }
+
+/* Browsers without view transitions: content rises in on load */
+@supports not (view-transition-name: none) {
+    body > main { animation: page-in .45s var(--ease-out) both; }
+}
+@keyframes page-in { from { opacity: 0; transform: translateY(14px); } }
+
+/* Leaving a page: quick fade so the switch never feels like a hard cut */
+html.page-leaving body > main { opacity: .35; transform: translateY(4px); transition: opacity .15s ease, transform .15s ease; }
+
+/* Tabs / panels / new rows */
+.ui-fade { animation: ui-fade .32s var(--ease-out) both; }
+@keyframes ui-fade { from { opacity: 0; transform: translateY(8px); } }
+.ui-lift { transition: transform .22s var(--ease-out), box-shadow .22s var(--ease-out), border-color .2s; }
+.ui-lift:hover { transform: translateY(-3px); box-shadow: 0 16px 34px -16px rgba(17, 24, 39, .22); }
+
+/* Modals */
+.ui-modal.open { animation: modal-bg .2s ease both; }
+.ui-modal.open > .panel { animation: modal-in .32s var(--ease-out) both; }
+@keyframes modal-bg { from { opacity: 0; } }
+@keyframes modal-in { from { opacity: 0; transform: translateY(18px) scale(.97); } }
+
+/* Toasts, menus */
+#ui-toast > div { animation: toast-in .35s var(--ease-out) both; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(.96); } }
+.row-menu { animation: menu-in .18s var(--ease-out) both; transform-origin: top right; }
+@keyframes menu-in { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
+
+/* Notification panel + badge */
+.notif-panel { opacity: 0; transform: translateY(-8px) scale(.98); transform-origin: top right; pointer-events: none; visibility: hidden;
+               transition: opacity .18s ease, transform .26s var(--ease-out), visibility 0s .26s; }
+.notif-panel.open { opacity: 1; transform: none; pointer-events: auto; visibility: visible; transition: opacity .18s ease, transform .26s var(--ease-out); }
+.notif-pop { animation: notif-pop .45s var(--ease-out); }
+@keyframes notif-pop { 0% { transform: scale(.4); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+}
