@@ -2,10 +2,16 @@
   "regions": [
     "hnd1"
   ],
+  "buildCommand": "npm --prefix web ci --no-audit --no-fund && npm --prefix web run build && rm -rf web/node_modules",
+  "outputDirectory": ".",
   "rewrites": [
     {
       "source": "/api/:route",
       "destination": "/api/router?__route=:route"
+    },
+    {
+      "source": "/app/:path*",
+      "destination": "/app/index.html"
     }
   ],
   "headers": [
@@ -37,6 +43,15 @@
         {
           "key": "Cache-Control",
           "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    },
+    {
+      "source": "/app/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }

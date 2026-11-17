@@ -106,6 +106,25 @@ A page only switches over when all of these pass:
   - Screenshots are not committed (`.gitignore`); they are regenerated from the old pages whenever needed.
 - `vercel.json` is unchanged: Phase 0 changes nothing that is deployed. Serving `/app/` on Vercel gets wired up in Phase 1, tested on a preview first.
 
+**Phase 1 — done locally, not pushed (17 Nov 2026)**
+
+- **The frame in React** (`web/src/components/frame/`): sidebar, phone bottom bar and slide-in menu, top bar, check-in / break buttons, check-in reminder, notifications, and the profile drawer. The markup, classes and behaviour are the same as the old scripts.
+- **Shared parts:**
+  - Popups: `Modal` with the "unsaved changes" guard, plus `confirm()`, toasts, the row menu, and the guard against leaving the page with unsaved changes.
+  - Fields: `PhoneField`, `CountryField`, `CityField`, `ScanInput` / `camera()`.
+  - Helpers: `pickBoxes()` and `whatsapp()`.
+  - The postcode lookup is still to do. It is used only by Booking and Branch Network, so it moves with those pages in Phase 4.
+- **Layout:** the React root is `display: contents`, so the frame lays out exactly like the old pages. `ui.css` lists the matching `#root` selectors next to the old ones.
+  - All 78 screenshots of the old pages are unchanged by this.
+- **Checks:**
+  - The frame matches the old pages pixel for pixel on all 15 pages at desktop and phone size (30/30, 0.00%).
+  - It also matches with notifications open, the profile drawer open, search expanded, and the phone menu open (8/8, 0%).
+  - 13 unit tests cover the guard, phone codes, list search, check-in stages and notifications.
+  - A scripted browser drove the fields on `/app/parts` without errors.
+- **Mock server:** its clock is now frozen at 17 Nov 2026 11:30 Muscat, so screenshots repeat exactly. Run it with `MOCK_NOW=real` for a live clock.
+- **Vercel:** builds `web/` into `/app` (`buildCommand`), and links into `/app/*` open the React app. Not deployed yet.
+- **Review pages:** `/app/` (the frame; `?as=<page>.html` highlights that page in the menu) and `/app/parts` (try the fields and popups).
+
 ### How to run
 
 ```bash
@@ -116,6 +135,9 @@ npm --prefix web test                                        # React unit tests
 node tests/visual/capture.mjs --out baseline                 # screenshots of the old pages
 node tests/visual/capture.mjs --out current --target new     # screenshots of the converted React pages
 node tests/visual/compare.mjs                                # differences → tests/visual/diff/
+node tests/visual/capture.mjs --frame --out frame-old       # frame only (sidebar, top bar), old pages
+node tests/visual/capture.mjs --frame --target new --out frame-new
+node tests/visual/compare.mjs --base frame-old --cur frame-new --diff frame-diff
 ```
 
 The layout check reports two existing items on the old pages; the React pages must report the same, no more:

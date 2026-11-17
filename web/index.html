@@ -15,8 +15,9 @@
     <title>Al-Farha Cargo</title>
     <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('/login.html');</script>
 </head>
-<body class="bg-[#ECECEF] min-h-screen antialiased text-gray-900 selection:bg-coral-500 selection:text-white">
-    <div id="root"></div>
+<!-- Same <body> as the old pages; #root is display:contents so the frame lays out exactly like them (see ui.css). -->
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="root" style="display: contents"></div>
     <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

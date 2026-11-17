@@ -1,6 +1,13 @@
 // Local preview: serves ALF-ERP static files + fake /api responses (sample data only). Run: node tests/mock/server.mjs  → http://localhost:5178
 import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+// The sample data is dated relative to "now". The clock is frozen (same moment as tests/visual/capture.mjs) so
+// screenshots repeat exactly; run with MOCK_NOW=real for a live clock, or MOCK_NOW=<ISO time> for another moment.
+if (process.env.MOCK_NOW !== 'real') {
+    const T = +new Date(process.env.MOCK_NOW || '2026-11-17T07:30:00Z');
+    const RealDate = Date;
+    globalThis.Date = class extends RealDate { constructor(...a) { super(...(a.length ? a : [T])); } static now() { return T; } };
+}
 const ROOT = path.resolve(process.argv[2] || fileURLToPath(new URL('../..', import.meta.url))); let role = 'super_admin';
 const day = (o) => new Date(Date.now() - o * 864e5).toISOString().slice(0, 10);
 const dash = (r) => ({

@@ -12,6 +12,7 @@ export default defineConfig({
         strictPort: true,
         proxy: Object.fromEntries(['/api', '/admin', '/assets', '/icons', '/login.html', '/track.html', '/manifest.webmanifest', '/pwa.js', '/sw.js'].map(p => [p, MOCK]))
     },
-    build: { outDir: 'dist', sourcemap: true },
+    // Built into /app at the repo root, which Vercel serves next to the old pages (vercel.json buildCommand).
+    build: { outDir: '../app', emptyOutDir: true, sourcemap: true },
     test: { environment: 'jsdom', setupFiles: ['./src/test-setup.ts'] }
 } as any);

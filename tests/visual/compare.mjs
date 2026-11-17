@@ -1,5 +1,5 @@
 // Compares tests/visual/current/*.png with tests/visual/baseline/*.png and writes red-highlight diffs to tests/visual/diff/.
-//   node tests/visual/compare.mjs [--max 0.5]      max = % of pixels allowed to differ per screenshot (default 0.5)
+//   node tests/visual/compare.mjs [--max 0.5] [--base baseline --cur current --diff diff]      max = % of pixels allowed to differ per screenshot (default 0.5)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -12,7 +12,8 @@ const pixelmatch = (await import(pathToFileURL(require.resolve('pixelmatch')).hr
 
 const i = process.argv.indexOf('--max');
 const MAX = i > 0 ? Number(process.argv[i + 1]) : 0.5;
-const dirs = { base: path.join(here, 'baseline'), cur: path.join(here, 'current'), diff: path.join(here, 'diff') };
+const opt = (k, d) => { const j = process.argv.indexOf('--' + k); return j > 0 ? process.argv[j + 1] : d; };
+const dirs = { base: path.join(here, opt('base', 'baseline')), cur: path.join(here, opt('cur', 'current')), diff: path.join(here, opt('diff', 'diff')) };
 fs.mkdirSync(dirs.diff, { recursive: true });
 
 const files = fs.existsSync(dirs.cur) ? fs.readdirSync(dirs.cur).filter(f => f.endsWith('.png')) : [];

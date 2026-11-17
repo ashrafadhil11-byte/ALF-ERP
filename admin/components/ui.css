@@ -145,12 +145,12 @@ input[type="checkbox"], input[type="radio"] { accent-color: #E86D58; }
 
 /* Browsers without view transitions: content rises in on load */
 @supports not (view-transition-name: none) {
-    body > main { animation: page-in .45s var(--ease-out) both; }
+    body > main, body > #root > main { animation: page-in .45s var(--ease-out) both; }
 }
 @keyframes page-in { from { opacity: 0; transform: translateY(14px); } }
 
 /* Leaving a page: quick fade so the switch never feels like a hard cut */
-html.page-leaving body > main { opacity: .35; transform: translateY(4px); transition: opacity .15s ease, transform .15s ease; }
+html.page-leaving body > main, html.page-leaving body > #root > main { opacity: .35; transform: translateY(4px); transition: opacity .15s ease, transform .15s ease; }
 
 /* Tabs / panels / new rows */
 .ui-fade { animation: ui-fade .32s var(--ease-out) both; }
@@ -182,13 +182,16 @@ html.page-leaving body > main { opacity: .35; transform: translateY(4px); transi
     ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
+/* The React app (web/) renders inside <div id="root" style="display:contents">, so its frame is laid out exactly like
+   the old pages; the selectors above and below list both forms. */
+
 /* ---------------------------------------------------------------
    App frame (desktop): the sidebar stays pinned and the main panel has a fixed size —
    only the main panel's content scrolls and changes between pages.
    --------------------------------------------------------------- */
 @media (min-width: 1024px) {
-    body:has(> #sidebar-container) { height: 100dvh; overflow: hidden; }
-    body:has(> #sidebar-container) > main {
+    body:has(> #sidebar-container), body:has(> #root > #sidebar-container) { height: 100dvh; overflow: hidden; }
+    body:has(> #sidebar-container) > main, body > #root > #sidebar-container ~ main {
         height: calc(100dvh - 2.5rem);
         min-height: 0;
         overflow-y: auto !important;
@@ -197,7 +200,7 @@ html.page-leaving body > main { opacity: .35; transform: translateY(4px); transi
         view-transition-name: erp-main;
     }
     /* pages that already have their own inner scroll area: let it fill the panel */
-    body:has(> #sidebar-container) > main > .overflow-y-auto { min-height: 0; }
+    body:has(> #sidebar-container) > main > .overflow-y-auto, body > #root > #sidebar-container ~ main > .overflow-y-auto { min-height: 0; }
 }
 ::view-transition-old(erp-main) { animation: vt-out .14s ease-in both; }
 ::view-transition-new(erp-main) { animation: vt-in .3s var(--ease-out) both; }
