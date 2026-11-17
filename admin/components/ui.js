@@ -44,14 +44,56 @@ window.UI = (() => {
         try { const a = new AudioContext(), o = a.createOscillator(); o.frequency.value = ok ? 880 : 220; o.connect(a.destination); o.start(); o.stop(a.currentTime + 0.12); } catch (e) {}
     }
 
-    const openModal = (id) => { document.getElementById(id).classList.add('open'); };
-    const closeModal = (id) => { document.getElementById(id).classList.remove('open'); };
+    // ---------- unsaved changes ----------
+    // Typing or picking something inside a popup (or a form marked data-guard) marks it "dirty".
+    // Closing it by clicking outside, pressing Esc, or the ✕ / Cancel button then asks first.
+    // Closing after a successful save (code, not a click) never asks.
+    const TRACK = /^(INPUT|SELECT|TEXTAREA)$/;
+    const tracked = (el) => el && TRACK.test(el.tagName) && !['search', 'button', 'submit', 'hidden', 'reset'].includes(el.type)
+        && !el.closest('[data-nodirty]') && !/search|find|filter|scan/i.test(`${el.id || ''} ${el.name || ''} ${el.placeholder || ''}`);
+    const markDirty = (e) => {
+        if (!e.isTrusted || !tracked(e.target)) return;
+        const box = e.target.closest('.ui-modal, [data-guard]');
+        if (box) box.dataset.dirty = '1';
+    };
+    document.addEventListener('input', markDirty, true);
+    document.addEventListener('change', markDirty, true);
+    const isDirty = (el) => el?.dataset?.dirty === '1';
+    const unmark = (el) => { if (el) delete el.dataset.dirty; };
+    let asking = false;
+    /** Ask before throwing away unsaved input. Resolves true when it is fine to close. */
+    async function allowClose(el) {
+        if (!isDirty(el)) return true;
+        if (asking) return false;
+        asking = true;
+        const ok = await confirm({ title: 'Discard unsaved changes?', message: 'You have entered or changed details here that are not saved yet. If you close now they will be lost.', confirmText: 'Discard', danger: true });
+        asking = false;
+        if (ok) unmark(el);
+        return ok;
+    }
+    async function dismiss(m) { if (await allowClose(m)) { m.classList.remove('open'); unmark(m); } }
+
+    const openModal = (id) => { const m = document.getElementById(id); unmark(m); m.classList.add('open'); };
+    const closeModal = (id, { force = false } = {}) => {
+        const m = document.getElementById(id); if (!m) return;
+        const ev = window.event;   // set while a click / key handler runs, not after a save finishes
+        if (!force && ev && ev.isTrusted && (ev.type === 'click' || ev.type === 'keydown') && isDirty(m)) { dismiss(m); return; }
+        m.classList.remove('open'); unmark(m);
+    };
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') document.querySelectorAll('.ui-modal.open').forEach(m => m.classList.remove('open'));
+        if (e.key !== 'Escape') return;
+        const open = [...document.querySelectorAll('.ui-modal.open')];
+        const top = open[open.length - 1]; if (!top) return;
+        if (top.dataset.confirm) { top.querySelector('[data-v="0"]')?.click(); return; }
+        dismiss(top);
     });
     document.addEventListener('click', (e) => {
-        if (e.target.classList?.contains('ui-modal')) e.target.classList.remove('open');
+        if (e.target.classList?.contains('ui-modal') && !e.target.dataset.confirm) dismiss(e.target);
         if (!e.target.closest('[data-menu-root]')) document.querySelectorAll('.row-menu').forEach(m => m.remove());
+    });
+    // Leaving the page (link, back, reload) with an unsaved form on it
+    window.addEventListener('beforeunload', (e) => {
+        if (document.querySelector('.ui-modal.open[data-dirty="1"], [data-guard][data-dirty="1"]')) { e.preventDefault(); e.returnValue = ''; }
     });
 
     /** Styled confirm dialog. Resolves true/false. */
@@ -59,6 +101,7 @@ window.UI = (() => {
         return new Promise((resolve) => {
             const m = document.createElement('div');
             m.className = 'ui-modal open';
+            m.dataset.confirm = '1';
             m.innerHTML = `
                 <div class="panel max-w-md" role="dialog" aria-modal="true" aria-labelledby="cfTitle">
                     <h3 id="cfTitle" class="text-lg font-extrabold text-gray-900">${esc(title)}</h3>
@@ -621,7 +664,7 @@ window.UI = (() => {
         });
     }
 
-    return { api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup, phoneField, splitPhone, pickBoxes };
+    return { allowClose, markClean: unmark, api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup, phoneField, splitPhone, pickBoxes };
 })();
 
 // Smooth page switches for browsers without cross-document view transitions (see ui.css "Motion").

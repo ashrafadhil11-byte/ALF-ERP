@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
          class="fixed inset-0 z-50 bg-gray-900/30 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300"></div>
 
     <!-- Slide-Over Profile Panel -->
-    <aside id="profileDrawerPanel" 
+    <aside id="profileDrawerPanel" data-guard 
            class="fixed top-3 bottom-3 right-3 z-50 w-full max-w-md bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 flex flex-col justify-between overflow-hidden transform translate-x-[110%] transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
         
         <!-- Top Header with Gradient Accent -->
@@ -217,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alertBox.className = 'p-3.5 rounded-2xl text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-100 block';
                 alertBox.textContent = 'Password updated. Your new credentials are now active.';
                 pwdForm.reset();
+                window.UI?.markClean?.(document.getElementById('profileDrawerPanel'));
             } catch (err) {
                 alertBox.className = 'p-3.5 rounded-2xl text-xs font-bold border bg-red-50 text-red-600 border-red-100 block';
                 alertBox.textContent = err.message;
@@ -309,10 +310,11 @@ window.openProfileModal = function() {
     });
 };
 
-window.closeProfileModal = function() {
+window.closeProfileModal = async function() {
     const backdrop = document.getElementById('profileDrawerBackdrop');
     const panel = document.getElementById('profileDrawerPanel');
     if (!backdrop || !panel) return;
+    if (window.UI?.allowClose && !(await UI.allowClose(panel))) return;   // unsaved password typed
 
     backdrop.classList.add('opacity-0');
     panel.classList.add('translate-x-[110%]');
