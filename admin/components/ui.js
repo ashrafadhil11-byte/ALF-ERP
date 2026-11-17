@@ -84,6 +84,7 @@ window.UI = (() => {
 
     // Line icons (24×24, stroke) — same style as the sidebar. Usage: UI.icon('truck', 'w-4 h-4')
     const ICONS = {
+        flag: '<path d="M4 22V4M4 4h12l-2 4 2 4H4"/>',
         lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
         fingerprint: '<path d="M12 11v3a8 8 0 01-1 4M8 12a4 4 0 018 0v1M5 13v-1a7 7 0 0114 0v2M16 17v1M12 3a9 9 0 019 9"/>',
         eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',

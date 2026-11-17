@@ -585,7 +585,7 @@
             return `
             <div class="sx-scroll pretty-scroll">
                 <div class="sx-hero">
-                    <span class="sx-badge"><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>Shipment · ${sea ? 'Sea' : 'Air'} cargo</span>
+                    <span class="sx-badge"><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span>${sea ? 'Sea' : 'Air'} shipment card</span>
                     <button type="button" onclick="closeDrawer()" aria-label="Close" class="sx-close">${I('x', 'w-4 h-4')}</button>
                 </div>
 
@@ -606,17 +606,25 @@
                         </div>
                     </section>
 
-                    <!-- route -->
+                    <!-- origin > destination -->
                     <section class="sx-route" style="--d:1">
-                        <div class="min-w-0"><p class="sx-k">From</p><p class="sx-city">${esc(b.origin_city || '—')}</p><p class="text-[11px] text-gray-400 truncate">${esc(b.origin_country || '')}</p></div>
-                        <div class="sx-path" style="--p:${pct}%"><span class="sx-path-fill"></span><span class="sx-plane">${I(sea ? 'ship' : 'plane', 'w-3.5 h-3.5')}</span></div>
-                        <div class="min-w-0 text-right"><p class="sx-k">To</p><p class="sx-city">${esc(b.dest_city || '—')}</p><p class="text-[11px] text-gray-400 truncate">${esc(b.dest_country || '')}</p></div>
+                        <div class="sx-end from">
+                            <p class="sx-k">${I('pin', 'w-3 h-3')}Origin</p>
+                            <p class="sx-city" title="${esc(b.origin_city || '')}">${esc(b.origin_city || '—')}</p>
+                            <span class="sx-country">${esc(b.origin_country || '—')}</span>
+                        </div>
+                        <span class="sx-join" aria-hidden="true">${I(sea ? 'ship' : 'plane', 'w-4 h-4')}</span>
+                        <div class="sx-end to">
+                            <p class="sx-k">Destination${I('flag', 'w-3 h-3')}</p>
+                            <p class="sx-city" title="${esc(b.dest_city || '')}">${esc(b.dest_city || '—')}</p>
+                            <span class="sx-country">${esc(b.dest_country || '—')}</span>
+                        </div>
                     </section>
 
                     <!-- progress -->
                     <section class="sx-progress ${cancelled ? 'is-cancelled' : exception ? 'is-alert' : ''}" style="--d:2;--p:${pct}%">
                         <div class="flex items-center justify-between mb-5">
-                            <p class="sx-k !mb-0">Shipment progress</p>
+                            <div><p class="sx-k !mb-0">Shipment progress</p><p class="text-[11px] font-bold text-gray-400 mt-1 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full ${exception ? 'bg-coral-500' : 'bg-emerald-500'}"></span>Updated ${fmtDate(events[0]?.event_at || b.updated_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p></div>
                             <span class="text-[11px] font-extrabold ${exception || cancelled ? 'text-coral-600' : 'text-gray-500'}">${exception || cancelled ? esc(b.current_status) : SX_STEPS[step][0]}</span>
                         </div>
                         <ol class="sx-track"><span class="sx-rail"><span class="sx-rail-fill"></span></span>${steps}</ol>
@@ -660,18 +668,14 @@
             </div>
 
             <footer class="sx-foot">
-                <div class="min-w-0">
-                    <p class="sx-k !mb-0.5">Last update</p>
-                    <p class="text-[12px] font-extrabold text-gray-700 flex items-center gap-1.5 truncate"><span class="w-1.5 h-1.5 rounded-full ${exception ? 'bg-coral-500' : 'bg-emerald-500'} flex-shrink-0"></span>${fmtDate(events[0]?.event_at || b.updated_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                </div>
-                <div class="flex items-center gap-2 flex-wrap justify-end">
-                    ${canDelete ? fab('trash', 'Delete', `onclick="deleteShipment('${awb}')"`, 'fab-danger') : ''}
-                    ${cancelled ? '' : fab('ban', 'Cancel', `onclick="cancelShipment('${awb}')"`, 'fab-danger')}
-                    ${b.fwd_docket ? fab('sync', 'Carrier sync', `onclick="syncCarriers('${awb}')"`) : ''}
-                    ${b.shipper_phone ? fab('message', 'WhatsApp', `onclick="whatsapp('${awb}')"`, 'fab-wa') : ''}
+                <div class="flex items-center gap-1.5">
                     ${fab('edit', 'Edit', `onclick="editShipment('${awb}')"`)}
-                    <a class="fab fab-open fab-primary" href="status-update.html?awb=${encodeURIComponent(b.awb)}" title="Update status">${I('refresh', 'w-4 h-4')}<span class="fab-label">Update status</span></a>
+                    ${b.shipper_phone ? fab('message', 'WhatsApp', `onclick="whatsapp('${awb}')"`, 'fab-wa') : ''}
+                    ${b.fwd_docket ? fab('sync', 'Carrier sync', `onclick="syncCarriers('${awb}')"`) : ''}
+                    ${cancelled ? '' : fab('ban', 'Cancel', `onclick="cancelShipment('${awb}')"`, 'fab-danger')}
+                    ${canDelete ? fab('trash', 'Delete', `onclick="deleteShipment('${awb}')"`, 'fab-danger') : ''}
                 </div>
+                <a class="fab fab-open fab-primary flex-shrink-0" href="status-update.html?awb=${encodeURIComponent(b.awb)}" title="Update status">${I('refresh', 'w-4 h-4')}<span class="fab-label">Update status</span></a>
             </footer>`;
         }
 
