@@ -1,0 +1,24 @@
+// Every signed-in page, where it lives today (old) and where its React version lives (new; null = not converted yet).
+// Phase by phase, fill in `new` as pages are converted.
+export const PAGES = [
+    { name: 'super-dashboard', old: '/admin/super-dashboard.html', new: null },
+    { name: 'shipments', old: '/admin/shipments.html', new: null },
+    { name: 'booking', old: '/admin/booking.html', new: null },
+    { name: 'status-update', old: '/admin/status-update.html', new: null },
+    { name: 'delivery', old: '/admin/delivery.html', new: null },
+    { name: 'consolidation', old: '/admin/consolidation.html', new: null },
+    { name: 'customers', old: '/admin/customers.html', new: null },
+    { name: 'crm', old: '/admin/crm.html', new: null },
+    { name: 'accounts', old: '/admin/accounts.html', new: null },
+    { name: 'warehouse', old: '/admin/warehouse.html', new: null },
+    { name: 'attendance', old: '/admin/attendance.html', new: null },
+    { name: 'create-user', old: '/admin/create-user.html', new: null },
+    { name: 'branches', old: '/admin/branches.html', new: null },
+    { name: 'integrations', old: '/admin/integrations.html', new: null },
+    { name: 'activity', old: '/admin/activity.html', new: null }
+];
+
+export const SIZES = [
+    { name: 'desktop', width: 1366, height: 800 },
+    { name: 'phone', width: 375, height: 812, isMobile: true, hasTouch: true }
+];

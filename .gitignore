@@ -1,0 +1,7 @@
+.claude/
+node_modules/
+web/dist/
+tests/visual/baseline/
+tests/visual/current/
+tests/visual/diff/
+*.tsbuildinfo
