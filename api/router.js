@@ -9,6 +9,7 @@ import consolidation from './_routes/consolidation.js';
 import carrierSync from './_routes/carrier-sync.js';
 import countries from './_routes/countries.js';
 import createUser from './_routes/create-user.js';
+import customers from './_routes/customers.js';
 import dashboardLayout from './_routes/dashboard-layout.js';
 import dashboard from './_routes/dashboard.js';
 import delivery from './_routes/delivery.js';
@@ -31,6 +32,7 @@ const ROUTES = {
     'carrier-sync': carrierSync,
     countries,
     'create-user': createUser,
+    customers,
     'dashboard-layout': dashboardLayout,
     dashboard,
     delivery,

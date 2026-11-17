@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
+    <title>Customers - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
+    </script>
+    <style>.opt[aria-pressed="true"] { background: #111827; color: #fff; } .money { font-variant-numeric: tabular-nums; white-space: nowrap; }</style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar pb-24 lg:pb-4">
+            <section class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center"><span data-icon="user"></span></div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Customers</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Built from every booking • matched by phone or civil ID</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                <input id="search" class="field" placeholder="Search name, phone, civil ID or customer no." autocomplete="off" aria-label="Search customers">
+                <div class="flex gap-1 bg-[#F8F8FA] p-1 rounded-full self-start">
+                    <button type="button" class="opt px-3 py-2 rounded-full text-[11px] font-extrabold" data-filter="" aria-pressed="true">All</button>
+                    <button type="button" class="opt px-3 py-2 rounded-full text-[11px] font-extrabold" data-filter="blocked" aria-pressed="false">Blocked</button>
+                </div>
+            </div>
+            <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
+                <table class="rtable w-full text-xs">
+                    <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                        <th class="p-3 pl-4 font-extrabold">Customer</th><th class="p-3 font-extrabold">Phone</th><th class="p-3 font-extrabold">Civil ID</th>
+                        <th class="p-3 font-extrabold text-right">Shipments</th><th class="p-3 font-extrabold">Last shipment</th><th class="p-3 pr-4 font-extrabold text-right">Balance due</th>
+                    </tr></thead>
+                    <tbody id="rows" class="divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
+            <div class="flex justify-center mt-4"><button id="more" type="button" class="btn btn-light hidden">Show more</button></div>
+        </div>
+    </main>
+
+    <!-- Profile -->
+    <div id="profile" class="ui-modal">
+        <div class="panel max-w-4xl">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3 min-w-0">
+                    <span id="pAvatar" class="w-12 h-12 rounded-2xl bg-[#111827] text-white flex items-center justify-center font-extrabold text-lg flex-shrink-0"></span>
+                    <div class="min-w-0"><h3 id="pName" class="text-xl font-extrabold truncate"></h3><p id="pSub" class="text-xs text-gray-400"></p></div>
+                </div>
+                <button type="button" onclick="UI.closeModal('profile')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div class="my-5 space-y-5 overflow-y-auto custom-scrollbar pr-1">
+                <div id="pKpis" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+                <form id="pForm" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-[#F8F8FA] rounded-[1.5rem] p-4">
+                    <div><label class="ui-label" for="fName">Name</label><input id="fName" class="field" required></div>
+                    <div><label class="ui-label">Phone</label><input id="fPhone" class="field soft" readonly title="The phone links bookings to this customer"></div>
+                    <div><label class="ui-label" for="fCivil">Civil ID / passport</label><input id="fCivil" class="field"></div>
+                    <div><label class="ui-label" for="fWa">WhatsApp</label><input id="fWa" class="field"></div>
+                    <div><label class="ui-label" for="fEmail">Email</label><input id="fEmail" type="email" class="field"></div>
+                    <div><label class="ui-label" for="fTags">Tags</label><input id="fTags" class="field" placeholder="e.g. VIP, corporate"></div>
+                    <div class="sm:col-span-2 lg:col-span-3"><label class="ui-label" for="fAddr">Address</label><input id="fAddr" class="field"></div>
+                    <div class="sm:col-span-2 lg:col-span-3"><label class="ui-label" for="fNotes">Notes</label><textarea id="fNotes" rows="2" class="field"></textarea></div>
+                    <div class="sm:col-span-2 lg:col-span-3 flex flex-wrap justify-between gap-2 items-center">
+                        <label id="blockWrap" class="flex items-center gap-2 text-xs font-bold text-[#D55C48]"><input id="fBlocked" type="checkbox" class="w-4 h-4">Blocked (warn staff at booking)</label>
+                        <div class="flex gap-2"><button type="button" id="mergeBtn" class="btn btn-light btn-sm"><span data-icon="layers"></span>Merge a duplicate</button><button class="btn btn-dark btn-sm">Save details</button></div>
+                    </div>
+                </form>
+                <div>
+                    <p class="sd-label mb-2">Receivers <span id="pRcvCount" class="text-gray-400"></span></p>
+                    <div id="pReceivers" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+                </div>
+                <div>
+                    <p class="sd-label mb-2">Shipments</p>
+                    <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden"><table class="rtable w-full text-xs">
+                        <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100"><th class="p-3 pl-4 font-extrabold">AWB</th><th class="p-3 font-extrabold">Date</th><th class="p-3 font-extrabold">Receiver</th><th class="p-3 font-extrabold">Pcs / kg</th><th class="p-3 pr-4 font-extrabold">Status</th></tr></thead>
+                        <tbody id="pShip" class="divide-y divide-gray-100"></tbody></table></div>
+                </div>
+                <div>
+                    <p class="sd-label mb-2">Invoices</p>
+                    <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden"><table class="rtable w-full text-xs">
+                        <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100"><th class="p-3 pl-4 font-extrabold">Invoice</th><th class="p-3 font-extrabold">Date</th><th class="p-3 font-extrabold text-right">Total</th><th class="p-3 font-extrabold text-right">Balance</th><th class="p-3 pr-4 font-extrabold">Status</th></tr></thead>
+                        <tbody id="pInv" class="divide-y divide-gray-100"></tbody></table></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Merge -->
+    <div id="mergeModal" class="ui-modal">
+        <div class="panel max-w-lg">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 class="text-lg font-extrabold">Merge a duplicate</h3><p id="mSub" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('mergeModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div class="my-5 space-y-3">
+                <input id="mSearch" class="field" placeholder="Find the duplicate by name, phone or civil ID" autocomplete="off" aria-label="Find duplicate">
+                <div id="mList" class="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { api, esc, toast, openModal, closeModal } = UI;
+        const $ = (id) => document.getElementById(id);
+        const THREE = ['OMR', 'BHD', 'KWD'];
+        const money = (cur, v) => `${cur} ${(+v || 0).toLocaleString('en', { minimumFractionDigits: THREE.includes(cur) ? 3 : 2, maximumFractionDigits: THREE.includes(cur) ? 3 : 2 })}`;
+        const day = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        const isOps = ['super_admin', 'head_office', 'branch_manager'].includes(UI.role());
+        let list = [], page = 0, filter = '', current = null;
+
+        async function load(reset = true) {
+            if (reset) { page = 0; list = []; }
+            try {
+                const d = await api(`/api/customers?q=${encodeURIComponent($('search').value.trim())}&page=${page}${filter ? '&filter=' + filter : ''}`);
+                list = list.concat(d.customers); $('more').classList.toggle('hidden', !d.more);
+            } catch (e) { toast(false, e.message); }
+            $('rows').innerHTML = list.map(c => `<tr class="hover:bg-[#F8F8FA] cursor-pointer ${c.blocked ? 'bg-[#FFF5F3]' : ''}" data-c="${c.id}">
+                <td class="p-3 pl-4" data-label="Customer"><span class="font-extrabold">${esc(c.name)}</span>${c.blocked ? ' <span class="pill-tag pill-coral">Blocked</span>' : ''}${(c.tags || []).map(t => ` <span class="pill-tag pill-gray">${esc(t)}</span>`).join('')}<span class="block text-[10px] text-gray-400 font-mono">${esc(c.customer_no || '')}</span></td>
+                <td class="p-3" data-label="Phone">${esc(c.phone || '—')}</td>
+                <td class="p-3" data-label="Civil ID">${esc(c.civil_id || '—')}</td>
+                <td class="p-3 text-right font-extrabold" data-label="Shipments">${c.stats?.shipments ?? 0}<span class="block text-[10px] text-gray-400 font-medium">${Math.round(+(c.stats?.kg || 0))} kg</span></td>
+                <td class="p-3" data-label="Last shipment">${day(c.stats?.last_shipment_at || c.last_booking_at)}</td>
+                <td class="p-3 pr-4 text-right" data-label="Balance due">${c.balance.length ? c.balance.map(b => `<span class="block font-extrabold text-[#D55C48] money">${money(b.currency, b.amount)}</span>`).join('') : '—'}</td></tr>`).join('')
+                || `<tr><td colspan="6" class="p-10 text-center text-gray-400">${$('search').value ? 'No customer matches.' : 'Customers appear here automatically as bookings are made.'}</td></tr>`;
+        }
+        let t; $('search').oninput = () => { clearTimeout(t); t = setTimeout(() => load(), 300); };
+        $('more').onclick = () => { page++; load(false); };
+        document.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { filter = b.dataset.filter; document.querySelectorAll('[data-filter]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); load(); });
+        $('rows').addEventListener('click', (e) => { const r = e.target.closest('[data-c]'); if (r) openProfile(+r.dataset.c); });
+
+        async function openProfile(id) {
+            let d;
+            try { d = await api(`/api/customers?id=${id}`); } catch (e) { return toast(false, e.message); }
+            current = d; const c = d.customer;
+            $('pAvatar').textContent = (c.name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
+            $('pName').textContent = c.name;
+            $('pSub').textContent = [c.customer_no, c.phone, c.branch_code && 'since ' + day(c.first_booking_at || c.created_at)].filter(Boolean).join(' · ');
+            const kpi = (label, val, cls = '') => `<div class="bg-[#F8F8FA] rounded-2xl p-3"><p class="sd-label">${label}</p><div class="text-lg font-extrabold ${cls}">${val}</div></div>`;
+            $('pKpis').innerHTML = kpi('Shipments', d.stats?.shipments ?? 0) + kpi('Shipped', `${Math.round(+(d.stats?.kg || 0))} kg`)
+                + kpi('Invoiced', d.spent.map(s => `<span class="block money text-base">${money(s.currency, s.amount)}</span>`).join('') || '—')
+                + kpi('Balance due', d.balance.map(s => `<span class="block money text-base">${money(s.currency, s.amount)}</span>`).join('') || '<span class="text-emerald-600">Nothing</span>', d.balance.length ? 'text-[#D55C48]' : '');
+            $('fName').value = c.name || ''; $('fPhone').value = c.phone || ''; $('fCivil').value = c.civil_id || ''; $('fWa').value = c.whatsapp || '';
+            $('fEmail').value = c.email || ''; $('fTags').value = (c.tags || []).join(', '); $('fAddr').value = c.address || ''; $('fNotes').value = c.notes || '';
+            $('fBlocked').checked = c.blocked; $('blockWrap').classList.toggle('hidden', !isOps); $('mergeBtn').classList.toggle('hidden', !isOps);
+            $('pRcvCount').textContent = `· ${d.contacts.length}`;
+            $('pReceivers').innerHTML = d.contacts.map(r => `<div class="flex items-start justify-between gap-2 bg-white border border-gray-100 rounded-2xl p-3">
+                <div class="min-w-0 text-xs"><p class="font-extrabold">${esc(r.name)} <span class="text-[10px] text-gray-400 font-bold">× ${r.times_used}</span></p>
+                <p class="text-gray-500">${esc(r.phone || '')}</p><p class="text-[11px] text-gray-400 truncate">${esc([r.address, r.city, r.country].filter(Boolean).join(', '))}</p></div>
+                <button type="button" class="icon-btn !w-7 !h-7" data-rdel="${r.id}" aria-label="Remove receiver">${UI.icon('x', 'w-3 h-3')}</button></div>`).join('')
+                || '<p class="text-xs text-gray-400">No receivers yet.</p>';
+            $('pShip').innerHTML = d.bookings.map(b => `<tr><td class="p-3 pl-4 font-extrabold font-mono" data-label="AWB"><a href="shipments.html?awb=${encodeURIComponent(b.awb)}" class="hover:text-coral-600">${esc(b.awb)}</a></td>
+                <td class="p-3" data-label="Date">${day(b.booked_at)}</td><td class="p-3" data-label="Receiver">${esc(b.consignee || '—')}<span class="block text-[10px] text-gray-400">${esc([b.dest_city, b.dest_country].filter(Boolean).join(', '))}</span></td>
+                <td class="p-3" data-label="Pcs / kg">${b.pieces ?? '—'} / ${b.chargeable_weight ?? b.weight ?? '—'}</td>
+                <td class="p-3 pr-4" data-label="Status"><span class="pill-tag pill-gray">${esc(b.current_status || '')}</span></td></tr>`).join('') || '<tr><td colspan="5" class="p-6 text-center text-gray-400">No shipments.</td></tr>';
+            const SP = { paid: 'pill-green', partial: 'pill-amber', unpaid: 'pill-coral', void: 'pill-gray' };
+            $('pInv').innerHTML = d.invoices.map(i => `<tr><td class="p-3 pl-4 font-extrabold font-mono" data-label="Invoice">${esc(i.invoice_no)}${i.awb ? `<span class="block text-[10px] text-gray-400 font-sans">${esc(i.awb)}</span>` : ''}</td>
+                <td class="p-3" data-label="Date">${day(i.issued_at)}</td><td class="p-3 text-right money" data-label="Total">${money(i.currency, i.total)}</td>
+                <td class="p-3 text-right money" data-label="Balance">${+i.balance && i.status !== 'void' ? money(i.currency, i.balance) : '—'}</td>
+                <td class="p-3 pr-4" data-label="Status"><span class="pill-tag ${SP[i.status]}">${i.status}</span></td></tr>`).join('') || '<tr><td colspan="5" class="p-6 text-center text-gray-400">No invoices.</td></tr>';
+            UI.paintIcons();
+            if (!$('profile').classList.contains('open')) openModal('profile');
+        }
+        $('pForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const c = current.customer;
+            try {
+                await api('/api/customers', { method: 'POST', body: { action: 'save', id: c.id, name: $('fName').value, civil_id: $('fCivil').value, whatsapp: $('fWa').value, email: $('fEmail').value, tags: $('fTags').value, address: $('fAddr').value, notes: $('fNotes').value, ...(isOps ? { blocked: $('fBlocked').checked } : {}) } });
+                toast(true, 'Saved.'); await openProfile(c.id); load();
+            } catch (err) { toast(false, err.message); }
+        };
+        $('pReceivers').addEventListener('click', async (e) => {
+            const b = e.target.closest('[data-rdel]'); if (!b) return;
+            if (!await UI.confirm({ title: 'Remove this receiver?', message: 'Only from the saved list — shipments are not changed.', confirmText: 'Remove' })) return;
+            try { await api('/api/customers', { method: 'POST', body: { action: 'contact_delete', id: +b.dataset.rdel } }); openProfile(current.customer.id); } catch (err) { toast(false, err.message); }
+        });
+
+        // merge
+        $('mergeBtn').onclick = () => { $('mSub').textContent = `Everything from the duplicate moves into ${current.customer.customer_no} ${current.customer.name}.`; $('mSearch').value = ''; $('mList').innerHTML = ''; openModal('mergeModal'); setTimeout(() => $('mSearch').focus(), 50); };
+        let mt; $('mSearch').oninput = () => { clearTimeout(mt); mt = setTimeout(async () => {
+            const q = $('mSearch').value.trim(); if (q.length < 2) { $('mList').innerHTML = ''; return; }
+            const d = await api(`/api/customers?q=${encodeURIComponent(q)}`).catch(() => ({ customers: [] }));
+            $('mList').innerHTML = d.customers.filter(c => c.id !== current.customer.id).map(c => `<button type="button" data-merge="${c.id}" class="w-full flex items-center justify-between gap-3 bg-[#F8F8FA] hover:bg-[#FFF5F3] rounded-2xl px-4 py-3 text-left">
+                <span class="min-w-0 text-xs"><b>${esc(c.name)}</b> <span class="text-gray-400 font-mono">${esc(c.customer_no)}</span><span class="block text-gray-500">${esc([c.phone, c.civil_id].filter(Boolean).join(' · '))}</span></span>
+                <span class="pill-tag pill-gray">${c.stats?.shipments ?? 0} shipments</span></button>`).join('') || '<p class="text-xs text-gray-400 text-center p-4">No other customer matches.</p>';
+        }, 300); };
+        $('mList').addEventListener('click', async (e) => {
+            const b = e.target.closest('[data-merge]'); if (!b) return;
+            const name = b.querySelector('b').textContent;
+            if (!await UI.confirm({ title: `Merge ${esc(name)} into ${esc(current.customer.name)}?`, message: 'Their shipments, invoices and receivers move here. This cannot be undone.', confirmText: 'Merge', danger: true })) return;
+            try { await api('/api/customers', { method: 'POST', body: { action: 'merge', keep: current.customer.id, drop: +b.dataset.merge } }); closeModal('mergeModal'); toast(true, 'Merged.'); openProfile(current.customer.id); load(); }
+            catch (err) { toast(false, err.message); }
+        });
+
+        load().then(() => { const id = new URLSearchParams(location.search).get('id'); if (id) openProfile(+id); });
+    </script>
+</body>
+</html>

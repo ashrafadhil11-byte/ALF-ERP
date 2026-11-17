@@ -97,6 +97,7 @@
                             <div><label class="ui-label" for="senderName">Full name <span class="req">*</span></label><input id="senderName" class="field" placeholder="As on ID"></div>
                             <div><label class="ui-label" for="senderId">Civil ID / passport</label><input id="senderId" class="field" placeholder="Optional"></div>
                         </div>
+                        <div id="custBox" class="hidden"></div>
                     </section>
 
                     <!-- 3. Receiver -->
@@ -434,7 +435,7 @@
             allowCustom: true, emptyText: 'No states listed — type one',
             onSelect: (it) => { rcvState = it; cityBox.reload(); cityBox.clear(); if (it) cityBox.preload(); refresh(); }
         });
-        UI.combobox($('destCountry'), {
+        const destBox = UI.combobox($('destCountry'), {
             load: () => UI.countryItems(),
             onSelect: (it) => {
                 rcvState = null;
@@ -463,6 +464,59 @@
             }
         });
 
+
+        // ---------- returning customer (Phase D): look up by mobile or civil ID ----------
+        let customer = null, lookupKey = '';
+        async function lookupCustomer(kind) {
+            const value = kind === 'civil' ? $('senderId').value.trim() : senderPh.value;
+            const key = kind + ':' + value;
+            if (!value || key === lookupKey) return;
+            lookupKey = key;
+            let d;
+            try { d = await api(`/api/customers?lookup=${kind}&value=${encodeURIComponent(value)}`); } catch (e) { return; }
+            if (!d.customer) { if (kind === 'phone') { customer = null; $('custBox').classList.add('hidden'); } return; }
+            customer = d.customer;
+            if (!$('senderName').value.trim()) $('senderName').value = customer.name || '';
+            if (!$('senderId').value.trim() && customer.civil_id) $('senderId').value = customer.civil_id;
+            if (kind === 'civil' && !senderPh.value && customer.phone) senderPh.setValue(customer.phone);
+            const bal = (customer.balance || []).map(b => `${b.currency} ${(+b.amount).toFixed(3)}`).join(' + ');
+            $('custBox').innerHTML = `<div class="rounded-2xl p-4 ${customer.blocked ? 'bg-[#FFF5F3] border border-[#FFD0C7]' : 'bg-white border border-gray-100'}">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-xs"><span class="pill-tag ${customer.blocked ? 'pill-coral' : 'pill-green'}">${customer.blocked ? 'Blocked customer' : 'Returning customer'}</span>
+                    <b class="ml-1">${esc(customer.name)}</b> <span class="text-gray-400 font-mono">${esc(customer.customer_no || '')}</span>
+                    · ${customer.stats?.shipments ?? 0} shipments${bal ? ` · <span class="text-[#D55C48] font-bold">owes ${esc(bal)}</span>` : ''}</p>
+                    <a href="customers.html?id=${customer.id}" target="_blank" rel="noopener" class="text-[11px] font-extrabold text-gray-500 hover:text-coral-600">Profile ↗</a>
+                </div>
+                ${customer.blocked && customer.notes ? `<p class="text-[11px] text-[#D55C48] mt-2">${esc(customer.notes)}</p>` : ''}
+                ${d.contacts.length ? `<p class="sd-label mt-3 mb-1.5">Send to a previous receiver</p><div class="flex flex-wrap gap-1.5">${d.contacts.map((r, i) => `<button type="button" data-rcv="${i}" class="pill-tag pill-gray hover:!bg-[#FFF5F3] hover:!text-[#D55C48] !py-1.5 !px-3">${esc(r.name)}${r.city ? ' · ' + esc(r.city) : ''}${r.country_code ? ' · ' + esc(r.country_code) : ''}</button>`).join('')}</div>` : ''}
+            </div>`;
+            $('custBox').classList.remove('hidden');
+            window._contacts = d.contacts;
+            if (customer.blocked) toast(false, `${customer.name} is marked as blocked — check with a manager.`);
+        }
+        $('senderPhone').addEventListener('blur', () => lookupCustomer('phone'));
+        $('senderPhone').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); lookupCustomer('phone'); } });
+        $('senderId').addEventListener('blur', () => lookupCustomer('civil'));
+        $('custBox').addEventListener('click', async (e) => {
+            const b = e.target.closest('[data-rcv]'); if (!b) return;
+            const r = window._contacts[+b.dataset.rcv], parts = r.parts || {};
+            $('rcvName').value = r.name || '';
+            if (r.phone) rcvPh.setValue(r.phone);
+            waPh.reset(); if (r.whatsapp && r.whatsapp !== r.phone) waPh.setValue(r.whatsapp);
+            if (r.country_code) {
+                await destBox.setValue(r.country_code);
+                rcvState = null; stateBox.reload(); cityBox.reload();
+                $('rcvState').disabled = false; $('rcvState').placeholder = 'Select or type state';
+                optionsKey = ''; quoteKey = '';
+            }
+            await stateBox.setValue(parts.state || '');
+            rcvState = stateBox.value;
+            await cityBox.setValue(parts.city || r.city || '');
+            $('rcvHouse').value = parts.house || ''; $('rcvStreet').value = parts.street || ''; $('rcvLandmark').value = parts.landmark || '';
+            $('rcvPin').value = parts.pin || ''; $('rcvPo').value = parts.po || '';
+            if (!parts.house && !parts.street && r.address) $('rcvStreet').value = r.address;
+            refresh(); toast(true, `${r.name} filled in — check the details.`);
+        });
         // ---------- submit ----------
         $('bookingForm').onsubmit = async (e) => {
             e.preventDefault();
@@ -500,7 +554,7 @@
 
             $('bookBtn').disabled = true; $('bookBtn').textContent = 'Booking…';
             try {
-                const out = await api('/api/bookings', { method: 'POST', body: { action: 'create', auto_ref: true, branch: b.branch_code, fields, charge_lines: charges.map(({ kind, description, qty, rate, product_id }) => ({ kind, description, qty, rate, product_id })) } });
+                const out = await api('/api/bookings', { method: 'POST', body: { action: 'create', auto_ref: true, branch: b.branch_code, fields, receiver_parts: { house: $('rcvHouse').value.trim(), street: $('rcvStreet').value.trim(), landmark: $('rcvLandmark').value.trim(), pin: $('rcvPin').value.trim(), po: $('rcvPo').value.trim(), state: $('rcvState').value.trim(), city: $('rcvCity').value.trim() }, charge_lines: charges.map(({ kind, description, qty, rate, product_id }) => ({ kind, description, qty, rate, product_id })) } });
                 if (!out.awb) throw new Error('The booking was saved but no reference came back. Check Shipments before booking again.');
                 done = { ...fields, awb: out.awb, booked_at: new Date().toISOString(), cargo_name: t.name, shipper: fields.shipper, consignee: fields.consignee,
                          declared_value: fields.declared_value || null, amount: fields.amount || null };

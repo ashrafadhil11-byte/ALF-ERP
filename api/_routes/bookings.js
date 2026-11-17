@@ -141,6 +141,11 @@ export default async function handler(req, res) {
                 raw: fromApi && body.raw && typeof body.raw === 'object' ? body.raw : null
             }, fields.intake_mode);
             // Counter bookings with a charge get an invoice (+ receipt when paid now). Imports are paid online.
+            // receiver address parts → the customer's saved receivers (to refill the form next time)
+            if (body.receiver_parts && typeof body.receiver_parts === 'object') {
+                const parts = Object.fromEntries(Object.entries(body.receiver_parts).slice(0, 12).map(([k, v]) => [String(k).slice(0, 20), String(v ?? '').slice(0, 200)]));
+                await fetch(`${rest}/bookings?awb=eq.${enc(out.awb || awb)}`, { method: 'PATCH', headers: serviceHeaders(), body: JSON.stringify({ receiver_parts: parts }) }).catch(() => {});
+            }
             const acc = fromApi ? {} : await autoInvoice({ awb: out.awb || awb, branch, fields, userName, lines: body.charge_lines });
             return res.status(200).json({ ...out, invoice: acc.invoice || null, invoice_error: acc.error || null });
         }
