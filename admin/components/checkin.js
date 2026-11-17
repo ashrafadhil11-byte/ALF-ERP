@@ -52,7 +52,7 @@
         const r = state.record, s = state.shift;
         const stage = !r?.check_in ? 'in' : !r.check_out ? 'out' : 'done';
         const label = busy ? 'Locating…' : stage === 'in' ? 'Check in' : stage === 'out' ? 'Check out' : `Done · ${hrs(r.worked_min)}`;
-        const tip = stage === 'in' ? `Shift ${s.start}–${s.end}` : stage === 'out' ? `In since ${hm(r.check_in)}${r.late_min ? ` (${r.late_min} min late)` : ''} · shift ends ${s.end}` : `${hm(r.check_in)} – ${hm(r.check_out)}`;
+        const tip = stage === 'in' ? `Shift ${s.start}–${s.end}${s.break_start ? ` · break ${s.break_start}–${s.break_end}` : ''}` : stage === 'out' ? `In since ${hm(r.check_in)}${r.late_min ? ` (${r.late_min} min late)` : ''} · shift ends ${s.end}` : `${hm(r.check_in)} – ${hm(r.check_out)}`;
         el.innerHTML = stage === 'done'
             ? `<a href="attendance.html" class="fab ck-done" title="${UI.esc(tip)}">${UI.icon('check')}<span class="fab-label">${UI.esc(label)}</span></a>`
             : `<button type="button" data-punch="${stage}" ${busy ? 'disabled' : ''} class="fab fab-open ck-${stage}" title="${UI.esc(tip)}" aria-label="${label}">${UI.icon('clock')}<span class="fab-label">${label}</span></button>`;

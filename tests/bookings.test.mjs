@@ -125,7 +125,7 @@ test('status: manager update calls set_status with allow_back and builds remark'
 test('status: database rule errors come back as 400 with the message', async () => {
     fake({ role: 'staff', branch: 'MCT' }, {
         ...STATUS(),
-        '/rest/v1/bookings?awb=in': () => [{ awb: 'A', branch_code: 'MCT' }],
+        '/rest/v1/bookings?awb=in': () => [{ awb: 'A', branch_code: 'MCT', fwd_agent: 'SMSA', fwd_docket: '1' }],
         'rpc/set_status': () => ({ __fail: { message: 'Booking A is already at a later step' } })
     });
     const r = res();

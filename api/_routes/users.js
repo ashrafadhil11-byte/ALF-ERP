@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     try {
         if (req.method === 'GET') {
             const [er, ar] = await Promise.all([
-                fetch(`${rest}/employees?select=id,full_name,username,role,branch,contact_number,recovery_email,is_driver,is_warehouse,warehouse_code,wh_pin_hash,shift_start,shift_end,grace_min,weekly_off,active,created_at&order=full_name.asc`, { headers: serviceHeaders() }),
+                fetch(`${rest}/employees?select=id,full_name,username,role,branch,contact_number,recovery_email,is_driver,is_warehouse,warehouse_code,wh_pin_hash,shift_start,shift_end,break_start,break_end,grace_min,weekly_off,active,created_at&order=full_name.asc`, { headers: serviceHeaders() }),
                 fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers: serviceHeaders() })
             ]);
             const employees = er.ok ? await er.json() : [];
@@ -99,6 +99,17 @@ export default async function handler(req, res) {
                 if (!hm.test(String(body.shift_start || '')) || !hm.test(String(body.shift_end || ''))) throw new UserError('Work hours must be HH:MM.');
                 if (body.shift_start === body.shift_end) throw new UserError('Start and end time cannot be the same.');
                 patch.shift_start = body.shift_start; patch.shift_end = body.shift_end;
+            }
+            // Break inside the work hours (optional; both times or neither)
+            if ('break_start' in body || 'break_end' in body) {
+                const bs = String(body.break_start || ''), be = String(body.break_end || '');
+                if (!bs && !be) { patch.break_start = null; patch.break_end = null; }
+                else {
+                    const hm = /^([01]\d|2[0-3]):[0-5]\d$/;
+                    if (!hm.test(bs) || !hm.test(be)) throw new UserError('Break needs a start and an end time (HH:MM).');
+                    if (bs === be) throw new UserError('Break start and end cannot be the same.');
+                    patch.break_start = bs; patch.break_end = be;
+                }
             }
             if ('grace_min' in body) {
                 const g = Math.round(Number(body.grace_min));

@@ -359,7 +359,7 @@ window.UI = (() => {
     const countryItems = () => (window.ALF_COUNTRIES || []).map(c => ({ value: c.c, label: c.n, sub: `${c.c} · ${c.d}`, img: `https://flagcdn.com/w40/${c.c.toLowerCase()}.png`, dial: c.d }));
 
     // ---------- Camera barcode / QR scanning ----------
-    // Mark any input with data-camera="submit" (submits its form) or data-camera="click:buttonId";
+    // Mark any input with data-camera="submit" (submits its form), data-camera="click:buttonId" or data-camera="fill" (just fills it);
     // add data-camera-continuous to keep scanning (batch). A camera button appears inside the input.
     const SCANNER_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
     let scannerLib;
@@ -437,7 +437,9 @@ window.UI = (() => {
                     continuous: input.hasAttribute('data-camera-continuous'),
                     onScan: (code) => {
                         input.value = code;
-                        if (action.startsWith('click:')) document.getElementById(action.slice(6))?.click();
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        if (action === 'fill') { beep(true); input.focus(); }
+                        else if (action.startsWith('click:')) document.getElementById(action.slice(6))?.click();
                         else if (input.form) input.form.requestSubmit();
                     }
                 });

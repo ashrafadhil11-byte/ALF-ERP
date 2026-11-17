@@ -147,6 +147,9 @@
                         <div><label class="ui-label" for="e_shStart">Starts</label><input id="e_shStart" type="time" class="field" required></div>
                         <div><label class="ui-label" for="e_shEnd">Ends</label><input id="e_shEnd" type="time" class="field" required></div>
                         <div><label class="ui-label" for="e_grace">Grace (min)</label><input id="e_grace" type="number" min="0" max="120" class="field" required></div>
+                        <div><label class="ui-label" for="e_brStart">Break from</label><input id="e_brStart" type="time" class="field"></div>
+                        <div><label class="ui-label" for="e_brEnd">Break to</label><input id="e_brEnd" type="time" class="field"></div>
+                        <div class="flex items-end pb-2"><span class="text-[10px] text-gray-400 leading-snug">Not counted as worked time. Leave empty for no break.</span></div>
                     </div>
                     <span class="ui-label block mt-2">Weekly off</span>
                     <div id="e_off" class="flex flex-wrap gap-1 mt-1"></div>
@@ -222,7 +225,7 @@
                         </div>
                     </td>
                     <td class="p-3" data-label="Role"><span class="pill-tag ${ROLE_PILL[u.role] || 'pill-gray'}">${esc(ROLES[u.role] || u.role || 'No role')}</span>${u.is_driver ? ' <span class="pill-tag pill-gray">Driver</span>' : ''}${u.is_warehouse ? ' <span class="pill-tag pill-dark">Warehouse</span>' : ''}</td>
-                    <td class="p-3 font-bold" data-label="Branch">${esc(['super_admin', 'head_office'].includes(u.role) && !u.branch ? 'All branches' : branchName(u.branch))}<span class="block text-[10px] text-gray-400 font-medium">${String(u.shift_start || '09:00').slice(0, 5)}–${String(u.shift_end || '18:00').slice(0, 5)}</span></td>
+                    <td class="p-3 font-bold" data-label="Branch">${esc(['super_admin', 'head_office'].includes(u.role) && !u.branch ? 'All branches' : branchName(u.branch))}<span class="block text-[10px] text-gray-400 font-medium">${String(u.shift_start || '09:00').slice(0, 5)}–${String(u.shift_end || '18:00').slice(0, 5)}${u.break_start ? ` · break ${String(u.break_start).slice(0, 5)}–${String(u.break_end).slice(0, 5)}` : ''}</span></td>
                     <td class="p-3 text-gray-500" data-label="Contact">${esc(u.contact_number || '—')}</td>
                     <td class="p-3 text-gray-500" data-label="Last sign-in">${ago(u.last_sign_in_at)}${u.email_confirmed ? '' : ' <span class="pill-tag pill-amber">Email not verified</span>'}</td>
                     <td class="p-3" data-label="Status"><span class="pill-tag ${u.active ? 'pill-green' : 'pill-gray'}">${u.active ? 'Active' : 'Inactive'}</span></td>
@@ -314,6 +317,8 @@
             $('e_shStart').value = String(editing.shift_start || '09:00').slice(0, 5);
             $('e_shEnd').value = String(editing.shift_end || '18:00').slice(0, 5);
             $('e_grace').value = editing.grace_min ?? 10;
+            $('e_brStart').value = editing.break_start ? String(editing.break_start).slice(0, 5) : '';
+            $('e_brEnd').value = editing.break_end ? String(editing.break_end).slice(0, 5) : '';
             $('e_off').innerHTML = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => `<button type="button" data-dow="${i + 1}" aria-pressed="${(editing.weekly_off || [5]).includes(i + 1)}" class="px-3 py-1.5 rounded-full text-[11px] font-extrabold bg-white border border-gray-200 aria-pressed:bg-[#111827] aria-pressed:text-white aria-pressed:border-[#111827]">${d}</button>`).join('');
             $('e_wh').checked = Boolean(editing.is_warehouse);
             if (editing.warehouse_code) $('e_whCode').value = editing.warehouse_code;
@@ -331,6 +336,7 @@
             const body = { id: editing.id, full_name: $('e_name').value, contact_number: ePh.value, branch: $('e_branch').value, is_driver: $('e_driver').checked,
                 is_warehouse: $('e_wh').checked, warehouse_code: $('e_whCode').value,
                 shift_start: $('e_shStart').value, shift_end: $('e_shEnd').value, grace_min: +$('e_grace').value,
+                break_start: $('e_brStart').value, break_end: $('e_brEnd').value,
                 weekly_off: [...$('e_off').querySelectorAll('[aria-pressed="true"]')].map(b => +b.dataset.dow) };
             if (!editing.is_me) body.role = $('e_role').value;
             const roleChanged = body.role && body.role !== editing.role;

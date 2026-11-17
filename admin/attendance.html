@@ -100,6 +100,8 @@
             <form id="shiftForm" class="my-5 grid grid-cols-2 gap-3">
                 <div><label class="ui-label" for="shStart">Starts</label><input id="shStart" type="time" class="field" required></div>
                 <div><label class="ui-label" for="shEnd">Ends</label><input id="shEnd" type="time" class="field" required></div>
+                <div><label class="ui-label" for="shBrStart">Break from <span class="text-gray-400 normal-case">(optional)</span></label><input id="shBrStart" type="time" class="field"></div>
+                <div><label class="ui-label" for="shBrEnd">Break to</label><input id="shBrEnd" type="time" class="field"></div>
                 <div class="col-span-2"><label class="ui-label" for="shGrace">Late after (minutes of grace)</label><input id="shGrace" type="number" min="0" max="120" class="field" required></div>
                 <div class="col-span-2"><span class="ui-label">Weekly off</span><div id="shOff" class="flex flex-wrap gap-1 mt-1"></div></div>
                 <div class="col-span-2 flex justify-end"><button class="btn btn-coral">Save shift</button></div>
@@ -150,7 +152,7 @@
                 <div class="bg-[#F8F8FA] rounded-[2rem] p-6 flex flex-col items-center text-center">
                     <p class="sd-label">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
                     <p id="clock" class="text-4xl font-extrabold tabular-nums my-2"></p>
-                    <p class="text-xs text-gray-500 mb-5">Shift ${me.shift.start}–${me.shift.end} · ${me.shift.grace_min} min grace · off ${off || 'none'}</p>
+                    <p class="text-xs text-gray-500 mb-5">Shift ${me.shift.start}–${me.shift.end}${me.shift.break_start ? ` · break ${me.shift.break_start}–${me.shift.break_end}` : ''} · ${me.shift.grace_min} min grace · off ${off || 'none'}</p>
                     ${state === 'done' ? `<div class="punch bg-emerald-50 text-emerald-700 flex flex-col items-center justify-center"><span data-icon="check" data-cls="w-8 h-8"></span><b class="mt-2">Day complete</b><span class="text-xs">${hm(r.check_in)} – ${hm(r.check_out)}</span></div>`
                         : `<button type="button" id="punchBtn" class="punch ${state === 'in' ? 'bg-[#111827]' : 'bg-coral-500'} text-white flex flex-col items-center justify-center shadow-xl hover:scale-[1.02] transition-transform">
                             <span data-icon="fingerprint" data-cls="w-10 h-10"></span><b class="mt-2 text-lg">${state === 'in' ? 'Check in' : 'Check out'}</b>${r?.check_in ? `<span class="text-xs opacity-80">in since ${hm(r.check_in)}</span>` : ''}</button>`}
@@ -306,7 +308,7 @@
             const d = await api('/api/attendance?view=shifts'); cache.shifts = d;
             $('pane').innerHTML = table([['Employee'], ['Shift'], ['Grace', 'right'], ['Weekly off'], ['']], d.rows.map((r, i) => `<tr>
                 <td class="p-3 pl-4" data-label="Employee"><b>${esc(r.full_name)}</b><span class="block text-[10px] text-gray-400">${esc([r.branch, String(r.role || '').replace(/_/g, ' ')].filter(Boolean).join(' · '))}</span></td>
-                <td class="p-3 font-extrabold" data-label="Shift">${String(r.shift_start).slice(0, 5)} – ${String(r.shift_end).slice(0, 5)}</td>
+                <td class="p-3 font-extrabold" data-label="Shift">${String(r.shift_start).slice(0, 5)} – ${String(r.shift_end).slice(0, 5)}${r.break_start ? `<span class="block text-[10px] text-gray-400 font-medium">break ${String(r.break_start).slice(0, 5)}–${String(r.break_end).slice(0, 5)}</span>` : ''}</td>
                 <td class="p-3 text-right" data-label="Grace">${r.grace_min} min</td>
                 <td class="p-3" data-label="Weekly off">${(r.weekly_off || []).map(n => DOW[n - 1]).join(', ') || 'none'}</td>
                 <td class="p-3 pr-4 text-right" data-label=""><button type="button" class="btn btn-light btn-sm" data-shift="${i}">Edit</button></td></tr>`).join(''), 'No staff.');
@@ -317,6 +319,7 @@
             shiftEmp = cache.shifts.rows[+b.dataset.shift];
             $('shSub').textContent = shiftEmp.full_name;
             $('shStart').value = String(shiftEmp.shift_start).slice(0, 5); $('shEnd').value = String(shiftEmp.shift_end).slice(0, 5); $('shGrace').value = shiftEmp.grace_min;
+            $('shBrStart').value = shiftEmp.break_start ? String(shiftEmp.break_start).slice(0, 5) : ''; $('shBrEnd').value = shiftEmp.break_end ? String(shiftEmp.break_end).slice(0, 5) : '';
             $('shOff').innerHTML = DOW.map((d, i) => `<button type="button" class="day-chip px-3 py-1.5 rounded-full bg-[#F8F8FA] text-[11px] font-extrabold" data-dow="${i + 1}" aria-pressed="${(shiftEmp.weekly_off || []).includes(i + 1)}">${d}</button>`).join('');
             openModal('shiftModal');
         });
@@ -324,7 +327,7 @@
         $('shiftForm').onsubmit = async (e) => {
             e.preventDefault();
             const off = [...$('shOff').querySelectorAll('[aria-pressed="true"]')].map(c => +c.dataset.dow);
-            try { await api('/api/attendance', { method: 'POST', body: { action: 'shift', employee_id: shiftEmp.id, shift_start: $('shStart').value, shift_end: $('shEnd').value, grace_min: +$('shGrace').value, weekly_off: off } }); closeModal('shiftModal'); toast(true, 'Shift saved.'); show(); }
+            try { await api('/api/attendance', { method: 'POST', body: { action: 'shift', employee_id: shiftEmp.id, shift_start: $('shStart').value, shift_end: $('shEnd').value, break_start: $('shBrStart').value, break_end: $('shBrEnd').value, grace_min: +$('shGrace').value, weekly_off: off } }); closeModal('shiftModal'); toast(true, 'Shift saved.'); show(); }
             catch (err) { toast(false, err.message); }
         };
 

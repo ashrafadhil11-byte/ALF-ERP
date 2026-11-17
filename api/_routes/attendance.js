@@ -9,7 +9,7 @@
 //   POST { action:'leave_cancel', id }
 //   POST { action:'leave_decide', id, decision:'approved'|'rejected', note }     managers
 //   POST { action:'manual', employee_id, date, check_in:'HH:MM'|null, check_out, reason }   managers
-//   POST { action:'shift', employee_id, shift_start, shift_end, grace_min, weekly_off:[1..7] } managers
+//   POST { action:'shift', employee_id, shift_start, shift_end, break_start?, break_end?, grace_min, weekly_off:[1..7] } managers
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 
 const enc = encodeURIComponent;
@@ -120,7 +120,7 @@ export default async function handler(req, res) {
                     get(`attendance?employee_id=eq.${enc(myId)}&work_date=eq.${today}&select=check_in,check_out,late_min,worked_min`).then(r => r[0] || null),
                     get(`leave_requests?employee_id=eq.${enc(myId)}&status=eq.approved&from_date=lte.${today}&to_date=gte.${today}&select=leave_type&limit=1`).then(r => r[0] || null)
                 ]);
-                const shift = { start: String(me.shift_start || '09:00').slice(0, 5), end: String(me.shift_end || '18:00').slice(0, 5), grace_min: me.grace_min ?? 10, weekly_off: me.weekly_off || [5] };
+                const shift = { start: String(me.shift_start || '09:00').slice(0, 5), end: String(me.shift_end || '18:00').slice(0, 5), break_start: me.break_start ? String(me.break_start).slice(0, 5) : null, break_end: me.break_end ? String(me.break_end).slice(0, 5) : null, grace_min: me.grace_min ?? 10, weekly_off: me.weekly_off || [5] };
                 return res.status(200).json({ today, timezone: tz, record, shift, on_leave: leave?.leave_type || null,
                     branch: br ? { code: br.branch_code, name: br.branch_name, has_location: br.lat != null && br.lng != null, geofence_m: br.geofence_m } : null,
                     remind: remindFor({ record, shift, onLeave: Boolean(leave), tz }) });
@@ -139,7 +139,7 @@ export default async function handler(req, res) {
                 return res.status(200).json({
                     today, month, timezone: tz,
                     branch: br ? { code: br.branch_code, name: br.branch_name, has_location: br.lat != null && br.lng != null, geofence_m: br.geofence_m } : null,
-                    shift: { start: String(me.shift_start || '09:00').slice(0, 5), end: String(me.shift_end || '18:00').slice(0, 5), grace_min: me.grace_min ?? 10, weekly_off: me.weekly_off || [5] },
+                    shift: { start: String(me.shift_start || '09:00').slice(0, 5), end: String(me.shift_end || '18:00').slice(0, 5), break_start: me.break_start ? String(me.break_start).slice(0, 5) : null, break_end: me.break_end ? String(me.break_end).slice(0, 5) : null, grace_min: me.grace_min ?? 10, weekly_off: me.weekly_off || [5] },
                     record: (await get(`attendance?employee_id=eq.${enc(myId)}&work_date=eq.${today}&select=*`))[0] || null,
                     days, leave
                 });
@@ -185,7 +185,7 @@ export default async function handler(req, res) {
             }
             if (q.view === 'shifts') {
                 const br = scopeBranch(q.branch);
-                const rows = await get(`employees?${br ? `branch=eq.${enc(br)}&` : ''}active=is.true&select=id,full_name,branch,role,shift_start,shift_end,grace_min,weekly_off&order=full_name.asc`);
+                const rows = await get(`employees?${br ? `branch=eq.${enc(br)}&` : ''}active=is.true&select=id,full_name,branch,role,shift_start,shift_end,break_start,break_end,grace_min,weekly_off&order=full_name.asc`);
                 return res.status(200).json({ rows });
             }
             throw new UserError('Unknown view.');
@@ -266,7 +266,12 @@ export default async function handler(req, res) {
                 if (!(grace >= 0 && grace <= 120)) throw new UserError('Grace must be 0–120 minutes.');
                 const off = [...new Set((Array.isArray(b.weekly_off) ? b.weekly_off : []).map(Number).filter(n => n >= 1 && n <= 7))].sort();
                 if (off.length > 3) throw new UserError('Up to 3 weekly off days.');
-                await fetch(`${rest}/employees?id=eq.${enc(e.id)}`, { method: 'PATCH', headers: serviceHeaders(), body: JSON.stringify({ shift_start: b.shift_start, shift_end: b.shift_end, grace_min: grace, weekly_off: off }) });
+                let brk = { break_start: null, break_end: null };
+                if (b.break_start || b.break_end) {
+                    if (!isTime(b.break_start) || !isTime(b.break_end) || b.break_start === b.break_end) throw new UserError('Break needs a start and an end time (HH:MM).');
+                    brk = { break_start: b.break_start, break_end: b.break_end };
+                }
+                await fetch(`${rest}/employees?id=eq.${enc(e.id)}`, { method: 'PATCH', headers: serviceHeaders(), body: JSON.stringify({ shift_start: b.shift_start, shift_end: b.shift_end, grace_min: grace, weekly_off: off, ...brk }) });
                 return res.status(200).json({ success: true });
             }
             default: throw new UserError('Unknown action.');

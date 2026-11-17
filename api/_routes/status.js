@@ -24,8 +24,12 @@ export default async function handler(req, res) {
             return res.status(200).json({ booking, boxes: boxes.sort((a, b) => a.piece_no - b.piece_no) });
         }
         if (req.method === 'GET') {
-            const r = await fetch(`${rest}/statuses?active=is.true&select=code,label,customer_label,stage,sort,is_exception,requires&order=is_exception,stage,sort`, { headers: serviceHeaders() });
-            return res.status(200).json({ statuses: r.ok ? await r.json() : [] });
+            const [r, a] = await Promise.all([
+                fetch(`${rest}/statuses?active=is.true&select=code,label,customer_label,stage,sort,is_exception,requires&order=is_exception,stage,sort`, { headers: serviceHeaders() }),
+                fetch(`${rest}/suppliers?active=is.true&kind=in.(agent,both)&select=id,name&order=name`, { headers: serviceHeaders() })
+            ]);
+            // agents saved under Accounts → Suppliers & agents, offered when assigning a forwarding agent
+            return res.status(200).json({ statuses: r.ok ? await r.json() : [], agents: a.ok ? await a.json() : [] });
         }
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -50,13 +54,19 @@ export default async function handler(req, res) {
 
         // Non-admins may only update shipments held by their own branch.
         const list = awbs.map(a => `"${a.replace(/"/g, '')}"`).join(',');
-        const br = await fetch(`${rest}/bookings?awb=in.(${enc(list)})&select=awb,branch_code`, { headers: serviceHeaders() });
+        const br = await fetch(`${rest}/bookings?awb=in.(${enc(list)})&select=awb,branch_code,fwd_agent,fwd_docket`, { headers: serviceHeaders() });
         const found = br.ok ? await br.json() : [];
         const missing = awbs.filter(a => !found.some(f => f.awb === a));
         if (missing.length) return res.status(400).json({ error: `Not found: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? '…' : ''}` });
         if (!ADMIN_ROLES.includes(session.role)) {
             const other = found.filter(f => f.branch_code !== session.branch).map(f => f.awb);
             if (other.length) return res.status(403).json({ error: `Held by another branch: ${other.slice(0, 10).join(', ')}` });
+        }
+
+        // "Handed to Forwarding Agent" uses the agent + docket chosen at "Assigned Forwarding Agent"
+        if (status.code === 'HANDED_TO_AGENT' && !String(b.fwd_agent || '').trim()) {
+            const none = found.filter(f => !f.fwd_agent || !f.fwd_docket).map(f => f.awb);
+            if (none.length) return res.status(400).json({ error: `Assign a forwarding agent first ("Assigned Forwarding Agent"): ${none.slice(0, 10).join(', ')}${none.length > 10 ? '…' : ''}` });
         }
 
         const extras = [

@@ -195,8 +195,8 @@
                         <div class="sm:col-span-2"><label class="ui-label" for="bTarget">Apply to</label><select id="bTarget" class="field"></select></div>
                         <div id="bBoxes" class="sm:col-span-2 hidden flex flex-wrap gap-2"></div>
                         <div class="sm:col-span-2"><label class="ui-label" for="bStatus">New status</label><select id="bStatus" class="field"></select></div>
-                        <div data-need="agent_docket"><label class="ui-label" for="bAgent">Forwarding agent</label><input id="bAgent" class="field"></div>
-                        <div data-need="agent_docket"><label class="ui-label" for="bDocket">Agent docket no.</label><input id="bDocket" class="field"></div>
+                        <div data-need="agent_docket"><label class="ui-label" for="bAgent">Forwarding agent</label><input id="bAgent" class="field" list="cAgentList" autocomplete="off"></div>
+                        <div data-need="agent_docket"><label class="ui-label" for="bDocket">Agent docket no.</label><input id="bDocket" class="field" data-camera="fill" aria-label="agent docket number" autocomplete="off" placeholder="Scan or type"></div>
                         <div><label class="ui-label" for="bLoc">Location</label><input id="bLoc" class="field" placeholder="Optional"></div>
                         <div><label class="ui-label" for="bRemark">Remark</label><input id="bRemark" class="field" placeholder="Optional"></div>
                         <button id="bApply" type="button" class="btn btn-dark sm:col-span-2"><span data-icon="refresh"></span>Update</button>
@@ -520,7 +520,12 @@
 
         // bulk status for everything inside
         async function loadStatuses() {
-            try { statuses = (await api('/api/status')).statuses; } catch (e) { statuses = []; }
+            try {
+                const st = await api('/api/status'); statuses = st.statuses;
+                let dl = document.getElementById('cAgentList');
+                if (!dl) { dl = document.createElement('datalist'); dl.id = 'cAgentList'; document.body.appendChild(dl); }
+                dl.innerHTML = (st.agents || []).map(x => `<option value="${esc(x.name)}"></option>`).join('') + ['SMSA', 'Aramex', 'DHL', 'FedEx', 'UPS'].map(n => `<option value="${n}"></option>`).join('');
+            } catch (e) { statuses = []; }
             $('bStatus').innerHTML = statuses.map(s => `<option value="${esc(s.code)}">${s.is_exception ? '⚠ ' : ''}${esc(s.label)}</option>`).join('');
             const sync = () => { const s = statuses.find(x => x.code === $('bStatus').value) || { requires: [] }; document.querySelectorAll('[data-need]').forEach(el => el.classList.toggle('hidden', !s.requires.includes(el.dataset.need))); };
             $('bStatus').onchange = sync; sync();

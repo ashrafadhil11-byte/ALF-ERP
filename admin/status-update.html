@@ -101,7 +101,7 @@
         const $ = (id) => document.getElementById(id);
         const STAGES = ['', 'Booking', 'Pickup', 'Origin', 'Export', 'Transit', 'Destination', 'Last Mile', 'Delivered', 'Review'];
         const EXTRA = {
-            agent_docket: [['fwd_agent', 'Forwarding agent', 'list="carrierList" placeholder="SMSA, Aramex, DHL… (others via 17Track)"'], ['fwd_docket', 'Agent docket / AWB', '']],
+            agent_docket: [['fwd_agent', 'Forwarding agent', 'list="carrierList" autocomplete="off" placeholder="Pick or type the agent"'], ['fwd_docket', 'Agent docket no.', 'data-camera="fill" aria-label="agent docket number" autocomplete="off" placeholder="Scan or type"']],
             to_branch: [['to_branch', 'To branch', '']],
             mawb: [['mawb', 'MAWB number', '']],
             driver: [['driver', 'Driver', '']]
@@ -155,6 +155,7 @@
             const req = st ? st.requires : [];
             $('extraFields').innerHTML = req.flatMap(r => EXTRA[r] || []).map(([id, lbl, attrs]) =>
                 `<div><label class="ui-label" for="x_${id}">${lbl} <span class="req">*</span></label><input id="x_${id}" data-extra="${id}" class="field" ${attrs}></div>`).join('');
+            UI.wireCameraInputs($('extraFields'));   // camera barcode scan for the docket number
             $('remarkReq').classList.toggle('hidden', !req.includes('remark'));
             render();
         };
@@ -183,8 +184,12 @@
         (async function init() {
             render();
             try {
-                const { statuses: list } = await api('/api/status');
+                const { statuses: list, agents = [] } = await api('/api/status');
                 statuses = list;
+                // saved agents first (Accounts → Suppliers & agents), then the common carriers
+                const known = new Set(agents.map(a => a.name.toLowerCase()));
+                $('carrierList').innerHTML = agents.map(a => `<option value="${esc(a.name)}">Saved agent</option>`).join('')
+                    + ['SMSA', 'Aramex', 'DHL', 'FedEx', 'UPS', 'India Post', 'Nepal Post'].filter(n => !known.has(n.toLowerCase())).map(n => `<option value="${n}"></option>`).join('');
                 const groups = {};
                 list.forEach(s => (groups[s.is_exception ? 'Exceptions' : STAGES[s.stage]] ||= []).push(s));
                 $('statusSelect').innerHTML = '<option value="">Choose milestone…</option>' + Object.entries(groups).map(([g, items]) =>
