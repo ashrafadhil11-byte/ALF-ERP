@@ -237,3 +237,100 @@ html.page-leaving body > main { opacity: .35; transform: translateY(4px); transi
 .pretty-scroll::-webkit-scrollbar-thumb { background: #D9DCE1; border-radius: 9999px; border: 2px solid #fff; }
 .pretty-scroll:hover::-webkit-scrollbar-thumb { background: #E86D58; }
 @media (prefers-reduced-motion: reduce) { .fab.ck-in::after { animation: none; } }
+
+/* ---------------------------------------------------------------
+   Shipment card (shipments.html) — same family as the employee identity card
+   --------------------------------------------------------------- */
+.sx-modal { position: fixed; inset: 0; z-index: 65; display: none; align-items: center; justify-content: center; padding: 12px;
+    background: rgba(17, 24, 39, .42); backdrop-filter: blur(6px); }
+.sx-modal.open { display: flex; animation: ui-fade .25s ease both; }
+.sx-panel { width: 100%; max-width: 640px; max-height: calc(100dvh - 24px); background: #fff; border-radius: 2.5rem; overflow: hidden;
+    display: flex; flex-direction: column; box-shadow: 0 40px 90px -25px rgba(17, 24, 39, .55); animation: modal-in .42s var(--ease-out) both; }
+@media (min-width: 640px) { .sx-modal { padding: 24px; } .sx-panel { max-height: calc(100dvh - 48px); } }
+.sx-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.sx-hero { height: 150px; padding: 26px 28px; display: flex; align-items: flex-start; justify-content: space-between;
+    background: radial-gradient(120% 140% at 85% 0%, #4B2A2A 0%, #1F2937 45%, #111827 100%); }
+.sx-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 9999px; background: rgba(255, 255, 255, .08);
+    color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.sx-close { width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; color: #fff;
+    background: rgba(255, 255, 255, .1); transition: background .2s, transform .3s var(--ease-out); }
+.sx-close:hover { background: rgba(255, 255, 255, .2); transform: rotate(90deg); }
+.sx-body { padding: 0 28px 28px; margin-top: -78px; display: flex; flex-direction: column; gap: 16px; }
+.sx-body > * { animation: sx-rise .55s var(--ease-out) both; animation-delay: calc(var(--d, 0) * 70ms + 60ms); }
+@keyframes sx-rise { from { opacity: 0; transform: translateY(14px); } }
+.sx-id { background: #fff; border-radius: 2rem; padding: 22px; display: flex; align-items: center; gap: 20px;
+    box-shadow: 0 18px 40px -18px rgba(17, 24, 39, .25); border: 1px solid #F1F2F4; }
+.sx-avatar { width: 76px; height: 76px; border-radius: 1.4rem; background: #E86D58; color: #fff; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; box-shadow: 0 12px 26px -10px rgba(232, 109, 88, .7); transition: transform .4s var(--ease-out); }
+.sx-id:hover .sx-avatar { transform: rotate(-6deg) scale(1.04); }
+.sx-copy { width: 30px; height: 30px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; color: #6B7280;
+    background: #F8F8FA; border: 1px solid #EEF0F3; transition: all .2s; flex-shrink: 0; }
+.sx-copy:hover { background: #111827; color: #fff; border-color: #111827; }
+.sx-copy.ok { background: #10B981; border-color: #10B981; color: #fff; transform: scale(1.1); }
+.sx-k { font-size: 11px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: .02em; margin-bottom: 6px; }
+.sx-v { font-size: 17px; font-weight: 800; color: #111827; letter-spacing: -.01em; }
+.sx-tile { background: #F8F8FA; border: 1px solid #F1F2F4; border-radius: 1.5rem; padding: 18px 20px; }
+.sx-tile.ui-lift:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -18px rgba(17, 24, 39, .3); border-color: #E5E7EB; background: #fff; }
+.sx-soft { background: #FFF5F3; border-color: #FFE8E3; }
+.sx-ic { width: 36px; height: 36px; border-radius: 9999px; background: #fff; border: 1px solid #EEF0F3; color: #6B7280; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .25s; }
+.sx-tile:hover .sx-ic { background: #111827; color: #fff; border-color: #111827; }
+.sx-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 9999px; background: #fff; border: 1px solid #EEF0F3;
+    font-size: 12px; font-weight: 700; color: #374151; transition: all .2s; }
+a.sx-chip:hover { background: #E86D58; border-color: #E86D58; color: #fff; }
+.sx-route { display: grid; grid-template-columns: 1fr 1.1fr 1fr; align-items: center; gap: 16px; background: #F8F8FA; border: 1px solid #F1F2F4; border-radius: 1.75rem; padding: 18px 22px; }
+.sx-city { font-size: 18px; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sx-path { position: relative; height: 2px; background-image: linear-gradient(to right, #D1D5DB 50%, transparent 50%); background-size: 8px 2px; }
+.sx-path-fill { position: absolute; left: 0; top: 0; height: 2px; width: var(--p); background: #E86D58; border-radius: 2px; animation: sx-grow 1s var(--ease-out) .35s both; }
+.sx-plane { position: absolute; top: 50%; left: var(--p); width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 9999px; background: #111827; color: #fff;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 5px #F8F8FA; animation: sx-fly 1s var(--ease-out) .35s both; }
+@keyframes sx-grow { from { width: 0; } }
+@keyframes sx-fly { from { left: 0; } }
+.sx-progress { background: #fff; border: 1px solid #F1F2F4; border-radius: 1.75rem; padding: 20px 18px 18px; }
+.sx-track { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); }
+.sx-rail { position: absolute; top: 19px; left: 10%; right: 10%; height: 3px; background: #F1F2F4; border-radius: 3px; }
+.sx-rail-fill { position: absolute; top: 0; bottom: 0; left: 0; width: var(--p); background: #111827; border-radius: 3px; animation: sx-grow 1.1s var(--ease-out) .4s both; }
+.is-alert .sx-rail-fill { background: #E86D58; }
+.is-cancelled .sx-rail-fill { background: #9CA3AF; }
+.sx-step { position: relative; display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center; }
+.sx-dot { position: relative; width: 40px; height: 40px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; background: #fff; color: #C4C8CF;
+    border: 2px solid #F1F2F4; transition: transform .3s var(--ease-out); animation: sx-pop .5s var(--ease-out) both; animation-delay: calc(var(--d) * 110ms + 250ms); }
+@keyframes sx-pop { from { transform: scale(.4); opacity: 0; } }
+.sx-step:hover .sx-dot { transform: scale(1.1); }
+.sx-step-name { font-size: 11px; font-weight: 800; color: #9CA3AF; }
+.sx-step.done .sx-dot { background: #111827; border-color: #111827; color: #fff; }
+.sx-step.done .sx-step-name, .sx-step.now .sx-step-name { color: #111827; }
+.sx-step.now .sx-dot { background: #E86D58; border-color: #E86D58; color: #fff; box-shadow: 0 0 0 6px #FFE8E3; }
+.sx-step.now .sx-dot::after { content: ""; position: absolute; inset: -2px; border-radius: 9999px; border: 2px solid #E86D58; animation: ck-ring 2.2s ease-out infinite; }
+.sx-step.alert .sx-dot { background: #FFF5F3; border-color: #E86D58; color: #D55C48; }
+.sx-step.alert .sx-step-name { color: #D55C48; }
+.sx-tabs { position: relative; display: grid; grid-template-columns: repeat(var(--n), 1fr); background: #F8F8FA; border: 1px solid #F1F2F4; border-radius: 1.4rem; padding: 6px; }
+.sx-tab-ind { position: absolute; top: 6px; bottom: 6px; left: 6px; width: calc((100% - 12px) / var(--n)); border-radius: 1rem; background: #fff;
+    box-shadow: 0 6px 16px -8px rgba(17, 24, 39, .25); transform: translateX(calc(var(--i) * 100%)); transition: transform .45s var(--ease-out), width .3s; }
+.sx-tab { position: relative; z-index: 1; white-space: nowrap; padding: 12px 8px; font-size: 14px; font-weight: 800; color: #9CA3AF; border-radius: 1rem; transition: color .25s; }
+.sx-tab.on { color: #111827; }
+.sx-tab:hover:not(.on) { color: #4B5563; }
+.sx-count { display: inline-flex; min-width: 22px; height: 20px; padding: 0 6px; margin-left: 4px; border-radius: 9999px; background: #E5E7EB; color: #4B5563;
+    font-size: 10px; align-items: center; justify-content: center; vertical-align: 1px; }
+.sx-tab.on .sx-count { background: #111827; color: #fff; }
+.sx-pane { animation: ui-fade .35s var(--ease-out) both; }
+.sx-timeline { position: relative; padding: 4px 0 0; }
+.sx-timeline::before { content: ""; position: absolute; left: 15px; top: 14px; bottom: 14px; width: 2px; background: #F1F2F4; }
+.sx-day { padding: 6px 0 10px 46px; font-size: 10px; font-weight: 800; color: #9CA3AF; text-transform: uppercase; letter-spacing: .06em; }
+.sx-ev { position: relative; padding: 0 0 20px 46px; animation: sx-rise .45s var(--ease-out) both; animation-delay: calc(var(--d) * 45ms); }
+.sx-ev-dot { position: absolute; left: 0; top: -2px; width: 32px; height: 32px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px #fff; }
+.sx-ev.latest .sx-ev-dot { box-shadow: 0 0 0 4px #fff, 0 0 0 7px #FFE8E3; }
+.sx-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 22px; background: #F8F8FA; border-top: 1px solid #F1F2F4; flex-shrink: 0; }
+.fab:active { transform: scale(.94); }
+.fab-primary { background: #E86D58; color: #fff; border-color: #E86D58; box-shadow: 0 10px 22px -10px rgba(232, 109, 88, .8); }
+.fab-primary:hover { background: #D55C48; border-color: #D55C48; }
+.fab-danger:hover { background: #D55C48; border-color: #D55C48; color: #fff; }
+.fab-wa:hover { background: #25D366; border-color: #25D366; color: #fff; }
+@media (max-width: 520px) {
+    .sx-hero { padding: 20px; height: 130px; } .sx-body { padding: 0 16px 20px; margin-top: -64px; }
+    .sx-id { padding: 16px; gap: 14px; } .sx-avatar { width: 58px; height: 58px; border-radius: 1.1rem; }
+    .sx-route { gap: 10px; padding: 14px 16px; grid-template-columns: 1fr .8fr 1fr; } .sx-city { font-size: 15px; }
+    .sx-tab { font-size: 13px; padding: 11px 4px; } .sx-tile { padding: 14px 16px; } .sx-v { font-size: 15px; }
+    .sx-step-name { font-size: 10px; } .sx-dot { width: 34px; height: 34px; } .sx-rail { top: 16px; }
+    .sx-foot { flex-direction: column; align-items: stretch; } .sx-foot > div:last-child { justify-content: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { .sx-body > *, .sx-ev, .sx-dot, .sx-path-fill, .sx-plane, .sx-rail-fill { animation: none !important; } }
