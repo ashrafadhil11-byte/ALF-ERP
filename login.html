@@ -217,6 +217,7 @@
                     
                     const userRole = result.role || 'staff';
                     localStorage.setItem('cargo_user_role', userRole);
+                    localStorage.setItem('cargo_is_warehouse', result.is_warehouse ? '1' : '');
 
                     // Role-Based Redirection
                     // One dashboard for every role; it adapts to the role.

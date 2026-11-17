@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
+    <title>Attendance - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
+    </script>
+    <style>
+        .opt[aria-pressed="true"] { background: #111827; color: #fff; }
+        .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+        .cal .d { border-radius: 12px; padding: 6px; min-height: 52px; font-size: 10px; background: #F8F8FA; }
+        .s-present { background: #ECFDF5 !important; } .s-late { background: #FFFBEB !important; } .s-absent { background: #FFF5F3 !important; }
+        .s-leave { background: #EFF6FF !important; } .s-off { background: #F3F4F6 !important; color: #9CA3AF; }
+        .punch { width: 180px; height: 180px; border-radius: 9999px; }
+        .day-chip[aria-pressed="true"] { background: #111827; color: #fff; }
+    </style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar pb-24 lg:pb-4">
+            <section class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center"><span data-icon="clock"></span></div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Attendance</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Check in at your branch • shifts • leave</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-1 bg-[#F8F8FA] p-1 rounded-full self-start" role="tablist">
+                    <button type="button" class="opt px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="me" aria-pressed="true">My attendance</button>
+                    <button type="button" class="opt mgr hidden px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="today" aria-pressed="false">Today</button>
+                    <button type="button" class="opt mgr hidden px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="report" aria-pressed="false">Report</button>
+                    <button type="button" class="opt mgr hidden px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="leave" aria-pressed="false">Leave <span id="leaveCount"></span></button>
+                    <button type="button" class="opt mgr hidden px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="shifts" aria-pressed="false">Shifts</button>
+                </div>
+            </section>
+            <div id="pane" class="ui-fade"></div>
+        </div>
+    </main>
+
+    <!-- Leave request -->
+    <div id="leaveModal" class="ui-modal">
+        <div class="panel max-w-md">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <h3 class="text-lg font-extrabold">Request leave</h3>
+                <button type="button" onclick="UI.closeModal('leaveModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <form id="leaveForm" class="my-5 grid grid-cols-2 gap-3">
+                <div class="col-span-2"><label class="ui-label" for="lType">Type</label><select id="lType" class="field"><option value="annual">Annual</option><option value="sick">Sick</option><option value="emergency">Emergency</option><option value="unpaid">Unpaid</option><option value="other">Other</option></select></div>
+                <div><label class="ui-label" for="lFrom">From</label><input id="lFrom" type="date" class="field" required></div>
+                <div><label class="ui-label" for="lTo">To</label><input id="lTo" type="date" class="field" required></div>
+                <div class="col-span-2"><label class="ui-label" for="lReason">Reason</label><textarea id="lReason" rows="2" class="field"></textarea></div>
+                <div class="col-span-2 flex justify-between items-center"><span id="lDays" class="text-xs text-gray-500"></span><button class="btn btn-coral">Send request</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Manual correction -->
+    <div id="fixModal" class="ui-modal">
+        <div class="panel max-w-md">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 class="text-lg font-extrabold">Correct attendance</h3><p id="fxSub" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('fixModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <form id="fixForm" class="my-5 grid grid-cols-2 gap-3">
+                <div><label class="ui-label" for="fxIn">Check in</label><input id="fxIn" type="time" class="field"></div>
+                <div><label class="ui-label" for="fxOut">Check out</label><input id="fxOut" type="time" class="field"></div>
+                <div class="col-span-2"><label class="ui-label" for="fxReason">Reason (kept on the record)</label><input id="fxReason" class="field" placeholder="e.g. phone battery died, checked in at 08:55" required></div>
+                <div class="col-span-2 flex justify-end"><button class="btn btn-coral">Save correction</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Shift -->
+    <div id="shiftModal" class="ui-modal">
+        <div class="panel max-w-md">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 class="text-lg font-extrabold">Shift</h3><p id="shSub" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('shiftModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <form id="shiftForm" class="my-5 grid grid-cols-2 gap-3">
+                <div><label class="ui-label" for="shStart">Starts</label><input id="shStart" type="time" class="field" required></div>
+                <div><label class="ui-label" for="shEnd">Ends</label><input id="shEnd" type="time" class="field" required></div>
+                <div class="col-span-2"><label class="ui-label" for="shGrace">Late after (minutes of grace)</label><input id="shGrace" type="number" min="0" max="120" class="field" required></div>
+                <div class="col-span-2"><span class="ui-label">Weekly off</span><div id="shOff" class="flex flex-wrap gap-1 mt-1"></div></div>
+                <div class="col-span-2 flex justify-end"><button class="btn btn-coral">Save shift</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const { api, esc, toast, openModal, closeModal } = UI;
+        const $ = (id) => document.getElementById(id);
+        const role = UI.role();
+        const isMgr = ['super_admin', 'head_office', 'branch_manager'].includes(role);
+        const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const ST = { present: ['pill-green', 'Present'], late: ['pill-amber', 'Late'], absent: ['pill-coral', 'Absent'], leave: ['pill-dark', 'Leave'], off: ['pill-gray', 'Off'], upcoming: ['pill-gray', '—'] };
+        const hm = (v) => v ? new Date(v).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—';
+        const hrs = (m) => m ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : '—';
+        const dd = (v) => new Date(v + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        const pill = (s) => `<span class="pill-tag ${ST[s]?.[0] || 'pill-gray'}">${ST[s]?.[1] || esc(s)}</span>`;
+        const LS = { pending: 'pill-amber', approved: 'pill-green', rejected: 'pill-coral', cancelled: 'pill-gray' };
+        let tab = 'me', me = null, month = null, cache = {};
+        if (isMgr) document.querySelectorAll('.mgr').forEach(b => b.classList.remove('hidden'));
+
+        const table = (heads, rows, empty) => `<div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden"><table class="rtable w-full text-xs">
+            <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">${heads.map(([h, a], i) => `<th class="p-3 ${i === 0 ? 'pl-4' : ''} ${i === heads.length - 1 ? 'pr-4' : ''} font-extrabold ${a === 'right' ? 'text-right' : ''}">${h}</th>`).join('')}</tr></thead>
+            <tbody class="divide-y divide-gray-100">${rows || `<tr><td colspan="${heads.length}" class="p-10 text-center text-gray-400">${empty}</td></tr>`}</tbody></table></div>`;
+
+        document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; document.querySelectorAll('[data-tab]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); show(); });
+        async function show() {
+            const pane = $('pane'); pane.classList.remove('ui-fade'); void pane.offsetWidth; pane.classList.add('ui-fade');
+            try { await ({ me: showMe, today: showToday, report: showReport, leave: showLeave, shifts: showShifts })[tab](); }
+            catch (e) { pane.innerHTML = `<p class="text-center text-gray-400 p-10">${esc(e.message)}</p>`; }
+            UI.paintIcons();
+        }
+
+        // ---------- my attendance ----------
+        async function showMe() {
+            me = await api(`/api/attendance?view=me${month ? '&month=' + month : ''}`); month = me.month;
+            const r = me.record;
+            const state = !r?.check_in ? 'in' : !r.check_out ? 'out' : 'done';
+            const off = me.shift.weekly_off.map(n => DOW[n - 1]).join(', ');
+            const [y, m] = me.month.split('-').map(Number);
+            const firstDow = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+            const cells = Array(firstDow).fill('<div></div>').concat(me.days.map(d => `<div class="d s-${d.status}" title="${esc(ST[d.status]?.[1] || d.status)}${d.leave_type ? ' · ' + d.leave_type : ''}">
+                <b class="text-xs">${+d.work_date.slice(8)}</b>${d.check_in ? `<span class="block">${hm(d.check_in)}–${d.check_out ? hm(d.check_out) : '…'}</span>` : ''}${d.late_min ? `<span class="block text-amber-700 font-bold">+${d.late_min}m late</span>` : ''}${d.status === 'leave' ? '<span class="block">leave</span>' : ''}${d.status === 'absent' ? '<span class="block text-[#D55C48] font-bold">absent</span>' : ''}</div>`));
+            const tot = me.days.reduce((t, d) => { t[d.status] = (t[d.status] || 0) + 1; t.late_min += d.late_min; t.worked += d.worked_min; return t; }, { late_min: 0, worked: 0 });
+            const kpi = (l, v, cls = '') => `<div class="bg-[#F8F8FA] rounded-2xl p-3"><p class="sd-label">${l}</p><div class="text-lg font-extrabold ${cls}">${v}</div></div>`;
+            $('pane').innerHTML = `<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <div class="bg-[#F8F8FA] rounded-[2rem] p-6 flex flex-col items-center text-center">
+                    <p class="sd-label">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long' })}</p>
+                    <p id="clock" class="text-4xl font-extrabold tabular-nums my-2"></p>
+                    <p class="text-xs text-gray-500 mb-5">Shift ${me.shift.start}–${me.shift.end} · ${me.shift.grace_min} min grace · off ${off || 'none'}</p>
+                    ${state === 'done' ? `<div class="punch bg-emerald-50 text-emerald-700 flex flex-col items-center justify-center"><span data-icon="check" data-cls="w-8 h-8"></span><b class="mt-2">Day complete</b><span class="text-xs">${hm(r.check_in)} – ${hm(r.check_out)}</span></div>`
+                        : `<button type="button" id="punchBtn" class="punch ${state === 'in' ? 'bg-[#111827]' : 'bg-coral-500'} text-white flex flex-col items-center justify-center shadow-xl hover:scale-[1.02] transition-transform">
+                            <span data-icon="fingerprint" data-cls="w-10 h-10"></span><b class="mt-2 text-lg">${state === 'in' ? 'Check in' : 'Check out'}</b>${r?.check_in ? `<span class="text-xs opacity-80">in since ${hm(r.check_in)}</span>` : ''}</button>`}
+                    <p id="gpsNote" class="text-[11px] text-gray-400 mt-4">${me.branch ? (me.branch.has_location ? `Must be within ${me.branch.geofence_m} m of ${esc(me.branch.name || me.branch.code)} — uses your location.` : `${esc(me.branch.name || me.branch.code)} has no location set yet, so your position is not checked.`) : 'Your account has no branch.'}</p>
+                    ${r?.late_min ? `<p class="text-xs font-bold text-amber-700 mt-2">Late by ${r.late_min} min today</p>` : ''}
+                </div>
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-1"><button type="button" class="icon-btn" id="mPrev" aria-label="Previous month">‹</button>
+                        <b class="text-sm w-36 text-center">${new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</b>
+                        <button type="button" class="icon-btn" id="mNext" aria-label="Next month">›</button></div>
+                        <button type="button" id="askLeave" class="btn btn-dark btn-sm"><span data-icon="calendar"></span>Request leave</button>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">${kpi('Present', (tot.present || 0) + (tot.late || 0))}${kpi('Late', `${tot.late || 0} <span class="text-xs text-gray-400">${tot.late_min} min</span>`, tot.late ? 'text-amber-700' : '')}${kpi('Absent', tot.absent || 0, tot.absent ? 'text-[#D55C48]' : '')}${kpi('Worked', hrs(tot.worked))}</div>
+                    <div class="cal text-center text-[10px] font-extrabold text-gray-400">${DOW.map(d => `<div>${d}</div>`).join('')}</div>
+                    <div class="cal">${cells.join('')}</div>
+                    <div><p class="sd-label mb-2">My leave requests</p>
+                    ${table([['Dates'], ['Type'], ['Days', 'right'], ['Status'], ['']], me.leave.map(l => `<tr><td class="p-3 pl-4" data-label="Dates">${dd(l.from_date)} – ${dd(l.to_date)}${l.reason ? `<span class="block text-[10px] text-gray-400">${esc(l.reason)}</span>` : ''}</td>
+                        <td class="p-3 capitalize" data-label="Type">${esc(l.leave_type)}</td><td class="p-3 text-right" data-label="Days">${l.days}</td>
+                        <td class="p-3" data-label="Status"><span class="pill-tag ${LS[l.status]}">${l.status}</span>${l.decided_by ? `<span class="block text-[10px] text-gray-400">${esc(l.decided_by)}${l.decision_note ? ' · ' + esc(l.decision_note) : ''}</span>` : ''}</td>
+                        <td class="p-3 pr-4 text-right" data-label="">${l.status === 'pending' ? `<button type="button" class="btn btn-light btn-sm" data-lcancel="${l.id}">Cancel</button>` : ''}</td></tr>`).join(''), 'No leave requests.')}</div>
+                </div></div>`;
+            const tickClock = () => { const c = $('clock'); if (c) c.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
+            tickClock(); clearInterval(window._clk); window._clk = setInterval(tickClock, 1000);
+            const step = (n) => { const dt = new Date(Date.UTC(y, m - 1 + n, 1)); month = dt.toISOString().slice(0, 7); show(); };
+            $('mPrev').onclick = () => step(-1); $('mNext').onclick = () => step(1);
+            $('askLeave').onclick = () => { $('leaveForm').reset(); $('lDays').textContent = ''; openModal('leaveModal'); };
+            if ($('punchBtn')) $('punchBtn').onclick = () => punch(state);
+        }
+
+        function position() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) return reject(new Error('This device cannot share its location.'));
+                navigator.geolocation.getCurrentPosition(p => resolve(p.coords), err => reject(new Error(err.code === 1
+                    ? 'Location is blocked. Allow location for this site in your browser settings, then try again.'
+                    : 'Could not get your location. Move near a window or turn on GPS and try again.')), { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+            });
+        }
+        async function punch(kind) {
+            const btn = $('punchBtn'); btn.disabled = true; btn.classList.add('opacity-70');
+            $('gpsNote').textContent = 'Getting your location…';
+            try {
+                let c = null;
+                if (me.branch?.has_location) c = await position();
+                else c = await position().catch(() => null);
+                const out = await api('/api/attendance', { method: 'POST', body: { action: 'punch', kind, lat: c?.latitude, lng: c?.longitude, accuracy: c?.accuracy } });
+                const rec = out.record;
+                toast(true, kind === 'in' ? `Checked in at ${hm(rec.check_in)}${rec.late_min ? ` — ${rec.late_min} min late` : ''}.` : `Checked out at ${hm(rec.check_out)}. Worked ${hrs(rec.worked_min)}.`);
+                UI.beep?.(true);
+                show();
+            } catch (e) { toast(false, e.message); btn.disabled = false; btn.classList.remove('opacity-70'); $('gpsNote').textContent = e.message; }
+        }
+
+        $('pane').addEventListener('click', async (e) => {
+            const c = e.target.closest('[data-lcancel]');
+            if (c) {
+                if (!await UI.confirm({ title: 'Cancel this leave request?', confirmText: 'Cancel request' })) return;
+                try { await api('/api/attendance', { method: 'POST', body: { action: 'leave_cancel', id: +c.dataset.lcancel } }); show(); } catch (err) { toast(false, err.message); }
+            }
+        });
+        const days = () => { const a = $('lFrom').value, b = $('lTo').value; if (!a || !b) return 0; return Math.round((new Date(b) - new Date(a)) / 864e5) + 1; };
+        $('lFrom').onchange = $('lTo').onchange = () => { if ($('lFrom').value && !$('lTo').value) $('lTo').value = $('lFrom').value; const n = days(); $('lDays').textContent = n > 0 ? `${n} day${n > 1 ? 's' : ''}` : ''; };
+        $('leaveForm').onsubmit = async (e) => {
+            e.preventDefault();
+            try { await api('/api/attendance', { method: 'POST', body: { action: 'leave_request', leave_type: $('lType').value, from_date: $('lFrom').value, to_date: $('lTo').value, reason: $('lReason').value } }); closeModal('leaveModal'); toast(true, 'Leave request sent to your manager.'); show(); }
+            catch (err) { toast(false, err.message); }
+        };
+
+        // ---------- managers: today ----------
+        async function showToday() {
+            const d = await api('/api/attendance?view=day'); cache.day = d;
+            const count = (s) => d.rows.filter(r => r.status === s).length;
+            const kpi = (l, v, cls = '') => `<div class="bg-[#F8F8FA] rounded-2xl p-3"><p class="sd-label">${l}</p><div class="text-2xl font-extrabold ${cls}">${v}</div></div>`;
+            $('pane').innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">${kpi('In', count('present') + count('late'), 'text-emerald-600')}${kpi('Late', count('late'), 'text-amber-700')}${kpi('Not in', count('absent'), 'text-[#D55C48]')}${kpi('On leave', count('leave'))}${kpi('Off', count('off'))}</div>`
+                + table([['Employee'], ['Status'], ['In'], ['Out'], ['Late', 'right'], ['Worked', 'right'], ['']], d.rows.map((r, i) => `<tr>
+                    <td class="p-3 pl-4" data-label="Employee"><b>${esc(r.full_name)}</b><span class="block text-[10px] text-gray-400">${esc(r.branch || '')}</span></td>
+                    <td class="p-3" data-label="Status">${pill(r.status)}${r.leave_type ? ` <span class="text-[10px] text-gray-400">${esc(r.leave_type)}</span>` : ''}${r.edited ? ' <span class="pill-tag pill-gray" title="Corrected by a manager">edited</span>' : ''}</td>
+                    <td class="p-3" data-label="In">${hm(r.check_in)}</td><td class="p-3" data-label="Out">${hm(r.check_out)}</td>
+                    <td class="p-3 text-right ${r.late_min ? 'text-amber-700 font-bold' : ''}" data-label="Late">${r.late_min ? r.late_min + 'm' : '—'}</td>
+                    <td class="p-3 text-right" data-label="Worked">${hrs(r.worked_min)}</td>
+                    <td class="p-3 pr-4 text-right" data-label=""><button type="button" class="btn btn-light btn-sm" data-fix="day:${i}">Correct</button></td></tr>`).join(''), 'No staff in this branch.');
+        }
+
+        // ---------- managers: report ----------
+        async function showReport() {
+            const to = cache.to || new Date().toISOString().slice(0, 10), from = cache.from || to.slice(0, 8) + '01';
+            const d = await api(`/api/attendance?view=report&from=${from}&to=${to}`); cache.report = d;
+            $('pane').innerHTML = `<div class="flex flex-wrap items-end gap-2 mb-4">
+                <div><label class="ui-label" for="rFrom">From</label><input id="rFrom" type="date" class="field" value="${d.from}"></div>
+                <div><label class="ui-label" for="rTo">To</label><input id="rTo" type="date" class="field" value="${d.to}"></div>
+                <button type="button" id="rCsv" class="btn btn-light"><span data-icon="upload"></span>Download CSV</button></div>`
+                + table([['Employee'], ['Present', 'right'], ['Late', 'right'], ['Absent', 'right'], ['Leave', 'right'], ['Late min', 'right'], ['Early out min', 'right'], ['Overtime', 'right'], ['Worked', 'right']],
+                    d.summary.map(s => `<tr><td class="p-3 pl-4" data-label="Employee"><b>${esc(s.full_name)}</b><span class="block text-[10px] text-gray-400">${esc(s.branch || '')}</span></td>
+                    <td class="p-3 text-right" data-label="Present">${s.present + s.late}</td><td class="p-3 text-right ${s.late ? 'text-amber-700 font-bold' : ''}" data-label="Late">${s.late}</td>
+                    <td class="p-3 text-right ${s.absent ? 'text-[#D55C48] font-bold' : ''}" data-label="Absent">${s.absent}</td><td class="p-3 text-right" data-label="Leave">${s.leave}</td>
+                    <td class="p-3 text-right" data-label="Late min">${s.late_min}</td><td class="p-3 text-right" data-label="Early out min">${s.early_min}</td>
+                    <td class="p-3 text-right" data-label="Overtime">${hrs(s.overtime_min)}</td><td class="p-3 pr-4 text-right font-extrabold" data-label="Worked">${hrs(s.worked_min)}</td></tr>`).join(''), 'No staff.')
+                + `<p class="sd-label mt-6 mb-2">Day by day (late, absent and corrected days)</p>`
+                + table([['Date'], ['Employee'], ['Status'], ['In'], ['Out'], ['']], d.rows.map((r, i) => ({ r, i })).filter(({ r }) => ['late', 'absent'].includes(r.status) || r.edited).map(({ r, i }) => `<tr>
+                    <td class="p-3 pl-4" data-label="Date">${dd(r.work_date)}</td><td class="p-3" data-label="Employee">${esc(r.full_name)}</td>
+                    <td class="p-3" data-label="Status">${pill(r.status)}${r.late_min ? ` <span class="text-[10px] text-amber-700">${r.late_min}m</span>` : ''}${r.edited ? ' <span class="pill-tag pill-gray">edited</span>' : ''}</td>
+                    <td class="p-3" data-label="In">${hm(r.check_in)}</td><td class="p-3" data-label="Out">${hm(r.check_out)}</td>
+                    <td class="p-3 pr-4 text-right" data-label=""><button type="button" class="btn btn-light btn-sm" data-fix="report:${i}">Correct</button></td></tr>`).join(''), 'Nobody late or absent in this period.');
+            $('rFrom').onchange = $('rTo').onchange = () => { cache.from = $('rFrom').value; cache.to = $('rTo').value; show(); };
+            $('rCsv').onclick = async () => {
+                try {
+                    const res = await fetch(`/api/attendance?view=report&format=csv&from=${$('rFrom').value}&to=${$('rTo').value}`, { headers: { Authorization: `Bearer ${localStorage.getItem('cargo_auth_token')}` } });
+                    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Download failed.');
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = `attendance_${$('rFrom').value}_${$('rTo').value}.csv`; a.click();
+                } catch (e) { toast(false, e.message); }
+            };
+        }
+
+        // correction (from Today or Report)
+        let fixing = null;
+        $('pane').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-fix]'); if (!b) return;
+            const [src, i] = b.dataset.fix.split(':');
+            fixing = (src === 'day' ? cache.day.rows : cache.report.rows)[+i];
+            const t = (v) => v ? new Date(v).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : '';
+            $('fxSub').textContent = `${fixing.full_name} · ${dd(fixing.work_date)}`;
+            $('fxIn').value = t(fixing.check_in); $('fxOut').value = t(fixing.check_out); $('fxReason').value = '';
+            openModal('fixModal');
+        });
+        $('fixForm').onsubmit = async (e) => {
+            e.preventDefault();
+            try { await api('/api/attendance', { method: 'POST', body: { action: 'manual', employee_id: fixing.employee_id, date: fixing.work_date, check_in: $('fxIn').value || null, check_out: $('fxOut').value || null, reason: $('fxReason').value } }); closeModal('fixModal'); toast(true, 'Corrected.'); show(); }
+            catch (err) { toast(false, err.message); }
+        };
+
+        // ---------- managers: leave ----------
+        async function showLeave() {
+            const d = await api('/api/attendance?view=leave'); cache.leave = d;
+            const pending = d.rows.filter(l => l.status === 'pending').length;
+            $('leaveCount').textContent = pending ? `· ${pending}` : '';
+            $('pane').innerHTML = table([['Employee'], ['Dates'], ['Type'], ['Days', 'right'], ['Status'], ['']], d.rows.map(l => `<tr class="${l.status === 'pending' ? 'bg-[#FFFBF5]' : ''}">
+                <td class="p-3 pl-4" data-label="Employee"><b>${esc(l.full_name)}</b><span class="block text-[10px] text-gray-400">${esc(l.branch_code || '')}</span></td>
+                <td class="p-3" data-label="Dates">${dd(l.from_date)} – ${dd(l.to_date)}${l.reason ? `<span class="block text-[10px] text-gray-400">${esc(l.reason)}</span>` : ''}</td>
+                <td class="p-3 capitalize" data-label="Type">${esc(l.leave_type)}</td><td class="p-3 text-right" data-label="Days">${l.days}</td>
+                <td class="p-3" data-label="Status"><span class="pill-tag ${LS[l.status]}">${l.status}</span>${l.decided_by ? `<span class="block text-[10px] text-gray-400">${esc(l.decided_by)}</span>` : ''}</td>
+                <td class="p-3 pr-4 text-right whitespace-nowrap" data-label="">${l.status === 'pending' ? `<button type="button" class="btn btn-dark btn-sm" data-decide="approved:${l.id}">Approve</button> <button type="button" class="btn btn-light btn-sm" data-decide="rejected:${l.id}">Reject</button>` : ''}</td></tr>`).join(''), 'No leave requests.');
+        }
+        $('pane').addEventListener('click', async (e) => {
+            const b = e.target.closest('[data-decide]'); if (!b) return;
+            const [decision, id] = b.dataset.decide.split(':');
+            const note = decision === 'rejected' ? prompt('Reason (shown to the employee):', '') : '';
+            if (note === null) return;
+            try { await api('/api/attendance', { method: 'POST', body: { action: 'leave_decide', id: +id, decision, note } }); toast(true, decision === 'approved' ? 'Approved.' : 'Rejected.'); show(); } catch (err) { toast(false, err.message); }
+        });
+
+        // ---------- managers: shifts ----------
+        async function showShifts() {
+            const d = await api('/api/attendance?view=shifts'); cache.shifts = d;
+            $('pane').innerHTML = table([['Employee'], ['Shift'], ['Grace', 'right'], ['Weekly off'], ['']], d.rows.map((r, i) => `<tr>
+                <td class="p-3 pl-4" data-label="Employee"><b>${esc(r.full_name)}</b><span class="block text-[10px] text-gray-400">${esc([r.branch, String(r.role || '').replace(/_/g, ' ')].filter(Boolean).join(' · '))}</span></td>
+                <td class="p-3 font-extrabold" data-label="Shift">${String(r.shift_start).slice(0, 5)} – ${String(r.shift_end).slice(0, 5)}</td>
+                <td class="p-3 text-right" data-label="Grace">${r.grace_min} min</td>
+                <td class="p-3" data-label="Weekly off">${(r.weekly_off || []).map(n => DOW[n - 1]).join(', ') || 'none'}</td>
+                <td class="p-3 pr-4 text-right" data-label=""><button type="button" class="btn btn-light btn-sm" data-shift="${i}">Edit</button></td></tr>`).join(''), 'No staff.');
+        }
+        let shiftEmp = null;
+        $('pane').addEventListener('click', (e) => {
+            const b = e.target.closest('[data-shift]'); if (!b) return;
+            shiftEmp = cache.shifts.rows[+b.dataset.shift];
+            $('shSub').textContent = shiftEmp.full_name;
+            $('shStart').value = String(shiftEmp.shift_start).slice(0, 5); $('shEnd').value = String(shiftEmp.shift_end).slice(0, 5); $('shGrace').value = shiftEmp.grace_min;
+            $('shOff').innerHTML = DOW.map((d, i) => `<button type="button" class="day-chip px-3 py-1.5 rounded-full bg-[#F8F8FA] text-[11px] font-extrabold" data-dow="${i + 1}" aria-pressed="${(shiftEmp.weekly_off || []).includes(i + 1)}">${d}</button>`).join('');
+            openModal('shiftModal');
+        });
+        $('shOff').onclick = (e) => { const c = e.target.closest('[data-dow]'); if (c) c.setAttribute('aria-pressed', String(c.getAttribute('aria-pressed') !== 'true')); };
+        $('shiftForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const off = [...$('shOff').querySelectorAll('[aria-pressed="true"]')].map(c => +c.dataset.dow);
+            try { await api('/api/attendance', { method: 'POST', body: { action: 'shift', employee_id: shiftEmp.id, shift_start: $('shStart').value, shift_end: $('shEnd').value, grace_min: +$('shGrace').value, weekly_off: off } }); closeModal('shiftModal'); toast(true, 'Shift saved.'); show(); }
+            catch (err) { toast(false, err.message); }
+        };
+
+        show();
+        if (isMgr) api('/api/attendance?view=leave&status=pending').then(d => { $('leaveCount').textContent = d.rows.length ? `· ${d.rows.length}` : ''; }).catch(() => {});
+    </script>
+</body>
+</html>

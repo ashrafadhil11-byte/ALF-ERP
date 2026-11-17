@@ -215,6 +215,18 @@
                         <label class="field flex items-center gap-2 cursor-pointer"><input id="b_hub" type="checkbox" class="w-4 h-4"><span class="text-xs font-bold">Hub branch</span></label></div>
                     <div class="sm:col-span-2"><label class="ui-label" for="b_type">Type</label><select id="b_type" class="field"><option value="branch">Branch (customer counter)</option><option value="warehouse">Central warehouse (stocks materials for branches, gathers & consolidates)</option></select></div>
                 </fieldset>
+                <fieldset class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Attendance — staff check in here</legend>
+                    <div><label class="ui-label" for="b_lat">Latitude</label><input id="b_lat" class="field" inputmode="decimal" placeholder="23.5880"></div>
+                    <div><label class="ui-label" for="b_lng">Longitude</label><input id="b_lng" class="field" inputmode="decimal" placeholder="58.3829"></div>
+                    <div><label class="ui-label" for="b_fence">Allowed distance (m)</label><input id="b_fence" class="field" type="number" min="30" max="5000" step="10" placeholder="200"></div>
+                    <div><label class="ui-label" for="b_tz">Time zone</label><select id="b_tz" class="field"><option>Asia/Muscat</option><option>Asia/Dubai</option><option>Asia/Riyadh</option><option>Asia/Qatar</option><option>Asia/Kuwait</option><option>Asia/Bahrain</option><option>Asia/Kolkata</option><option>Asia/Kathmandu</option><option>Asia/Colombo</option><option>Asia/Karachi</option><option>Asia/Dhaka</option><option>Asia/Manila</option><option>Africa/Cairo</option><option>Europe/London</option></select></div>
+                    <div class="col-span-2 sm:col-span-4 flex flex-wrap items-center gap-2">
+                        <button type="button" id="b_here" class="btn btn-light btn-sm"><span data-icon="pin"></span>Use my current location</button>
+                        <a id="b_map" target="_blank" rel="noopener" class="btn btn-light btn-sm hidden"><span data-icon="globe"></span>Check on map</a>
+                        <span class="text-[11px] text-gray-400">Stand inside the branch and tap the button. Leave empty to allow check-in from anywhere.</span>
+                    </div>
+                </fieldset>
             </div>
 
             <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
@@ -417,6 +429,8 @@
             $('b_taxRate').value = b.tax_rate ?? 0;
             $('b_hub').checked = Boolean(b.is_hub);
             $('b_type').value = b.branch_type || 'branch';
+            $('b_lat').value = b.lat ?? ''; $('b_lng').value = b.lng ?? ''; $('b_fence').value = b.geofence_m ?? 200; $('b_tz').value = b.timezone || 'Asia/Muscat';
+            showMapLink();
             $('pvDest').innerHTML = destinations.filter(d => d.active).map(d => `<option value="${esc(d.code)}">${esc(d.code)} · ${esc(d.country_name)}</option>`).join('')
                 + '<option value="DE">DE · any other country</option>';
             $('pvCargo').innerHTML = cargoTypes.filter(t => t.active).map(t => `<option value="${esc(t.code)}">${esc(t.code)} · ${esc(t.name)}</option>`).join('');
@@ -502,6 +516,7 @@
                 location: $('b_city').value.trim(), address: $('b_address').textContent === '—' ? $('b_city').value.trim() : $('b_address').textContent,
                 phoneNumber: branchPh.value, managerId: mgr ? mgr.id : null, managerName: mgr ? (mgr.full_name || mgr.username) : 'Unassigned',
                 currency: $('b_currency').value, taxName: $('b_taxName').value.trim(), taxRate: $('b_taxRate').value, isHub: $('b_hub').checked, branchType: $('b_type').value,
+                lat: $('b_lat').value.trim(), lng: $('b_lng').value.trim(), geofence: $('b_fence').value, timezone: $('b_tz').value,
                 status: editing?.status
             };
             if (!await UI.confirm({ title: editing ? `Save changes to ${body.branchName}?` : 'Create this branch?',
@@ -596,6 +611,24 @@
         let saved = 'branches'; try { saved = localStorage.getItem('alf_branch_tab') || 'branches'; } catch (e) {}
         setTab(['branches', 'destinations', 'cargo'].includes(saved) ? saved : 'branches');
         loadAll();
+    
+        // ---------- attendance location ----------
+        function showMapLink() {
+            const lat = parseFloat($('b_lat').value), lng = parseFloat($('b_lng').value);
+            const ok = Number.isFinite(lat) && Number.isFinite(lng);
+            $('b_map').classList.toggle('hidden', !ok);
+            if (ok) $('b_map').href = `https://www.google.com/maps?q=${lat},${lng}`;
+        }
+        ['b_lat', 'b_lng'].forEach(id => $(id).addEventListener('input', showMapLink));
+        $('b_here').onclick = () => {
+            if (!navigator.geolocation) return toast(false, 'This device cannot share its location.');
+            $('b_here').disabled = true;
+            navigator.geolocation.getCurrentPosition(p => {
+                $('b_lat').value = p.coords.latitude.toFixed(6); $('b_lng').value = p.coords.longitude.toFixed(6);
+                showMapLink(); $('b_here').disabled = false;
+                toast(true, `Location set (accurate to about ${Math.round(p.coords.accuracy)} m).`);
+            }, err => { $('b_here').disabled = false; toast(false, err.code === 1 ? 'Location is blocked for this site — allow it in the browser.' : 'Could not get the location.'); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        };
     </script>
 </body>
 </html>

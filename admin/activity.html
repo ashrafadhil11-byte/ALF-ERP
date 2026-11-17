@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
+    <title>Activity Log - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
+    </script>
+    <style>pre.details { white-space: pre-wrap; word-break: break-word; font-size: 11px; }</style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar pb-24 lg:pb-4">
+            <section class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center"><span data-icon="clipboard"></span></div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Activity Log</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Every change by every user • passwords and PINs are never stored</p>
+                    </div>
+                </div>
+            </section>
+
+            <form id="filters" class="grid grid-cols-2 lg:grid-cols-6 gap-2 mb-4">
+                <div><label class="ui-label" for="fFrom">From</label><input id="fFrom" type="date" class="field"></div>
+                <div><label class="ui-label" for="fTo">To</label><input id="fTo" type="date" class="field"></div>
+                <div><label class="ui-label" for="fUser">User</label><select id="fUser" class="field"><option value="">Everyone</option></select></div>
+                <div><label class="ui-label" for="fRoute">Area</label><select id="fRoute" class="field"><option value="">All areas</option></select></div>
+                <div class="col-span-2"><label class="ui-label" for="fQ">Search</label><input id="fQ" class="field" placeholder="AWB, invoice, action, error…" autocomplete="off"></div>
+                <label class="col-span-2 lg:col-span-6 flex items-center gap-2 text-xs font-bold text-gray-600"><input id="fFailed" type="checkbox" class="w-4 h-4">Only failed / refused attempts</label>
+            </form>
+
+            <div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
+                <table class="rtable w-full text-xs">
+                    <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
+                        <th class="p-3 pl-4 font-extrabold">When</th><th class="p-3 font-extrabold">User</th><th class="p-3 font-extrabold">What</th><th class="p-3 font-extrabold">Record</th><th class="p-3 pr-4 font-extrabold">Result</th>
+                    </tr></thead>
+                    <tbody id="rows" class="divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
+            <div class="flex justify-center mt-4"><button id="more" type="button" class="btn btn-light hidden">Show more</button></div>
+        </div>
+    </main>
+
+    <div id="detail" class="ui-modal">
+        <div class="panel max-w-2xl">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 id="dTitle" class="text-lg font-extrabold"></h3><p id="dSub" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('detail')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div class="my-5 overflow-y-auto custom-scrollbar"><pre id="dBody" class="details bg-[#F8F8FA] rounded-2xl p-4 font-mono"></pre></div>
+        </div>
+    </div>
+
+    <script>
+        const { api, esc, toast, openModal } = UI;
+        const $ = (id) => document.getElementById(id);
+        // Plain names for the areas of the app (route → label)
+        const AREA = { login: 'Sign in', bookings: 'Bookings', status: 'Status update', delivery: 'Delivery / POD', transfers: 'Branch transfers', consolidation: 'Consolidation',
+            accounts: 'Accounts', customers: 'Customers', warehouse: 'Warehouse', attendance: 'Attendance', users: 'Staff & users', 'create-user': 'New user', branches: 'Branches',
+            integrations: 'Integrations', profile: 'Profile', codes: 'Status codes', 'carrier-sync': 'Carrier sync', 'dashboard-layout': 'Dashboard layout', notifications: 'Notifications' };
+        const VERB = { POST: 'saved', PUT: 'saved', PATCH: 'changed', DELETE: 'deleted' };
+        const what = (r) => r.route === 'login' ? (r.ok ? 'signed in' : 'sign-in attempt') : r.action ? words(r.action) : VERB[r.method] || r.method;
+        const when = (v) => new Date(v).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const words = (s) => String(s || '').replace(/_/g, ' ');
+        let rows = [], page = 0, users = [];
+
+        $('fFrom').value = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+        $('fRoute').innerHTML += Object.entries(AREA).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+
+        async function load(reset = true) {
+            if (reset) { page = 0; rows = []; }
+            const p = new URLSearchParams({ from: $('fFrom').value, page });
+            if ($('fTo').value) p.set('to', $('fTo').value);
+            if ($('fUser').value) p.set('user', $('fUser').value);
+            if ($('fRoute').value) p.set('route', $('fRoute').value);
+            if ($('fQ').value.trim()) p.set('q', $('fQ').value.trim());
+            if ($('fFailed').checked) p.set('failed', '1');
+            try {
+                const d = await api('/api/activity?' + p);
+                rows = rows.concat(d.rows); $('more').classList.toggle('hidden', !d.more);
+                if (!users.length && d.users.length) { users = d.users; $('fUser').innerHTML += users.map(u => `<option value="${u.id}">${esc(u.full_name || '—')}${u.branch ? ' · ' + esc(u.branch) : ''}</option>`).join(''); }
+            } catch (e) { toast(false, e.message); }
+            $('rows').innerHTML = rows.map((r, i) => `<tr class="hover:bg-[#F8F8FA] cursor-pointer ${r.ok ? '' : 'bg-[#FFF5F3]'}" data-i="${i}">
+                <td class="p-3 pl-4 whitespace-nowrap" data-label="When">${when(r.at)}</td>
+                <td class="p-3" data-label="User"><b>${esc(r.user_name || r.user_email || 'Unknown')}</b><span class="block text-[10px] text-gray-400">${esc([words(r.role), r.branch].filter(Boolean).join(' · '))}</span></td>
+                <td class="p-3" data-label="What"><span class="pill-tag pill-gray">${esc(AREA[r.route] || r.route)}</span> ${esc(what(r))}</td>
+                <td class="p-3 font-mono" data-label="Record">${esc(r.target || '—')}</td>
+                <td class="p-3 pr-4" data-label="Result">${r.ok ? '<span class="pill-tag pill-green">Done</span>' : `<span class="pill-tag pill-coral">${r.status === 401 || r.status === 403 || r.status === 423 ? 'Refused' : 'Failed'}</span><span class="block text-[10px] text-[#D55C48] mt-0.5">${esc(r.error || '')}</span>`}</td></tr>`).join('')
+                || '<tr><td colspan="5" class="p-10 text-center text-gray-400">Nothing recorded for these filters.</td></tr>';
+        }
+        let t; const later = () => { clearTimeout(t); t = setTimeout(() => load(), 300); };
+        ['fFrom', 'fTo', 'fUser', 'fRoute', 'fFailed'].forEach(id => $(id).onchange = () => load());
+        $('fQ').oninput = later;
+        $('filters').onsubmit = (e) => { e.preventDefault(); load(); };
+        $('more').onclick = () => { page++; load(false); };
+        $('rows').addEventListener('click', (e) => {
+            const tr = e.target.closest('[data-i]'); if (!tr) return;
+            const r = rows[+tr.dataset.i];
+            $('dTitle').textContent = `${AREA[r.route] || r.route} — ${what(r)}`;
+            $('dSub').textContent = `${r.user_name || r.user_email || 'Unknown'} · ${when(r.at)} · ${r.ip || ''}`;
+            $('dBody').textContent = JSON.stringify({ result: r.ok ? 'done' : `${r.status} ${r.error || ''}`, record: r.target, ...r.details, device: r.user_agent }, null, 2);
+            openModal('detail');
+        });
+        load();
+    </script>
+</body>
+</html>

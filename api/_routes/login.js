@@ -59,7 +59,7 @@ export default async function handler(req, res) {
         }
 
         // 3. Role from the employees table / app_metadata (never user_metadata, which users can edit)
-        const empRes = await fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${encodeURIComponent(data.user.id)}&select=role`, {
+        const empRes = await fetch(`${SUPABASE_URL}/rest/v1/employees?id=eq.${encodeURIComponent(data.user.id)}&select=*`, {
             headers: serviceHeaders()
         });
         const empRows = empRes.ok ? await empRes.json() : [];
@@ -69,7 +69,8 @@ export default async function handler(req, res) {
             success: true, 
             access_token: data.access_token,
             user: data.user,
-            role
+            role,
+            is_warehouse: Boolean(empRows[0]?.is_warehouse && empRows[0]?.warehouse_code)
         });
 
     } catch (error) {

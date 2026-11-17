@@ -484,18 +484,16 @@ export default async function handler(req, res) {
                 return res.status(200).json({ success: true, ...out });
             }
             case 'stock_dispatch':
-            case 'stock_receive':
             case 'stock_reject':
+                throw new UserError('Send or reject requests on the Warehouse page (needs your warehouse PIN).', 403);
+            case 'stock_receive':
             case 'stock_cancel': {
                 const r = (await get(`stock_requests?id=eq.${enc(b.id)}&select=*`))[0];
                 if (!r) throw new UserError('Request not found.', 404);
-                const side = b.action === 'stock_dispatch' || b.action === 'stock_reject' ? r.warehouse : r.branch_code;
-                if (!full && session.branch !== side) throw new UserError(b.action === 'stock_dispatch' || b.action === 'stock_reject' ? 'Only the warehouse can do this.' : 'Only the requesting branch can do this.', 403);
-                if (b.action === 'stock_dispatch') return res.status(200).json({ success: true, ...(await rpc('stock_request_dispatch', { p_id: r.id, p_lines: Array.isArray(b.lines) ? b.lines : [], p_user_name: userName })) });
+                if (!full && session.branch !== r.branch_code) throw new UserError('Only the requesting branch can do this.', 403);
                 if (b.action === 'stock_receive') return res.status(200).json({ success: true, ...(await rpc('stock_request_receive', { p_id: r.id, p_user_name: userName })) });
                 if (r.status !== 'requested') throw new UserError(`${r.request_no} is already ${r.status}.`);
-                const patch = b.action === 'stock_reject' ? { status: 'rejected', reject_reason: str(b.reason, 200) || null } : { status: 'cancelled' };
-                await fetch(`${rest}/stock_requests?id=eq.${r.id}&status=eq.requested`, { method: 'PATCH', headers: serviceHeaders(), body: JSON.stringify(patch) });
+                await fetch(`${rest}/stock_requests?id=eq.${r.id}&status=eq.requested`, { method: 'PATCH', headers: serviceHeaders(), body: JSON.stringify({ status: 'cancelled' }) });
                 return res.status(200).json({ success: true });
             }
             case 'internal_settle': {

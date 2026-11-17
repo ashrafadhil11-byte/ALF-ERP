@@ -4,10 +4,10 @@ window.UI = (() => {
     const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const clean = (v) => String(v || '').trim().replace(/^'/, '').replace(/\s+/g, '').toUpperCase();
 
-    async function api(path, { method = 'GET', body } = {}) {
+    async function api(path, { method = 'GET', body, headers = {} } = {}) {
         const res = await fetch(path, {
             method,
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}`, ...headers },
             body: body ? JSON.stringify(body) : undefined
         });
         if (res.status === 401) {
@@ -73,6 +73,8 @@ window.UI = (() => {
 
     // Line icons (24×24, stroke) — same style as the sidebar. Usage: UI.icon('truck', 'w-4 h-4')
     const ICONS = {
+        lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+        fingerprint: '<path d="M12 11v3a8 8 0 01-1 4M8 12a4 4 0 018 0v1M5 13v-1a7 7 0 0114 0v2M16 17v1M12 3a9 9 0 019 9"/>',
         eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
         edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/>',
         refresh: '<path d="M21 12a9 9 0 01-15.3 6.4L3 16"/><path d="M3 21v-5h5"/><path d="M3 12a9 9 0 0115.3-6.4L21 8"/><path d="M21 3v5h-5"/>',

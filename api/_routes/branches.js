@@ -12,6 +12,18 @@ function financeFields(body = {}) {
     }
     if (body.isHub !== undefined) out.is_hub = Boolean(body.isHub);
     if (body.branchType !== undefined) out.branch_type = body.branchType === 'warehouse' ? 'warehouse' : 'branch';
+    // Attendance: where the branch is (staff check in within geofence metres of it)
+    if (body.lat !== undefined || body.lng !== undefined) {
+        const lat = body.lat === '' || body.lat == null ? null : Number(body.lat);
+        const lng = body.lng === '' || body.lng == null ? null : Number(body.lng);
+        const ok = (lat === null && lng === null) || (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180);
+        if (ok) { out.lat = lat; out.lng = lng; }
+    }
+    if (body.geofence !== undefined && body.geofence !== '') {
+        const g = Math.round(Number(body.geofence));
+        if (g >= 30 && g <= 5000) out.geofence_m = g;
+    }
+    if (body.timezone && /^[A-Za-z_]+\/[A-Za-z_\-/]+$/.test(body.timezone)) out.timezone = body.timezone;
     return out;
 }
 

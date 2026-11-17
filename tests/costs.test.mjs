@@ -85,7 +85,7 @@ test('accounts: cost bill for a shipment by AWB; staff cannot', async () => {
     assert.deepEqual([b.p_branch, b.p_booking_id, b.p_consolidation_id, b.p_pay_method], ['SNY', 'bk1', null, 'cash']);
 });
 
-test('accounts: only the warehouse sends, only the branch receives; settling is head office', async () => {
+test('accounts: sending moved to the Warehouse page, only the branch receives; settling is head office', async () => {
     const REQ = { '/rest/v1/stock_requests?id=eq.5': () => [{ id: 5, request_no: 'SRQ-SNY-000001', warehouse: 'CWH', branch_code: 'SNY', status: 'requested' }] };
     fake(MGR, REQ);
     let r = res();
@@ -98,7 +98,8 @@ test('accounts: only the warehouse sends, only the branch receives; settling is 
     fake({ ...MGR, branch: 'CWH' }, { ...REQ, 'rpc/stock_request_dispatch': () => ({ request_no: 'SRQ-SNY-000001', total: 22.5 }) });
     r = res();
     await accounts(req('POST', { body: { action: 'stock_dispatch', id: 5, lines: [{ product_id: 1, qty: 30 }] } }), r);
-    assert.equal(r.body.success, true);
+    assert.equal(r.code, 403);   // even the warehouse branch: sending is on the PIN-locked Warehouse page now
+    assert.match(r.body.error, /Warehouse page/);
     fake(MGR);
     r = res();
     await accounts(req('POST', { body: { action: 'internal_settle', warehouse: 'CWH', branch_code: 'SNY', amount: 5, method: 'bank' } }), r);

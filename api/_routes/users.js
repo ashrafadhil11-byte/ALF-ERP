@@ -2,6 +2,7 @@
 //   GET                                   list staff with last sign-in
 //   PATCH { id, full_name?, contact_number?, role?, branch?, is_driver?, active? }
 //   POST  { action:'reset_password', id }  emails a password-reset link
+//   PATCH also takes { is_warehouse, warehouse_code }  — warehouse operator (they still need their own PIN)
 import { requireSession, serviceHeaders, normalizeRole, ADMIN_ROLES } from '../_lib/auth.js';
 
 const enc = encodeURIComponent;
@@ -30,15 +31,16 @@ export default async function handler(req, res) {
     try {
         if (req.method === 'GET') {
             const [er, ar] = await Promise.all([
-                fetch(`${rest}/employees?select=id,full_name,username,role,branch,contact_number,recovery_email,is_driver,active,created_at&order=full_name.asc`, { headers: serviceHeaders() }),
+                fetch(`${rest}/employees?select=id,full_name,username,role,branch,contact_number,recovery_email,is_driver,is_warehouse,warehouse_code,wh_pin_hash,active,created_at&order=full_name.asc`, { headers: serviceHeaders() }),
                 fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers: serviceHeaders() })
             ]);
             const employees = er.ok ? await er.json() : [];
             const authUsers = ar.ok ? ((await ar.json()).users || []) : [];
             const byId = Object.fromEntries(authUsers.map(u => [u.id, u]));
             return res.status(200).json({
-                users: employees.map(e => ({
+                users: employees.map(({ wh_pin_hash, ...e }) => ({
                     ...e,
+                    has_wh_pin: Boolean(wh_pin_hash),
                     role: normalizeRole(e.role) || e.role,
                     last_sign_in_at: byId[e.id]?.last_sign_in_at || null,
                     email_confirmed: Boolean(byId[e.id]?.email_confirmed_at),
@@ -91,6 +93,18 @@ export default async function handler(req, res) {
                 patch.branch = code || null;
             }
             if ('is_driver' in body) patch.is_driver = Boolean(body.is_driver);
+            if ('is_warehouse' in body) {
+                patch.is_warehouse = Boolean(body.is_warehouse);
+                if (patch.is_warehouse) {
+                    const code = String(body.warehouse_code || '').trim();
+                    const wr = await fetch(`${rest}/branches?branch_code=eq.${enc(code)}&branch_type=eq.warehouse&select=branch_code&limit=1`, { headers: serviceHeaders() });
+                    if (!code || !(wr.ok ? await wr.json() : []).length) throw new UserError('Pick the warehouse this operator works in.');
+                    if (code !== emp.warehouse_code) Object.assign(patch, { wh_pin_hash: null, wh_pin_failed: 0, wh_pin_locked_until: null });  // new warehouse → set a new PIN
+                    patch.warehouse_code = code;
+                } else {
+                    Object.assign(patch, { warehouse_code: null, wh_pin_hash: null, wh_pin_failed: 0, wh_pin_locked_until: null });
+                }
+            }
             if ('active' in body) {
                 if (isSelf && !body.active) throw new UserError('You cannot deactivate yourself.');
                 patch.active = Boolean(body.active);

@@ -147,6 +147,16 @@
                 <label class="sm:col-span-2 flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100 cursor-pointer">
                     <input id="e_driver" type="checkbox" class="w-4 h-4"><span class="text-xs font-bold">Driver</span><span class="text-[11px] text-gray-400">— does pickups / deliveries</span>
                 </label>
+                <div class="sm:col-span-2 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100 space-y-2">
+                    <label class="flex items-center gap-3 cursor-pointer">
+                        <input id="e_wh" type="checkbox" class="w-4 h-4"><span class="text-xs font-bold">Warehouse operator</span><span class="text-[11px] text-gray-400">— branch requests, warehouse stock and purchases</span>
+                    </label>
+                    <div id="e_whBox" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-2 items-end">
+                        <div><label class="ui-label" for="e_whCode">Warehouse</label><select id="e_whCode" class="field"></select></div>
+                        <div class="flex items-center gap-2 text-[11px] text-gray-500"><span id="e_whPin"></span><button type="button" id="e_whReset" class="btn btn-light btn-sm hidden">Reset PIN</button></div>
+                        <p class="sm:col-span-2 text-[11px] text-gray-400">They set their own warehouse PIN the first time they open the Warehouse page, and must enter it every time.</p>
+                    </div>
+                </div>
             </div>
             <div class="flex justify-end gap-2 pt-4 border-t border-gray-100">
                 <button type="button" class="btn btn-light" onclick="UI.closeModal('editModal')">Cancel</button>
@@ -207,7 +217,7 @@
                             <p class="text-[10px] text-gray-400 truncate">@${esc(u.username || '—')} • ${esc(u.recovery_email || '')}</p></div>
                         </div>
                     </td>
-                    <td class="p-3" data-label="Role"><span class="pill-tag ${ROLE_PILL[u.role] || 'pill-gray'}">${esc(ROLES[u.role] || u.role || 'No role')}</span>${u.is_driver ? ' <span class="pill-tag pill-gray">Driver</span>' : ''}</td>
+                    <td class="p-3" data-label="Role"><span class="pill-tag ${ROLE_PILL[u.role] || 'pill-gray'}">${esc(ROLES[u.role] || u.role || 'No role')}</span>${u.is_driver ? ' <span class="pill-tag pill-gray">Driver</span>' : ''}${u.is_warehouse ? ' <span class="pill-tag pill-dark">Warehouse</span>' : ''}</td>
                     <td class="p-3 font-bold" data-label="Branch">${esc(['super_admin', 'head_office'].includes(u.role) && !u.branch ? 'All branches' : branchName(u.branch))}</td>
                     <td class="p-3 text-gray-500" data-label="Contact">${esc(u.contact_number || '—')}</td>
                     <td class="p-3 text-gray-500" data-label="Last sign-in">${ago(u.last_sign_in_at)}${u.email_confirmed ? '' : ' <span class="pill-tag pill-amber">Email not verified</span>'}</td>
@@ -295,6 +305,14 @@
             $('e_branch').innerHTML = '<option value="">All branches</option>' + branches.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join('');
             $('e_branch').value = editing.branch || '';
             $('e_driver').checked = Boolean(editing.is_driver);
+            const whs = branches.filter(b => b.branch_type === 'warehouse');
+            $('e_whCode').innerHTML = whs.length ? whs.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join('') : '<option value="">No warehouse yet — set a branch type to Warehouse in Branch Network</option>';
+            $('e_wh').checked = Boolean(editing.is_warehouse);
+            if (editing.warehouse_code) $('e_whCode').value = editing.warehouse_code;
+            $('e_whPin').textContent = editing.is_warehouse ? (editing.has_wh_pin ? 'PIN is set.' : 'PIN not set yet.') : '';
+            $('e_whReset').classList.toggle('hidden', !(editing.is_warehouse && editing.has_wh_pin));
+            $('e_wh').onchange = () => $('e_whBox').classList.toggle('hidden', !$('e_wh').checked);
+            $('e_wh').onchange();
             $('e_role').onchange = () => { const g = ['super_admin', 'head_office'].includes($('e_role').value); $('e_branch').disabled = g; if (g) $('e_branch').value = ''; };
             $('e_role').onchange();
             openModal('editModal');
@@ -302,7 +320,8 @@
         $('editForm').onsubmit = async (e) => {
             e.preventDefault();
             if (!ePh.valid) return toast(false, 'Contact number looks wrong — check the country code and number.');
-            const body = { id: editing.id, full_name: $('e_name').value, contact_number: ePh.value, branch: $('e_branch').value, is_driver: $('e_driver').checked };
+            const body = { id: editing.id, full_name: $('e_name').value, contact_number: ePh.value, branch: $('e_branch').value, is_driver: $('e_driver').checked,
+                is_warehouse: $('e_wh').checked, warehouse_code: $('e_whCode').value };
             if (!editing.is_me) body.role = $('e_role').value;
             const roleChanged = body.role && body.role !== editing.role;
             if (roleChanged && !await UI.confirm({ title: 'Change role?', message: `${esc(editing.full_name)}: <b>${esc(ROLES[editing.role] || editing.role)}</b> → <b>${esc(ROLES[body.role])}</b>. Their access changes at their next page load.`, confirmText: 'Change role' })) return;
@@ -310,6 +329,12 @@
                 await api('/api/users', { method: 'PATCH', body });
                 toast(true, 'User updated.'); closeModal('editModal'); load();
             } catch (err) { toast(false, err.message); }
+        };
+
+        $('e_whReset').onclick = async () => {
+            if (!await UI.confirm({ title: `Reset ${esc(editing.full_name)}'s warehouse PIN?`, message: 'They will set a new PIN the next time they open the Warehouse page.', confirmText: 'Reset PIN' })) return;
+            try { await api('/api/warehouse', { method: 'POST', body: { action: 'reset_pin', employee_id: editing.id } }); editing.has_wh_pin = false; $('e_whPin').textContent = 'PIN not set yet.'; $('e_whReset').classList.add('hidden'); toast(true, 'PIN reset.'); }
+            catch (err) { toast(false, err.message); }
         };
 
         window.toggleActive = async (id) => {

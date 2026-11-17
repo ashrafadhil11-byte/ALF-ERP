@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
+    <title>Warehouse - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <script>
+        tailwind.config = { theme: { extend: {
+            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
+        } } };
+    </script>
+    <style>
+        .opt[aria-pressed="true"] { background: #111827; color: #fff; }
+        .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .pin-box { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .low { background: #FFF5F3; }
+    </style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar pb-24 lg:pb-4">
+            <section class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 mb-6 border-b border-gray-100 gap-4">
+                <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm self-start">
+                    <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center"><span data-icon="warehouse"></span></div>
+                    <div>
+                        <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">Warehouse</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                        <p id="whSub" class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Branch requests, stock, purchases • PIN protected</p>
+                    </div>
+                </div>
+                <div id="lockBar" class="hidden flex items-center gap-2 self-start sm:self-auto">
+                    <span class="pill-tag pill-green"><span id="lockLeft"></span></span>
+                    <button type="button" id="changePinBtn" class="btn btn-light btn-sm"><span data-icon="key"></span>Change PIN</button>
+                    <button type="button" id="lockBtn" class="btn btn-dark btn-sm"><span data-icon="lock"></span>Lock</button>
+                </div>
+            </section>
+
+            <!-- Gate: no access / set PIN / enter PIN -->
+            <div id="gate" class="max-w-sm mx-auto py-8 text-center">
+                <div class="w-16 h-16 rounded-3xl bg-[#111827] text-white flex items-center justify-center mx-auto mb-4"><span data-icon="lock" data-cls="w-7 h-7"></span></div>
+                <h2 id="gTitle" class="text-xl font-extrabold">Loading…</h2>
+                <p id="gText" class="text-xs text-gray-500 mt-1 mb-5"></p>
+                <form id="gForm" class="space-y-3 hidden" autocomplete="off">
+                    <input id="gCurrent" class="field pin-box hidden" type="password" inputmode="numeric" pattern="\d*" maxlength="6" placeholder="Current" aria-label="Current PIN">
+                    <input id="gPin" class="field pin-box" type="password" inputmode="numeric" pattern="\d*" maxlength="6" placeholder="••••" aria-label="PIN" autocomplete="off">
+                    <input id="gPin2" class="field pin-box hidden" type="password" inputmode="numeric" pattern="\d*" maxlength="6" placeholder="Again" aria-label="Repeat PIN">
+                    <button id="gBtn" class="btn btn-coral w-full justify-center">Unlock</button>
+                    <button type="button" id="gCancel" class="btn btn-light w-full justify-center hidden">Cancel</button>
+                </form>
+            </div>
+
+            <!-- Unlocked -->
+            <div id="work" class="hidden">
+                <div class="flex flex-wrap gap-1 bg-[#F8F8FA] p-1 rounded-full self-start w-fit mb-5" role="tablist">
+                    <button type="button" class="opt px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="requests" aria-pressed="true">Requests <span id="reqCount"></span></button>
+                    <button type="button" class="opt px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="stock" aria-pressed="false">Stock</button>
+                    <button type="button" class="opt px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="purchases" aria-pressed="false">Purchases</button>
+                </div>
+                <div id="pane" class="ui-fade"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Send request -->
+    <div id="sendModal" class="ui-modal">
+        <div class="panel max-w-xl">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 id="sTitle" class="text-lg font-extrabold">Send</h3><p id="sSub" class="text-xs text-gray-400 mt-0.5"></p></div>
+                <button type="button" onclick="UI.closeModal('sendModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <div id="sLines" class="my-5 space-y-2 overflow-y-auto custom-scrollbar"></div>
+            <div class="flex justify-between items-center gap-3 pt-4 border-t border-gray-100">
+                <span class="text-xs text-gray-500">Total to branch <b id="sTotal" class="money text-gray-900"></b></span>
+                <button type="button" id="sGo" class="btn btn-coral">Send to branch</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New purchase -->
+    <div id="buyModal" class="ui-modal">
+        <div class="panel max-w-2xl">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <div><h3 class="text-lg font-extrabold">Purchase into the warehouse</h3><p class="text-xs text-gray-400 mt-0.5">Stock goes up at the cost you paid.</p></div>
+                <button type="button" onclick="UI.closeModal('buyModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <form id="buyForm" class="my-5 space-y-3 overflow-y-auto custom-scrollbar">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div><label class="ui-label" for="bSupplier">Supplier</label><select id="bSupplier" class="field"></select></div>
+                    <div><label class="ui-label" for="bPay">Paid by</label><select id="bPay" class="field"><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank</option><option value="credit">On credit (pay later)</option></select></div>
+                    <div><label class="ui-label" for="bRef">Supplier bill no.</label><input id="bRef" class="field"></div>
+                </div>
+                <div id="bLines" class="space-y-2"></div>
+                <button type="button" id="bAdd" class="btn btn-light btn-sm"><span data-icon="plus"></span>Add item</button>
+                <div class="flex justify-between items-center gap-3 pt-4 border-t border-gray-100">
+                    <span class="text-xs text-gray-500">Total <b id="bTotal" class="money text-gray-900"></b></span>
+                    <button class="btn btn-coral">Save purchase</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- New item -->
+    <div id="itemModal" class="ui-modal">
+        <div class="panel max-w-md">
+            <div class="flex justify-between items-start pb-4 border-b border-gray-100 gap-4">
+                <h3 class="text-lg font-extrabold">New stock item</h3>
+                <button type="button" onclick="UI.closeModal('itemModal')" aria-label="Close" class="w-9 h-9 rounded-full bg-gray-50 hover:bg-gray-100 flex items-center justify-center text-gray-500 flex-shrink-0"><span data-icon="x"></span></button>
+            </div>
+            <form id="itemForm" class="my-5 grid grid-cols-2 gap-3">
+                <div><label class="ui-label" for="iSku">Item code</label><input id="iSku" class="field" placeholder="CTN-L" required></div>
+                <div><label class="ui-label" for="iUnit">Unit</label><input id="iUnit" class="field" value="pcs"></div>
+                <div class="col-span-2"><label class="ui-label" for="iName">Name</label><input id="iName" class="field" placeholder="Carton box large" required></div>
+                <div class="col-span-2"><label class="ui-label" for="iPrice">Price to branches</label><input id="iPrice" type="number" step="0.001" min="0" class="field"></div>
+                <div class="col-span-2 flex justify-end"><button class="btn btn-coral">Add item</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const { api, esc, toast, openModal, closeModal } = UI;
+        const $ = (id) => document.getElementById(id);
+        const THREE = ['OMR', 'BHD', 'KWD'];
+        let CUR = 'OMR';
+        const dp = () => THREE.includes(CUR) ? 3 : 2;
+        const money = (v, cur = CUR) => `${cur} ${(+v || 0).toLocaleString('en', { minimumFractionDigits: THREE.includes(cur) ? 3 : 2, maximumFractionDigits: THREE.includes(cur) ? 3 : 2 })}`;
+        const day = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+        const when = (v) => v ? new Date(v).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+        const KEY = 'alf_wh_token';
+
+        // ---------- unlock token (this tab only; locks itself when it runs out) ----------
+        let tok = null, timer = null, status = null, tab = 'requests', data = {};
+        try { tok = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) { tok = null; }
+        const valid = () => tok && new Date(tok.expires_at) > new Date();
+        const wh = (path, opts = {}) => api(path, { ...opts, headers: { 'x-warehouse-token': tok?.token || '' } }).catch(err => {
+            if (err.status === 423 && valid()) { lock('Locked — enter your PIN again.'); }
+            throw err;
+        });
+        function keep(t) { tok = t; try { sessionStorage.setItem(KEY, JSON.stringify(t)); } catch (e) { /* private mode */ } }
+        function lock(msg) {
+            tok = null; try { sessionStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+            clearInterval(timer); $('work').classList.add('hidden'); $('lockBar').classList.add('hidden');
+            gate('enter'); if (msg) toast(false, msg);
+        }
+        function tick() {
+            if (!valid()) return lock('Warehouse locked after 30 minutes.');
+            const s = Math.max(0, Math.round((new Date(tok.expires_at) - Date.now()) / 1000));
+            $('lockLeft').textContent = `Unlocked · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+        }
+        $('lockBtn').onclick = () => lock();
+        // Locks when the operator leaves the page open and walks away from it.
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && tok && !valid()) lock('Warehouse locked.'); });
+
+        // ---------- gate ----------
+        let mode = 'enter';
+        function gate(m) {
+            mode = m;
+            $('gate').classList.remove('hidden'); $('gForm').classList.remove('hidden');
+            ['gCurrent', 'gPin', 'gPin2'].forEach(id => { $(id).value = ''; });
+            $('gCurrent').classList.toggle('hidden', m !== 'change');
+            $('gPin2').classList.toggle('hidden', m === 'enter');
+            $('gCancel').classList.toggle('hidden', m !== 'change');
+            $('gPin').placeholder = m === 'enter' ? '••••' : 'New PIN';
+            const name = status?.warehouse_name ? `${status.warehouse_name} (${status.warehouse})` : status?.warehouse;
+            $('gTitle').textContent = m === 'set' ? 'Set your warehouse PIN' : m === 'change' ? 'Change your PIN' : `Unlock ${name || 'warehouse'}`;
+            $('gText').textContent = m === 'set' ? 'Pick 4–6 digits only you know. You will enter it each time you open the warehouse — this stops accidental changes.'
+                : m === 'change' ? 'Enter your current PIN, then the new one twice.'
+                : status?.locked_until ? `Too many wrong PINs — try again after ${new Date(status.locked_until).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.`
+                : 'Enter your warehouse PIN. It stays unlocked for 30 minutes in this tab.';
+            $('gBtn').textContent = m === 'enter' ? 'Unlock' : 'Save PIN';
+            setTimeout(() => (m === 'change' ? $('gCurrent') : $('gPin')).focus(), 50);
+        }
+        $('gCancel').onclick = () => { $('gate').classList.add('hidden'); $('work').classList.remove('hidden'); };
+        $('changePinBtn').onclick = () => { $('work').classList.add('hidden'); gate('change'); };
+        $('gForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const pin = $('gPin').value.trim();
+            if (!/^\d{4,6}$/.test(pin)) return toast(false, 'PIN is 4 to 6 digits.');
+            if (mode !== 'enter' && pin !== $('gPin2').value.trim()) return toast(false, 'The two PINs do not match.');
+            $('gBtn').disabled = true;
+            try {
+                const out = await api('/api/warehouse', { method: 'POST', body: mode === 'enter' ? { action: 'unlock', pin } : { action: 'set_pin', pin, current_pin: mode === 'change' ? $('gCurrent').value.trim() : undefined } });
+                keep({ token: out.token, expires_at: out.expires_at });
+                if (mode !== 'enter') toast(true, 'PIN saved.');
+                status.has_pin = true; open();
+            } catch (err) {
+                toast(false, err.message); $('gPin').value = '';
+                if (err.status === 423) { status.locked_until = new Date(Date.now() + 15 * 60e3).toISOString(); gate('enter'); }
+            } finally { $('gBtn').disabled = false; }
+        };
+
+        async function start() {
+            try { status = await api('/api/warehouse?view=status'); } catch (e) { $('gTitle').textContent = 'Could not load'; $('gText').textContent = e.message; return; }
+            CUR = status.currency || 'OMR';
+            try { localStorage.setItem('cargo_is_warehouse', status.access ? '1' : ''); } catch (e) { /* ignore */ }
+            if (!status.access) {
+                $('gTitle').textContent = 'Warehouse operators only';
+                $('gText').textContent = 'Ask super admin or head office to turn on "Warehouse operator" for your account in Staff & Users.';
+                return;
+            }
+            $('whSub').textContent = `${status.warehouse_name || status.warehouse} • branch requests, stock, purchases`;
+            if (!status.has_pin) return gate('set');
+            if (valid()) return open();
+            gate('enter');
+        }
+        function open() {
+            $('gate').classList.add('hidden'); $('work').classList.remove('hidden'); $('lockBar').classList.remove('hidden');
+            clearInterval(timer); tick(); timer = setInterval(tick, 1000);
+            show();
+        }
+
+        // ---------- tabs ----------
+        document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { tab = b.dataset.tab; document.querySelectorAll('[data-tab]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); show(); });
+        const table = (heads, rows, empty) => `<div class="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden"><table class="rtable w-full text-xs">
+            <thead><tr class="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">${heads.map(([h, a], i) => `<th class="p-3 ${i === 0 ? 'pl-4' : ''} ${i === heads.length - 1 ? 'pr-4' : ''} font-extrabold ${a === 'right' ? 'text-right' : ''}">${h}</th>`).join('')}</tr></thead>
+            <tbody class="divide-y divide-gray-100">${rows || `<tr><td colspan="${heads.length}" class="p-10 text-center text-gray-400">${empty}</td></tr>`}</tbody></table></div>`;
+
+        async function show() {
+            const pane = $('pane');
+            pane.classList.remove('ui-fade'); void pane.offsetWidth; pane.classList.add('ui-fade');
+            try {
+                if (tab === 'requests') await showRequests();
+                else if (tab === 'stock') await showStock();
+                else await showPurchases();
+            } catch (e) { if (e.status !== 423) pane.innerHTML = `<p class="text-center text-gray-400 p-10">${esc(e.message)}</p>`; }
+            UI.paintIcons();
+        }
+
+        async function showRequests() {
+            const d = await wh('/api/warehouse?view=requests'); data.requests = d;
+            const SP = { requested: 'pill-amber', dispatched: 'pill-dark', received: 'pill-green', rejected: 'pill-coral', cancelled: 'pill-gray' };
+            const waiting = d.requests.filter(r => r.status === 'requested').length;
+            $('reqCount').textContent = waiting ? `· ${waiting}` : '';
+            const rows = d.requests.map(r => `<tr class="${r.status === 'requested' ? 'bg-[#FFFBF5]' : ''}">
+                <td class="p-3 pl-4 font-extrabold font-mono" data-label="Request">${esc(r.request_no)}<span class="block text-[10px] text-gray-400 font-sans">${when(r.requested_at)} · ${esc(r.requested_by || '')}</span></td>
+                <td class="p-3 font-extrabold" data-label="Branch">${esc(r.branch_code)}</td>
+                <td class="p-3" data-label="Items">${(r.lines || []).map(l => `${l.qty_sent != null ? `${+l.qty_sent}/${+l.qty_requested}` : +l.qty_requested} × ${esc(l.name)}`).join(', ')}${r.notes ? `<span class="block text-[10px] text-gray-400">${esc(r.notes)}</span>` : ''}${r.reject_reason ? `<span class="block text-[10px] text-[#D55C48]">${esc(r.reject_reason)}</span>` : ''}</td>
+                <td class="p-3 text-right money" data-label="Total">${+r.total ? money(r.total, r.currency || CUR) : '—'}</td>
+                <td class="p-3" data-label="Status"><span class="pill-tag ${SP[r.status]}">${r.status}</span>${r.dispatched_at ? `<span class="block text-[10px] text-gray-400">sent ${when(r.dispatched_at)}</span>` : ''}</td>
+                <td class="p-3 pr-4 text-right whitespace-nowrap" data-label="">${r.status === 'requested' ? `<button type="button" class="btn btn-dark btn-sm" data-send="${r.id}">Send</button> <button type="button" class="btn btn-light btn-sm" data-reject="${r.id}">Reject</button>` : ''}</td></tr>`).join('');
+            $('pane').innerHTML = table([['Request'], ['Branch'], ['Items'], ['Total', 'right'], ['Status'], ['']], rows, 'No requests from branches yet.');
+        }
+        $('pane').addEventListener('click', async (e) => {
+            const s = e.target.closest('[data-send]'), r = e.target.closest('[data-reject]');
+            if (s) openSend(+s.dataset.send);
+            if (r) {
+                const req = data.requests.requests.find(x => x.id === +r.dataset.reject);
+                const reason = prompt(`Reject ${req.request_no} from ${req.branch_code}? Reason (shown to the branch):`, '');
+                if (reason === null) return;
+                try { await wh('/api/warehouse', { method: 'POST', body: { action: 'reject', id: req.id, reason } }); toast(true, 'Rejected.'); show(); } catch (err) { toast(false, err.message); }
+            }
+        });
+
+        let sending = null;
+        function openSend(id) {
+            sending = data.requests.requests.find(x => x.id === id);
+            const stock = data.requests.stock;
+            $('sTitle').textContent = `Send ${sending.request_no}`;
+            $('sSub').textContent = `To ${sending.branch_code} · stock leaves the warehouse, branch owes the total (internal invoice)`;
+            $('sLines').innerHTML = (sending.lines || []).map((l, i) => {
+                const st = stock.find(s => s.product_id === l.product_id) || {};
+                const have = +st.qty || 0, price = l.unit_price ?? st.sell_price ?? 0;
+                return `<div class="grid grid-cols-12 gap-2 items-center bg-[#F8F8FA] rounded-2xl p-3" data-line="${i}">
+                    <div class="col-span-12 sm:col-span-5 text-xs"><b>${esc(l.name)}</b><span class="block text-[10px] ${have < +l.qty_requested ? 'text-[#D55C48] font-bold' : 'text-gray-400'}">asked ${+l.qty_requested} · in stock ${have} ${esc(l.unit || '')}</span></div>
+                    <label class="col-span-6 sm:col-span-3"><span class="sr-only">Qty to send</span><input type="number" min="0" step="any" class="field !py-2" data-q value="${Math.min(+l.qty_requested, have)}"></label>
+                    <label class="col-span-6 sm:col-span-4"><span class="sr-only">Price each</span><input type="number" min="0" step="0.001" class="field !py-2" data-p value="${(+price).toFixed(dp())}"></label></div>`;
+            }).join('');
+            const sum = () => { let t = 0; $('sLines').querySelectorAll('[data-line]').forEach(r => { t += (+r.querySelector('[data-q]').value || 0) * (+r.querySelector('[data-p]').value || 0); }); $('sTotal').textContent = money(t); };
+            $('sLines').oninput = sum; sum();
+            openModal('sendModal');
+        }
+        $('sGo').onclick = async () => {
+            const lines = [...$('sLines').querySelectorAll('[data-line]')].map(r => { const l = sending.lines[+r.dataset.line]; return { product_id: l.product_id, qty: +r.querySelector('[data-q]').value || 0, unit_price: +r.querySelector('[data-p]').value || 0 }; });
+            if (!lines.some(l => l.qty > 0)) return toast(false, 'Nothing to send.');
+            $('sGo').disabled = true;
+            try { await wh('/api/warehouse', { method: 'POST', body: { action: 'dispatch', id: sending.id, lines } }); closeModal('sendModal'); toast(true, `${sending.request_no} sent to ${sending.branch_code}.`); show(); }
+            catch (err) { toast(false, err.message); } finally { $('sGo').disabled = false; }
+        };
+
+        async function showStock() {
+            const d = await wh('/api/warehouse?view=stock'); data.stock = d; CUR = d.currency || CUR;
+            const value = d.items.reduce((t, i) => t + i.qty * i.avg_cost, 0);
+            const rows = d.items.map(i => `<tr class="${i.reorder_level && i.qty <= i.reorder_level ? 'low' : ''}" data-item="${i.id}">
+                <td class="p-3 pl-4" data-label="Item"><b>${esc(i.name)}</b><span class="block text-[10px] text-gray-400 font-mono">${esc(i.sku)}</span></td>
+                <td class="p-3 text-right font-extrabold" data-label="In stock">${i.qty} <span class="text-[10px] text-gray-400 font-medium">${esc(i.unit)}</span>${i.reorder_level && i.qty <= i.reorder_level ? '<span class="block text-[10px] text-[#D55C48]">reorder</span>' : ''}</td>
+                <td class="p-3 text-right money" data-label="Avg cost">${money(i.avg_cost)}</td>
+                <td class="p-3" data-label="Price to branches"><input type="number" min="0" step="0.001" class="field !py-1.5 !w-28 text-right" data-price value="${(+i.sell_price).toFixed(dp())}" aria-label="Price to branches for ${esc(i.name)}"></td>
+                <td class="p-3" data-label="Reorder at"><input type="number" min="0" step="any" class="field !py-1.5 !w-20 text-right" data-reorder value="${i.reorder_level || ''}" aria-label="Reorder level for ${esc(i.name)}"></td>
+                <td class="p-3 pr-4 text-right whitespace-nowrap" data-label=""><button type="button" class="btn btn-light btn-sm" data-save>Save</button> <button type="button" class="btn btn-light btn-sm" data-count>Count</button></td></tr>`).join('');
+            const TY = { purchase: 'Purchase', sale: 'Sale', transfer_out: 'Sent', transfer_in: 'Received', adjust: 'Count', void: 'Void' };
+            const moves = d.moves.map(m => `<tr><td class="p-3 pl-4" data-label="When">${when(m.created_at)}</td><td class="p-3" data-label="Item">${esc(m.products?.name || '')}</td>
+                <td class="p-3" data-label="Type">${TY[m.kind] || esc(m.kind)}</td>
+                <td class="p-3 text-right font-extrabold ${+m.qty < 0 ? 'text-[#D55C48]' : 'text-emerald-600'}" data-label="Qty">${+m.qty > 0 ? '+' : ''}${+m.qty}</td>
+                <td class="p-3 pr-4" data-label="Reference">${esc(m.note || '')}<span class="block text-[10px] text-gray-400">${esc(m.created_by_name || '')}</span></td></tr>`).join('');
+            $('pane').innerHTML = `<div class="flex flex-wrap justify-between items-center gap-3 mb-3"><p class="text-xs text-gray-500">Stock value at cost <b class="money text-gray-900">${money(value)}</b></p>
+                <button type="button" id="newItem" class="btn btn-dark btn-sm"><span data-icon="plus"></span>New item</button></div>`
+                + table([['Item'], ['In stock', 'right'], ['Avg cost', 'right'], ['Price to branches'], ['Reorder at'], ['']], rows, 'No stock items yet. Add one, then make a purchase.')
+                + `<p class="sd-label mt-6 mb-2">Latest movements</p>` + table([['When'], ['Item'], ['Type'], ['Qty', 'right'], ['Reference']], moves, 'No movements yet.');
+            $('newItem').onclick = () => { $('itemForm').reset(); $('iUnit').value = 'pcs'; openModal('itemModal'); };
+        }
+        $('pane').addEventListener('click', async (e) => {
+            const row = e.target.closest('[data-item]'); if (!row) return;
+            const item = data.stock.items.find(i => i.id === +row.dataset.item);
+            if (e.target.closest('[data-save]')) {
+                try { await wh('/api/warehouse', { method: 'POST', body: { action: 'price', product_id: item.id, sell_price: row.querySelector('[data-price]').value, reorder_level: row.querySelector('[data-reorder]').value } }); toast(true, `${item.name} saved.`); }
+                catch (err) { toast(false, err.message); }
+            }
+            if (e.target.closest('[data-count]')) {
+                const v = prompt(`Counted ${item.name} on the shelf (system says ${item.qty} ${item.unit}):`, String(item.qty));
+                if (v === null || v.trim() === '') return;
+                const note = Number(v) !== item.qty ? (prompt('Reason for the difference (optional):', '') || '') : '';
+                try { await wh('/api/warehouse', { method: 'POST', body: { action: 'count', product_id: item.id, counted: Number(v), note } }); toast(true, 'Stock count saved.'); show(); }
+                catch (err) { toast(false, err.message); }
+            }
+        });
+        $('itemForm').onsubmit = async (e) => {
+            e.preventDefault();
+            try { await wh('/api/warehouse', { method: 'POST', body: { action: 'item', sku: $('iSku').value, name: $('iName').value, unit: $('iUnit').value, sell_price: $('iPrice').value } }); closeModal('itemModal'); toast(true, 'Item added.'); show(); }
+            catch (err) { toast(false, err.message); }
+        };
+
+        async function showPurchases() {
+            const d = await wh('/api/warehouse?view=purchases'); data.purchases = d;
+            if (!data.stock) data.stock = await wh('/api/warehouse?view=stock');
+            const SP = { paid: 'pill-green', partial: 'pill-amber', unpaid: 'pill-coral', void: 'pill-gray' };
+            const rows = d.purchases.map(p => `<tr><td class="p-3 pl-4 font-extrabold font-mono" data-label="Purchase">${esc(p.purchase_no)}<span class="block text-[10px] text-gray-400 font-sans">${day(p.purchase_date)}${p.bill_ref ? ' · bill ' + esc(p.bill_ref) : ''}</span></td>
+                <td class="p-3" data-label="Supplier">${esc(p.suppliers?.name || 'Cash purchase')}</td>
+                <td class="p-3" data-label="Items">${(p.lines || []).map(l => `${+l.qty} × ${esc(l.description)}`).join(', ')}</td>
+                <td class="p-3 text-right money" data-label="Total">${money(p.total, p.currency)}</td>
+                <td class="p-3 pr-4" data-label="Status"><span class="pill-tag ${SP[p.status]}">${p.status}</span>${+p.balance && p.status !== 'void' ? `<span class="block text-[10px] text-[#D55C48]">${money(p.balance, p.currency)} due</span>` : ''}</td></tr>`).join('');
+            $('pane').innerHTML = `<div class="flex justify-end mb-3"><button type="button" id="newBuy" class="btn btn-dark btn-sm"><span data-icon="plus"></span>New purchase</button></div>`
+                + table([['Purchase'], ['Supplier'], ['Items'], ['Total', 'right'], ['Status']], rows, 'No purchases yet.');
+            $('newBuy').onclick = openBuy;
+        }
+        function lineHtml() {
+            return `<div class="grid grid-cols-12 gap-2 items-center bg-[#F8F8FA] rounded-2xl p-2" data-bl>
+                <select class="field !py-2 col-span-12 sm:col-span-6" data-prod aria-label="Item">${data.stock.items.map(i => `<option value="${i.id}">${esc(i.name)} (${esc(i.unit)})</option>`).join('')}</select>
+                <input type="number" min="0" step="any" class="field !py-2 col-span-4 sm:col-span-2" data-qty placeholder="Qty" aria-label="Qty">
+                <input type="number" min="0" step="0.001" class="field !py-2 col-span-6 sm:col-span-3" data-cost placeholder="Cost each" aria-label="Cost each">
+                <button type="button" class="icon-btn col-span-2 sm:col-span-1 justify-self-end" data-del aria-label="Remove line">${UI.icon('x', 'w-3 h-3')}</button></div>`;
+        }
+        const buyTotal = () => { let t = 0; $('bLines').querySelectorAll('[data-bl]').forEach(r => { t += (+r.querySelector('[data-qty]').value || 0) * (+r.querySelector('[data-cost]').value || 0); }); $('bTotal').textContent = money(t); };
+        function openBuy() {
+            if (!data.stock.items.length) return toast(false, 'Add a stock item first (Stock tab → New item).');
+            $('bSupplier').innerHTML = '<option value="">— Cash purchase (no supplier) —</option>' + data.purchases.suppliers.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+            $('bRef').value = ''; $('bPay').value = 'cash'; $('bLines').innerHTML = lineHtml(); buyTotal();
+            openModal('buyModal');
+        }
+        $('bAdd').onclick = () => { $('bLines').insertAdjacentHTML('beforeend', lineHtml()); };
+        $('bLines').oninput = buyTotal;
+        $('bLines').onclick = (e) => { const d = e.target.closest('[data-del]'); if (d && $('bLines').children.length > 1) { d.closest('[data-bl]').remove(); buyTotal(); } };
+        $('buyForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const lines = [...$('bLines').querySelectorAll('[data-bl]')].map(r => {
+                const id = +r.querySelector('[data-prod]').value; const it = data.stock.items.find(i => i.id === id);
+                return { product_id: id, description: it?.name || '', qty: +r.querySelector('[data-qty]').value || 0, unit_cost: +r.querySelector('[data-cost]').value || 0 };
+            }).filter(l => l.qty > 0);
+            if (!lines.length) return toast(false, 'Enter a quantity.');
+            try {
+                const out = await wh('/api/warehouse', { method: 'POST', body: { action: 'purchase', supplier_id: $('bSupplier').value || null, pay_method: $('bPay').value, bill_ref: $('bRef').value, lines } });
+                closeModal('buyModal'); toast(true, `${out.purchase_no || 'Purchase'} saved — stock updated.`); data.stock = null; show();
+            } catch (err) { toast(false, err.message); }
+        };
+
+        start();
+    </script>
+</body>
+</html>
