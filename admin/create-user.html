@@ -20,7 +20,7 @@
             else if (role !== 'super_admin' && role !== 'head_office') window.location.replace('super-dashboard.html');
         })();
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/assets/app.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="components/ui.css" rel="stylesheet">
     <script src="components/countries.js"></script>
@@ -28,12 +28,6 @@
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
-    <script>
-        tailwind.config = { theme: { extend: {
-            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
-            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
-        } } };
-    </script>
 </head>
 <body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
     <div id="sidebar-container" class="hidden lg:block z-20"></div>
@@ -147,6 +141,16 @@
                 <label class="sm:col-span-2 flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100 cursor-pointer">
                     <input id="e_driver" type="checkbox" class="w-4 h-4"><span class="text-xs font-bold">Driver</span><span class="text-[11px] text-gray-400">— does pickups / deliveries</span>
                 </label>
+                <div class="sm:col-span-2 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100">
+                    <p class="text-xs font-bold mb-2">Work hours <span class="text-[11px] text-gray-400 font-medium">— used for check-in reminders and late / early marking</span></p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div><label class="ui-label" for="e_shStart">Starts</label><input id="e_shStart" type="time" class="field" required></div>
+                        <div><label class="ui-label" for="e_shEnd">Ends</label><input id="e_shEnd" type="time" class="field" required></div>
+                        <div><label class="ui-label" for="e_grace">Grace (min)</label><input id="e_grace" type="number" min="0" max="120" class="field" required></div>
+                    </div>
+                    <span class="ui-label block mt-2">Weekly off</span>
+                    <div id="e_off" class="flex flex-wrap gap-1 mt-1"></div>
+                </div>
                 <div class="sm:col-span-2 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100 space-y-2">
                     <label class="flex items-center gap-3 cursor-pointer">
                         <input id="e_wh" type="checkbox" class="w-4 h-4"><span class="text-xs font-bold">Warehouse operator</span><span class="text-[11px] text-gray-400">— branch requests, warehouse stock and purchases</span>
@@ -218,7 +222,7 @@
                         </div>
                     </td>
                     <td class="p-3" data-label="Role"><span class="pill-tag ${ROLE_PILL[u.role] || 'pill-gray'}">${esc(ROLES[u.role] || u.role || 'No role')}</span>${u.is_driver ? ' <span class="pill-tag pill-gray">Driver</span>' : ''}${u.is_warehouse ? ' <span class="pill-tag pill-dark">Warehouse</span>' : ''}</td>
-                    <td class="p-3 font-bold" data-label="Branch">${esc(['super_admin', 'head_office'].includes(u.role) && !u.branch ? 'All branches' : branchName(u.branch))}</td>
+                    <td class="p-3 font-bold" data-label="Branch">${esc(['super_admin', 'head_office'].includes(u.role) && !u.branch ? 'All branches' : branchName(u.branch))}<span class="block text-[10px] text-gray-400 font-medium">${String(u.shift_start || '09:00').slice(0, 5)}–${String(u.shift_end || '18:00').slice(0, 5)}</span></td>
                     <td class="p-3 text-gray-500" data-label="Contact">${esc(u.contact_number || '—')}</td>
                     <td class="p-3 text-gray-500" data-label="Last sign-in">${ago(u.last_sign_in_at)}${u.email_confirmed ? '' : ' <span class="pill-tag pill-amber">Email not verified</span>'}</td>
                     <td class="p-3" data-label="Status"><span class="pill-tag ${u.active ? 'pill-green' : 'pill-gray'}">${u.active ? 'Active' : 'Inactive'}</span></td>
@@ -307,6 +311,10 @@
             $('e_driver').checked = Boolean(editing.is_driver);
             const whs = branches.filter(b => b.branch_type === 'warehouse');
             $('e_whCode').innerHTML = whs.length ? whs.map(b => `<option value="${esc(b.branch_code)}">${esc(b.branch_name)} (${esc(b.branch_code)})</option>`).join('') : '<option value="">No warehouse yet — set a branch type to Warehouse in Branch Network</option>';
+            $('e_shStart').value = String(editing.shift_start || '09:00').slice(0, 5);
+            $('e_shEnd').value = String(editing.shift_end || '18:00').slice(0, 5);
+            $('e_grace').value = editing.grace_min ?? 10;
+            $('e_off').innerHTML = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => `<button type="button" data-dow="${i + 1}" aria-pressed="${(editing.weekly_off || [5]).includes(i + 1)}" class="px-3 py-1.5 rounded-full text-[11px] font-extrabold bg-white border border-gray-200 aria-pressed:bg-[#111827] aria-pressed:text-white aria-pressed:border-[#111827]">${d}</button>`).join('');
             $('e_wh').checked = Boolean(editing.is_warehouse);
             if (editing.warehouse_code) $('e_whCode').value = editing.warehouse_code;
             $('e_whPin').textContent = editing.is_warehouse ? (editing.has_wh_pin ? 'PIN is set.' : 'PIN not set yet.') : '';
@@ -321,7 +329,9 @@
             e.preventDefault();
             if (!ePh.valid) return toast(false, 'Contact number looks wrong — check the country code and number.');
             const body = { id: editing.id, full_name: $('e_name').value, contact_number: ePh.value, branch: $('e_branch').value, is_driver: $('e_driver').checked,
-                is_warehouse: $('e_wh').checked, warehouse_code: $('e_whCode').value };
+                is_warehouse: $('e_wh').checked, warehouse_code: $('e_whCode').value,
+                shift_start: $('e_shStart').value, shift_end: $('e_shEnd').value, grace_min: +$('e_grace').value,
+                weekly_off: [...$('e_off').querySelectorAll('[aria-pressed="true"]')].map(b => +b.dataset.dow) };
             if (!editing.is_me) body.role = $('e_role').value;
             const roleChanged = body.role && body.role !== editing.role;
             if (roleChanged && !await UI.confirm({ title: 'Change role?', message: `${esc(editing.full_name)}: <b>${esc(ROLES[editing.role] || editing.role)}</b> → <b>${esc(ROLES[body.role])}</b>. Their access changes at their next page load.`, confirmText: 'Change role' })) return;
@@ -331,6 +341,7 @@
             } catch (err) { toast(false, err.message); }
         };
 
+        $('e_off').onclick = (e) => { const b = e.target.closest('[data-dow]'); if (b) b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); };
         $('e_whReset').onclick = async () => {
             if (!await UI.confirm({ title: `Reset ${esc(editing.full_name)}'s warehouse PIN?`, message: 'They will set a new PIN the next time they open the Warehouse page.', confirmText: 'Reset PIN' })) return;
             try { await api('/api/warehouse', { method: 'POST', body: { action: 'reset_pin', employee_id: editing.id } }); editing.has_wh_pin = false; $('e_whPin').textContent = 'PIN not set yet.'; $('e_whReset').classList.add('hidden'); toast(true, 'PIN reset.'); }

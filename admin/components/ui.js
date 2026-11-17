@@ -4,7 +4,18 @@ window.UI = (() => {
     const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const clean = (v) => String(v || '').trim().replace(/^'/, '').replace(/\s+/g, '').toUpperCase();
 
-    async function api(path, { method = 'GET', body, headers = {} } = {}) {
+    // Identical reads that are already on their way share one request.
+    const inflight = new Map();
+    function api(path, opts = {}) {
+        const m = (opts.method || 'GET').toUpperCase();
+        if (m !== 'GET') return request(path, opts);
+        const key = path + '|' + JSON.stringify(opts.headers || {});
+        if (inflight.has(key)) return inflight.get(key);
+        const p = request(path, opts).finally(() => inflight.delete(key));
+        inflight.set(key, p);
+        return p;
+    }
+    async function request(path, { method = 'GET', body, headers = {} } = {}) {
         const res = await fetch(path, {
             method,
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}`, ...headers },

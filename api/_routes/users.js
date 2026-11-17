@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     try {
         if (req.method === 'GET') {
             const [er, ar] = await Promise.all([
-                fetch(`${rest}/employees?select=id,full_name,username,role,branch,contact_number,recovery_email,is_driver,is_warehouse,warehouse_code,wh_pin_hash,active,created_at&order=full_name.asc`, { headers: serviceHeaders() }),
+                fetch(`${rest}/employees?select=id,full_name,username,role,branch,contact_number,recovery_email,is_driver,is_warehouse,warehouse_code,wh_pin_hash,shift_start,shift_end,grace_min,weekly_off,active,created_at&order=full_name.asc`, { headers: serviceHeaders() }),
                 fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers: serviceHeaders() })
             ]);
             const employees = er.ok ? await er.json() : [];
@@ -93,6 +93,23 @@ export default async function handler(req, res) {
                 patch.branch = code || null;
             }
             if ('is_driver' in body) patch.is_driver = Boolean(body.is_driver);
+            // Work hours (late / early are measured against these)
+            if ('shift_start' in body || 'shift_end' in body) {
+                const hm = /^([01]\d|2[0-3]):[0-5]\d$/;
+                if (!hm.test(String(body.shift_start || '')) || !hm.test(String(body.shift_end || ''))) throw new UserError('Work hours must be HH:MM.');
+                if (body.shift_start === body.shift_end) throw new UserError('Start and end time cannot be the same.');
+                patch.shift_start = body.shift_start; patch.shift_end = body.shift_end;
+            }
+            if ('grace_min' in body) {
+                const g = Math.round(Number(body.grace_min));
+                if (!(g >= 0 && g <= 120)) throw new UserError('Grace must be 0–120 minutes.');
+                patch.grace_min = g;
+            }
+            if ('weekly_off' in body) {
+                const off = [...new Set((Array.isArray(body.weekly_off) ? body.weekly_off : []).map(Number).filter(n => n >= 1 && n <= 7))].sort();
+                if (off.length > 3) throw new UserError('Up to 3 weekly off days.');
+                patch.weekly_off = off;
+            }
             if ('is_warehouse' in body) {
                 patch.is_warehouse = Boolean(body.is_warehouse);
                 if (patch.is_warehouse) {

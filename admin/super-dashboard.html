@@ -26,7 +26,7 @@
     </script>
 
     <!-- Tailwind CSS & Fonts -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/assets/app.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Initialize Global Widget Registry First -->
@@ -63,27 +63,6 @@
 
     <!-- Smartphone Grid & Cloud Sync Engine -->
     <script src="widgets/widget-manager.js" defer></script>
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
-                    colors: {
-                        coral: { 
-                            50: '#FFF5F3',
-                            100: '#FFE8E3',
-                            200: '#FFD0C7',
-                            300: '#F7A99A',
-                            400: '#F08A76',
-                            500: '#E86D58', 
-                            600: '#D55C48' 
-                        }
-                    }
-                }
-            }
-        }
-    </script>
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -134,6 +113,7 @@
 
         <!-- Scrollable Dashboard Body -->
         <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+            <div id="checkinCard"></div>
             
             <!-- ================================================================================= -->
             <!-- LAYER 2: PORTAL IDENTITY + BRANCH (LEFT) • WIDGET CONTROLS + DATE/TIME (RIGHT)    -->

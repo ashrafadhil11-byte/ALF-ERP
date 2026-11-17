@@ -175,3 +175,23 @@ html.page-leaving body > main { opacity: .35; transform: translateY(4px); transi
     *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
     ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+
+/* ---------------------------------------------------------------
+   App frame (desktop): the sidebar stays pinned and the main panel has a fixed size —
+   only the main panel's content scrolls and changes between pages.
+   --------------------------------------------------------------- */
+@media (min-width: 1024px) {
+    body:has(> #sidebar-container) { height: 100dvh; overflow: hidden; }
+    body:has(> #sidebar-container) > main {
+        height: calc(100dvh - 2.5rem);
+        min-height: 0;
+        overflow-y: auto !important;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+        view-transition-name: erp-main;
+    }
+    /* pages that already have their own inner scroll area: let it fill the panel */
+    body:has(> #sidebar-container) > main > .overflow-y-auto { min-height: 0; }
+}
+::view-transition-old(erp-main) { animation: vt-out .14s ease-in both; }
+::view-transition-new(erp-main) { animation: vt-in .3s var(--ease-out) both; }

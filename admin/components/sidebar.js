@@ -1,111 +1,115 @@
 // File: admin/components/sidebar.js
+// Desktop sidebar: grouped menu that never grows past the screen (the menu scrolls inside the panel).
+// Groups fold open / closed; the group of the current page always opens. Sign out stays pinned at the bottom.
 document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('sidebar-container');
     if (!container) return;
 
     const currentPage = window.location.pathname.split('/').pop() || 'super-dashboard.html';
 
-    const navItemClass = (page) => {
-        const isActive = currentPage === page;
-        return isActive
-            ? 'flex items-center gap-3.5 px-4 py-3.5 bg-[#111827] text-white rounded-2xl font-semibold text-sm shadow-sm transition-all'
-            : 'flex items-center gap-3.5 px-4 py-3.5 text-gray-500 hover:text-gray-900 hover:bg-gray-50 rounded-2xl font-medium text-sm transition-all';
-    };
-
     // UI only — the API enforces the same rules server-side.
     const role = localStorage.getItem('cargo_user_role') || 'staff';
     const isAdmin = role === 'super_admin' || role === 'head_office';
-    const onlyIf = (cond, html) => (cond ? html : '');
     const isWarehouse = localStorage.getItem('cargo_is_warehouse') === '1';
 
-    const iconClass = (page) => currentPage === page ? 'w-5 h-5 text-[#E86D58]' : 'w-5 h-5';
+    const svg = (d, extra = '') => `<svg class="w-[18px] h-[18px] flex-shrink-0 ${extra}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
+    const I = {
+        home: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+        ship: '<path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>',
+        plus: '<path d="M12 5v14M5 12h14"/>',
+        scan: '<path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2M7 12h10"/>',
+        truck: '<path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+        layers: '<path d="M12 2l9 5-9 5-9-5 9-5z"/><path d="M3 12l9 5 9-5M3 17l9 5 9-5"/>',
+        users: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>',
+        cash: '<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2s1.3 1.7 3 2 3 .9 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2m0 8v2"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        warehouse: '<path d="M3 21V9l9-6 9 6v12"/><path d="M7 21v-8h10v8M7 17h10"/>',
+        building: '<path d="M4 21V5a2 2 0 012-2h8a2 2 0 012 2v16M16 9h2a2 2 0 012 2v10M2 21h20M8 7h4M8 11h4M8 15h4"/>',
+        staff: '<circle cx="9" cy="7" r="4"/><path d="M3 21v-2a6 6 0 0112 0v2M19 8v6M22 11h-6"/>',
+        link: '<path d="M10 14a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1 1M14 10a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1-1"/>',
+        pulse: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+        chev: '<path d="M6 9l6 6 6-6"/>'
+    };
+
+    // [label, page, icon, show?]
+    const GROUPS = [
+        { id: 'top', items: [[isAdmin ? 'Global Overview' : 'Dashboard', 'super-dashboard.html', 'home', true]] },
+        { id: 'ops', label: 'Operations', items: [
+            ['Shipments & AWB', 'shipments.html', 'ship', true],
+            ['New Booking', 'booking.html', 'plus', true],
+            ['Scan & Update', 'status-update.html', 'scan', true],
+            ['Delivery & POD', 'delivery.html', 'truck', true],
+            ['Consolidation & Bulk', 'consolidation.html', 'layers', true]
+        ] },
+        { id: 'biz', label: 'Customers & money', items: [
+            ['Customers', 'customers.html', 'users', true],
+            ['Accounts', 'accounts.html', 'cash', role !== 'staff'],
+            ['Warehouse', 'warehouse.html', 'warehouse', isWarehouse || isAdmin]
+        ] },
+        { id: 'team', label: 'Team', items: [
+            ['Attendance', 'attendance.html', 'clock', true],
+            ['Staff & Users', 'create-user.html', 'staff', isAdmin]
+        ] },
+        { id: 'admin', label: 'Settings', items: [
+            ['Branch Network', 'branches.html', 'building', isAdmin],
+            ['Integrations', 'integrations.html', 'link', isAdmin],
+            ['Activity Log', 'activity.html', 'pulse', isAdmin]
+        ] }
+    ].map(g => ({ ...g, items: g.items.filter(i => i[3]) })).filter(g => g.items.length);
+
+    let folded = {};
+    try { folded = JSON.parse(localStorage.getItem('alf_nav_folded') || '{}'); } catch (e) { folded = {}; }
+    const item = ([label, page, icon]) => {
+        const on = currentPage === page;
+        return `<a href="${page}" ${on ? 'aria-current="page"' : ''} class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors ${on ? 'bg-[#111827] text-white font-semibold shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 font-medium'}">
+            ${svg(I[icon], on ? 'text-[#E86D58]' : '')}<span class="truncate">${label}</span></a>`;
+    };
+    const group = (g) => {
+        if (!g.label) return `<div class="space-y-0.5">${g.items.map(item).join('')}</div>`;
+        const hasCurrent = g.items.some(i => i[1] === currentPage);
+        const open = hasCurrent || !folded[g.id];
+        return `<div class="nav-group" data-group="${g.id}">
+            <button type="button" class="nav-head w-full flex items-center justify-between px-3.5 pt-3 pb-1.5 text-[10px] font-extrabold uppercase tracking-wider text-gray-400 hover:text-gray-600" aria-expanded="${open}">
+                <span>${g.label}</span>${svg(I.chev, `nav-chev transition-transform ${open ? '' : '-rotate-90'}`)}</button>
+            <div class="nav-items space-y-0.5 ${open ? '' : 'hidden'}">${g.items.map(item).join('')}</div></div>`;
+    };
 
     container.innerHTML = `
-    <aside class="h-[calc(100vh-2.5rem)] w-64 bg-white rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] flex flex-col justify-between p-6 sticky top-5 border border-gray-100/80">
-        <div>
-            <!-- Centered Logo for White Backgrounds -->
-            <div class="mb-10 mt-3 px-2 flex justify-center items-center">
-                <img src="../assets/LOGO%20BG%20W.svg" alt="Al-Farha Cargo" class="h-11 w-auto object-contain mx-auto">
-            </div>
-            
-            <!-- Navigation Links -->
-            <nav class="space-y-1.5">
-                <a href="super-dashboard.html" class="${navItemClass('super-dashboard.html')}">
-                    <svg class="${iconClass('super-dashboard.html')}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                    ${isAdmin ? 'Global Overview' : 'Dashboard'}
-                </a>
-                <a href="shipments.html" class="${navItemClass('shipments.html')} justify-between">
-                    <span class="flex items-center gap-3.5">
-                        <svg class="${iconClass('shipments.html')}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                        Shipments & AWB
-                    </span>
-                </a>
-                <a href="customers.html" class="${navItemClass('customers.html')}">
-                    <svg class="${iconClass('customers.html')}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-                    Customers
-                </a>
-                <a href="booking.html" class="${navItemClass('booking.html')}">
-                    <svg class="${iconClass('booking.html')}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                    New Booking
-                </a>
-                <a href="status-update.html" class="${navItemClass('status-update.html')}">
-                    <svg class="${iconClass('status-update.html')}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
-                    Scan & Update
-                </a>
-                <a href="delivery.html" class="${navItemClass('delivery.html')}">
-                    <svg class="${iconClass('delivery.html')}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-                    Delivery & POD
-                </a>
-                <a href="consolidation.html" class="${navItemClass('consolidation.html')}">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                    Consolidation & Bulk
-                </a>
-                <a href="attendance.html" class="${navItemClass('attendance.html')}">
-                    <svg class="${iconClass('attendance.html')}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                    Attendance
-                </a>
-                ${onlyIf(isWarehouse || isAdmin, `<a href="warehouse.html" class="${navItemClass('warehouse.html')}">
-                    <svg class="${iconClass('warehouse.html')}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M3 21V9l9-6 9 6v12"/><path d="M7 21v-8h10v8M7 17h10"/></svg>
-                    Warehouse
-                </a>`)}
-                ${onlyIf(isAdmin, `<a href="branches.html" class="${navItemClass('branches.html')}">
-                    <svg class="${iconClass('branches.html')}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                    Branch Network
-                </a>
-                <a href="create-user.html" class="${navItemClass('create-user.html')}">
-                    <svg class="${iconClass('create-user.html')}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                    Staff & Users
-                </a>
-                <a href="integrations.html" class="${navItemClass('integrations.html')}">
-                    <svg class="${iconClass('integrations.html')}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-                    Integrations
-                </a>
-                <a href="activity.html" class="${navItemClass('activity.html')}">
-                    <svg class="${iconClass('activity.html')}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                    Activity Log
-                </a>`)}
-                ${onlyIf(role !== 'staff', `<a href="accounts.html" class="${navItemClass('accounts.html')}">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Accounts
-                </a>`)}
-                <div class="flex items-center justify-between gap-3.5 px-4 py-3.5 text-gray-400 rounded-2xl font-medium text-sm cursor-default" title="Reserved for AI features — coming later">
-                    <span class="flex items-center gap-3.5">
-                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
-                        AI Assistant
-                    </span>
-                    <span class="text-[9px] font-extrabold uppercase bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Soon</span>
-                </div>
-            </nav>
-        </div>
-        
-        <div class="mt-auto pt-6 border-t border-gray-100">
-            <button onclick="handleLogout()" class="w-full flex items-center justify-center gap-2 bg-[#FFF5F3] text-[#E86D58] font-semibold text-sm py-3.5 rounded-2xl hover:bg-[#FFEAE5] transition-colors">
+    <aside class="h-[calc(100dvh-2.5rem)] w-60 bg-white rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] flex flex-col p-4 sticky top-5 border border-gray-100/80">
+        <a href="super-dashboard.html" class="flex justify-center items-center py-3 mb-2 flex-shrink-0" aria-label="Home">
+            <img src="../assets/LOGO%20BG%20W.svg" alt="Al-Farha Cargo" class="h-9 w-auto object-contain">
+        </a>
+        <nav class="flex-1 min-h-0 overflow-y-auto custom-scrollbar -mx-1 px-1 space-y-1" aria-label="Main menu">
+            ${GROUPS.map(group).join('')}
+        </nav>
+        <div class="pt-3 mt-2 border-t border-gray-100 flex-shrink-0">
+            <button onclick="handleLogout()" class="w-full flex items-center justify-center gap-2 bg-[#FFF5F3] text-[#E86D58] font-semibold text-sm py-2.5 rounded-xl hover:bg-[#FFEAE5] transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
                 Sign Out
             </button>
         </div>
     </aside>
     `;
+
+    container.querySelectorAll('.nav-head').forEach(btn => btn.addEventListener('click', () => {
+        const g = btn.closest('.nav-group');
+        const open = btn.getAttribute('aria-expanded') !== 'true';
+        btn.setAttribute('aria-expanded', String(open));
+        g.querySelector('.nav-items').classList.toggle('hidden', !open);
+        g.querySelector('.nav-chev').classList.toggle('-rotate-90', !open);
+        folded[g.dataset.group] = !open;
+        try { localStorage.setItem('alf_nav_folded', JSON.stringify(folded)); } catch (e) { /* ignore */ }
+    }));
+    // Keep the current page's link in view when the menu is long.
+    container.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
+
+    // Faster page changes: start loading a page as soon as the pointer rests on its link.
+    const done = new Set();
+    container.addEventListener('pointerover', (e) => {
+        const a = e.target.closest('a.nav-item'); if (!a || done.has(a.href) || a.getAttribute('aria-current')) return;
+        done.add(a.href);
+        const l = document.createElement('link'); l.rel = 'prefetch'; l.href = a.href; document.head.appendChild(l);
+    });
 });
 
 // Phones / tablets: app-style bottom navigation (hidden on desktop, where the sidebar shows).

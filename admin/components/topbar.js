@@ -113,6 +113,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.head.appendChild(ns);
     }
 
+    // Check in / out card + reminder popup
+    if (!document.querySelector('script[src$="components/checkin.js"]')) {
+        const cs = document.createElement('script');
+        cs.src = 'components/checkin.js';
+        document.head.appendChild(cs);
+    }
+
     // Close collapsible search when clicking outside
     document.addEventListener('click', (e) => {
         const wrapper = document.getElementById('collapsibleSearchWrapper');

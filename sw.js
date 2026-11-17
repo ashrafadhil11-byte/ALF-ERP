@@ -1,8 +1,9 @@
 // File: sw.js — makes the ERP installable and keeps the app shell available offline.
 // API calls (/api/*) are never cached: data is always live.
-const VERSION = 'alf-erp-v5';
+const VERSION = 'alf-erp-v6';
 const SHELL = [
     '/offline.html',
+    '/assets/app.css',
     '/admin/components/ui.css',
     '/admin/components/ui.js',
     '/admin/components/sidebar.js',

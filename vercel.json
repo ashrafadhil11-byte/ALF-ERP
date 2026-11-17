@@ -1,21 +1,50 @@
 {
+  "regions": [
+    "hnd1"
+  ],
   "rewrites": [
-    { "source": "/api/:route", "destination": "/api/router?__route=:route" }
+    {
+      "source": "/api/:route",
+      "destination": "/api/router?__route=:route"
+    }
   ],
   "headers": [
     {
       "source": "/sw.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Service-Worker-Allowed", "value": "/" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
       ]
     },
     {
       "source": "/manifest.webmanifest",
-      "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/manifest+json"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
     }
   ],
   "crons": [
-    { "path": "/api/carrier-sync", "schedule": "0 3 * * *" }
+    {
+      "path": "/api/carrier-sync",
+      "schedule": "0 3 * * *"
+    }
   ]
 }

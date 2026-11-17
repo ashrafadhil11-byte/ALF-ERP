@@ -14,19 +14,13 @@
     <script src="/pwa.js" defer></script>
     <title>Consolidation & Bulk - Al-Farha Cargo</title>
     <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="/assets/app.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="components/ui.css" rel="stylesheet">
     <script src="components/ui.js"></script>
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
-    <script>
-        tailwind.config = { theme: { extend: {
-            fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
-            colors: { coral: { 50: '#FFF5F3', 100: '#FFE8E3', 200: '#FFD0C7', 300: '#F7A99A', 400: '#F08A76', 500: '#E86D58', 600: '#D55C48' } }
-        } } };
-    </script>
     <style>
         .tab[aria-selected="true"] { background: #111827; color: #fff; }
         .opt[aria-pressed="true"] { background: #111827; color: #fff; }

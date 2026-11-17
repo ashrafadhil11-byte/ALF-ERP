@@ -49,6 +49,32 @@ export function zonedIso(day, hm, tz = 'Asia/Muscat') {
     return new Date(guess.getTime() - (asLocal - guess.getTime())).toISOString();
 }
 
+/** Minutes since midnight + ISO weekday (1 Mon … 7 Sun) in a time zone. */
+export function localClock(tz = 'Asia/Muscat', at = new Date()) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', weekday: 'short', hour: '2-digit', minute: '2-digit' }).formatToParts(at).map(x => [x.type, x.value]));
+    return { minutes: (+p.hour) * 60 + (+p.minute), dow: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(p.weekday) + 1 };
+}
+const toMin = (hm) => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m; };
+
+/**
+ * Should the user be reminded now?
+ *   'in'  — from 15 min before the shift starts until the shift ends, not checked in yet
+ *   'out' — shift is over (and 10 min more), checked in but not out (until midnight)
+ * Never on a weekly off day or approved leave. Night shifts (end before start) only get the check-in reminder.
+ */
+export function remindFor({ record, shift, onLeave, tz, at = new Date() }) {
+    if (onLeave) return null;
+    const { minutes, dow } = localClock(tz, at);
+    if ((shift.weekly_off || []).includes(dow)) return null;
+    const s = toMin(shift.start), e = toMin(shift.end), night = e <= s;
+    if (!record?.check_in) {
+        const inWindow = night ? minutes >= s - 15 : (minutes >= s - 15 && minutes < e);
+        return inWindow ? 'in' : null;
+    }
+    if (!record.check_out && !night && minutes >= e + 10) return 'out';
+    return null;
+}
+
 export function leaveDays(from, to) {
     return Math.round((new Date(to + 'T00:00:00Z') - new Date(from + 'T00:00:00Z')) / 864e5) + 1;
 }
@@ -85,6 +111,20 @@ export default async function handler(req, res) {
         const b = req.body || {};
 
         if (req.method === 'GET') {
+            if (q.view === 'status') {
+                // Small, fast: today's record + whether to remind (used by the dashboard card and the popup on every page)
+                const br = me.branch ? await branchOf(me.branch) : null;
+                const tz = br?.timezone || 'Asia/Muscat';
+                const today = localDay(tz);
+                const [record, leave] = await Promise.all([
+                    get(`attendance?employee_id=eq.${enc(myId)}&work_date=eq.${today}&select=check_in,check_out,late_min,worked_min`).then(r => r[0] || null),
+                    get(`leave_requests?employee_id=eq.${enc(myId)}&status=eq.approved&from_date=lte.${today}&to_date=gte.${today}&select=leave_type&limit=1`).then(r => r[0] || null)
+                ]);
+                const shift = { start: String(me.shift_start || '09:00').slice(0, 5), end: String(me.shift_end || '18:00').slice(0, 5), grace_min: me.grace_min ?? 10, weekly_off: me.weekly_off || [5] };
+                return res.status(200).json({ today, timezone: tz, record, shift, on_leave: leave?.leave_type || null,
+                    branch: br ? { code: br.branch_code, name: br.branch_name, has_location: br.lat != null && br.lng != null, geofence_m: br.geofence_m } : null,
+                    remind: remindFor({ record, shift, onLeave: Boolean(leave), tz }) });
+            }
             if (!q.view || q.view === 'me') {
                 const br = me.branch ? await branchOf(me.branch) : null;
                 const tz = br?.timezone || 'Asia/Muscat';
