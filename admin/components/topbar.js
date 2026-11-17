@@ -51,6 +51,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- Top-Right: Animated Collapsible Search + Quick Add + Clickable Profile -->
         <div class="flex items-center gap-3 lg:gap-3.5 self-start sm:self-center">
             
+            <!-- Check in / out (admin/components/checkin.js) -->
+            <div id="checkinSlot" class="flex-shrink-0"></div>
+
             <!-- Animated Collapsible Search Bar -->
             <div id="collapsibleSearchWrapper" 
                  class="relative flex items-center bg-[#F8F8FA] border border-gray-200/70 rounded-full h-11 w-11 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] shadow-sm">

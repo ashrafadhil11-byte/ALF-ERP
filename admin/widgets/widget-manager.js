@@ -352,13 +352,9 @@ window.toggleEditLayoutMode = function() {
     const banner = document.getElementById('customize-mode-banner');
 
     if (btn) {
-        if (isEditMode) {
-            btn.className = 'bg-coral-500 hover:bg-coral-600 text-white px-5 py-2.5 rounded-full text-xs font-extrabold flex items-center gap-2 shadow-md transition-all';
-            btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg><span>Done Customizing</span>`;
-        } else {
-            btn.className = 'bg-[#F8F8FA] hover:bg-gray-100 text-gray-800 px-4 py-2.5 rounded-full border border-gray-200/60 text-xs font-bold flex items-center gap-2 transition-all';
-            btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg><span>Customize</span>`;
-        }
+        btn.classList.toggle('is-on', isEditMode);
+        const label = btn.querySelector('.fab-label');
+        if (label) label.textContent = isEditMode ? 'Done customizing' : 'Customize';
     }
 
     if (banner) {

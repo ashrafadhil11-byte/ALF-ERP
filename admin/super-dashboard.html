@@ -27,6 +27,7 @@
 
     <!-- Tailwind CSS & Fonts -->
     <link href="/assets/app.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Initialize Global Widget Registry First -->
@@ -111,61 +112,46 @@
         <!-- =============================================================== -->
         <div id="topbar-container"></div>
 
-        <!-- Scrollable Dashboard Body -->
-        <div class="flex-1 overflow-y-auto pr-1 custom-scrollbar">
-            <div id="checkinCard"></div>
-            
-            <!-- ================================================================================= -->
-            <!-- LAYER 2: PORTAL IDENTITY + BRANCH (LEFT) • WIDGET CONTROLS + DATE/TIME (RIGHT)    -->
-            <!-- One row on wide screens; two aligned rows below; every control is 48px tall.      -->
-            <!-- ================================================================================= -->
-            <section class="flex flex-col min-[1400px]:flex-row min-[1400px]:items-center justify-between gap-3 pb-6 mb-6 border-b border-gray-100">
+            <!-- ================================================================== -->
+            <!-- LAYER 2 (frozen): portal + branch + live • widget controls + clock  -->
+            <!-- ================================================================== -->
+            <section class="dash-bar flex flex-wrap items-center justify-between gap-2.5 pb-4 mb-4 border-b border-gray-100 flex-shrink-0">
 
-                <!-- Left: portal, branch picker, live status -->
-                <div class="grid grid-cols-[1fr_auto] sm:flex sm:flex-nowrap items-center gap-2.5 min-w-0 flex-1">
-                    <div class="col-span-2 flex items-center gap-3 h-12 bg-[#F8F8FA] pl-1 pr-4 rounded-full border border-gray-200/70 shadow-sm min-w-0 max-w-full sm:max-w-[360px]">
-                        <div class="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center font-extrabold text-xs tracking-tight shadow-sm flex-shrink-0">
-                            AF
-                        </div>
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2">
-                                <span id="portalTitle" class="text-xs font-extrabold text-gray-900 tracking-tight whitespace-nowrap">Dashboard</span>
+                <div class="flex flex-wrap items-center gap-2.5 min-w-0">
+                    <div class="flex items-center gap-2.5 h-11 bg-[#F8F8FA] pl-1 pr-4 rounded-full border border-gray-200/70 shadow-sm min-w-0 max-w-[280px]">
+                        <div class="w-9 h-9 rounded-full bg-[#111827] text-white flex items-center justify-center font-extrabold text-[11px] tracking-tight flex-shrink-0">AF</div>
+                        <div class="min-w-0 leading-tight">
+                            <div class="flex items-center gap-1.5">
+                                <span id="portalTitle" class="text-xs font-extrabold text-gray-900 tracking-tight truncate">Dashboard</span>
                                 <span class="w-1.5 h-1.5 rounded-full bg-coral-500 flex-shrink-0"></span>
                             </div>
-                            <p id="portalScope" class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5 truncate">Loading…</p>
+                            <p id="portalScope" class="text-[10px] font-medium text-gray-400 truncate">Loading…</p>
                         </div>
                     </div>
 
                     <!-- Branch picker (admins only; filled from live data) -->
                     <select id="branchPicker" onchange="setDashboardBranch(this.value)" aria-label="Show branch"
-                            class="hidden field pill !h-12 !py-0 sm:!w-auto min-w-0 sm:min-w-[150px] flex-shrink-0"></select>
+                            class="hidden field pill !h-11 !py-0 !pl-4 !pr-9 !text-xs !w-auto max-w-[190px] flex-shrink-0"></select>
 
-                    <!-- Live / sync status -->
-                    <div class="h-12 flex items-center flex-shrink-0">
-                        <span id="cloudSyncStatus" class="text-[10px] font-bold text-emerald-600 bg-emerald-50/80 px-3 py-1.5 rounded-full border border-emerald-100 whitespace-nowrap">
-                            Connecting…
-                        </span>
-                    </div>
+                    <span id="cloudSyncStatus" class="text-[10px] font-bold text-emerald-600 bg-emerald-50/80 px-3 py-1.5 rounded-full border border-emerald-100 whitespace-nowrap">Connecting…</span>
                 </div>
 
-                <!-- Right: widget controls + compact date/time -->
-                <div class="grid grid-cols-2 sm:flex sm:flex-nowrap items-center gap-2.5 flex-shrink-0">
-                    <button onclick="openWidgetModal()" class="h-12 justify-center bg-white hover:bg-gray-50 text-gray-800 px-4 rounded-full border border-gray-200/80 text-xs font-bold flex items-center gap-2 shadow-sm transition-all whitespace-nowrap">
-                        <svg class="w-4 h-4 text-coral-500" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
-                        <span>Widgets</span>
-                        <span id="active-widget-count" class="bg-[#F8F8FA] text-gray-600 px-2 py-0.5 rounded-full text-[10px] border border-gray-100">8/8</span>
+                <div class="flex items-center gap-2.5 flex-shrink-0">
+                    <button type="button" onclick="openWidgetModal()" class="fab" title="Add or remove widgets">
+                        <svg class="w-4 h-4 text-coral-500 fab-ic" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path></svg>
+                        <span class="fab-label">Widgets</span>
+                        <span id="active-widget-count" class="fab-badge">8/8</span>
+                    </button>
+                    <button type="button" id="editLayoutBtn" onclick="toggleEditLayoutMode()" class="fab" title="Arrange and resize widgets">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        <span class="fab-label">Customize</span>
                     </button>
 
-                    <button id="editLayoutBtn" onclick="toggleEditLayoutMode()" class="h-12 justify-center bg-[#F8F8FA] hover:bg-gray-100 text-gray-800 px-4 rounded-full border border-gray-200/60 text-xs font-bold flex items-center gap-2 transition-all whitespace-nowrap">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
-                        <span>Customize</span>
-                    </button>
-
-                    <!-- Date & live time (compact, same height as the buttons) -->
-                    <div class="hidden sm:flex col-span-2 h-12 items-center justify-between sm:justify-start gap-3 bg-[#F8F8FA] pl-4 pr-1.5 rounded-full border border-gray-100 whitespace-nowrap">
+                    <!-- Date & live time -->
+                    <div class="hidden sm:flex h-11 items-center gap-2.5 bg-[#F8F8FA] pl-4 pr-1 rounded-full border border-gray-100 whitespace-nowrap">
                         <div class="text-right leading-none">
-                            <p class="text-base font-extrabold text-gray-900 tracking-tight tabular-nums" id="currentTime">--:-- --</p>
-                            <p class="text-[9px] font-bold text-coral-500 uppercase tracking-widest mt-0.5">Local time</p>
+                            <p class="text-sm font-extrabold text-gray-900 tracking-tight tabular-nums" id="currentTime">--:-- --</p>
+                            <p class="text-[8px] font-bold text-coral-500 uppercase tracking-widest mt-0.5">Local time</p>
                         </div>
                         <div class="h-9 flex items-center gap-2 bg-white rounded-full pl-1 pr-3 border border-gray-200/80 shadow-sm">
                             <span class="w-7 h-7 rounded-full bg-[#111827] text-white flex items-center justify-center text-[11px] font-extrabold" id="currentDay">--</span>
@@ -179,7 +165,7 @@
             </section>
 
             <!-- Customize Mode Instruction Banner (Hidden unless Customize is clicked) -->
-            <div id="customize-mode-banner" class="hidden items-center justify-between bg-[#111827] text-white px-5 py-3 rounded-2xl mb-5 shadow-md">
+            <div id="customize-mode-banner" class="hidden items-center justify-between bg-[#111827] text-white px-5 py-3 rounded-2xl mb-4 shadow-md flex-shrink-0">
                 <div class="flex items-center gap-3">
                     <span class="w-2.5 h-2.5 rounded-full bg-coral-500 animate-ping"></span>
                     <p class="text-xs font-semibold">
@@ -191,6 +177,8 @@
                 </button>
             </div>
 
+        <!-- Only the widgets scroll; everything above stays in place -->
+        <div class="dash-scroll flex-1 min-h-0 overflow-y-auto pretty-scroll -mr-2 pr-2">
             <!-- SMARTPHONE RESIZABLE & DRAGGABLE BENTO GRID -->
             <section class="bg-[#F8F8FA] rounded-[2rem] p-4 lg:p-6">
                 <div id="widgets-grid" class="smart-widget-grid">

@@ -1,5 +1,5 @@
 // File: admin/components/checkin.js — check in / out from anywhere in the app.
-//  • Dashboard: a "Today" card with the Check in / Check out button (any element with id="checkinCard").
+//  • Top bar (every page): Check in / Check out button; after check-out it shows the hours worked.
 //  • Every page: a reminder popup when your shift has started and you have not checked in,
 //    or your shift is over and you have not checked out. "Later" hides it for 30 minutes.
 // Data: GET /api/attendance?view=status (the server decides when to remind, in the branch's time zone).
@@ -44,27 +44,18 @@
         } catch (e) { busy = false; UI.toast(false, e.message); paintCard(); paintPopup(); }
     }
 
-    // ---------- dashboard card ----------
+    // ---------- top bar button (every page) ----------
     function paintCard() {
-        const el = document.getElementById('checkinCard');
+        const el = document.getElementById('checkinSlot');
         if (!el) return;
-        if (!state) { el.innerHTML = ''; return; }
+        if (!state || state.on_leave) { el.innerHTML = ''; return; }
         const r = state.record, s = state.shift;
-        const stage = state.on_leave ? 'leave' : !r?.check_in ? 'in' : !r.check_out ? 'out' : 'done';
-        const line = stage === 'leave' ? `On ${state.on_leave} leave today`
-            : stage === 'in' ? `Not checked in yet · shift ${s.start}–${s.end}`
-            : stage === 'out' ? `In since ${hm(r.check_in)}${r.late_min ? ` · ${r.late_min} min late` : ''} · shift ends ${s.end}`
-            : `${hm(r.check_in)} – ${hm(r.check_out)} · worked ${hrs(r.worked_min)}`;
-        const btn = stage === 'in' || stage === 'out'
-            ? `<button type="button" data-punch="${stage}" ${busy ? 'disabled' : ''} class="btn ${stage === 'in' ? 'btn-dark' : 'btn-coral'} !h-11 !px-5 flex-shrink-0">${busy ? 'Getting location…' : stage === 'in' ? 'Check in' : 'Check out'}</button>`
-            : `<span class="pill-tag ${stage === 'done' ? 'pill-green' : 'pill-gray'}">${stage === 'done' ? 'Day complete' : 'Leave'}</span>`;
-        el.innerHTML = `<div class="flex items-center justify-between gap-3 bg-[#F8F8FA] border border-gray-100 rounded-[1.5rem] pl-3 pr-3 py-2.5 mb-5">
-            <div class="flex items-center gap-3 min-w-0">
-                <span class="w-10 h-10 rounded-full ${stage === 'out' ? 'bg-emerald-500' : stage === 'done' ? 'bg-emerald-100 text-emerald-700' : 'bg-[#111827]'} ${stage === 'done' ? '' : 'text-white'} flex items-center justify-center flex-shrink-0">${UI.icon(stage === 'done' ? 'check' : 'clock')}</span>
-                <div class="min-w-0"><p class="text-xs font-extrabold">Attendance · ${new Date().toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' })}</p>
-                <p class="text-[11px] text-gray-500 truncate">${UI.esc(line)}</p></div>
-            </div>
-            <div class="flex items-center gap-2">${btn}<a href="attendance.html" class="icon-btn hidden sm:flex" aria-label="Open attendance">${UI.icon('calendar')}</a></div></div>`;
+        const stage = !r?.check_in ? 'in' : !r.check_out ? 'out' : 'done';
+        const label = busy ? 'Locating…' : stage === 'in' ? 'Check in' : stage === 'out' ? 'Check out' : `Done · ${hrs(r.worked_min)}`;
+        const tip = stage === 'in' ? `Shift ${s.start}–${s.end}` : stage === 'out' ? `In since ${hm(r.check_in)}${r.late_min ? ` (${r.late_min} min late)` : ''} · shift ends ${s.end}` : `${hm(r.check_in)} – ${hm(r.check_out)}`;
+        el.innerHTML = stage === 'done'
+            ? `<a href="attendance.html" class="fab ck-done" title="${UI.esc(tip)}">${UI.icon('check')}<span class="fab-label">${UI.esc(label)}</span></a>`
+            : `<button type="button" data-punch="${stage}" ${busy ? 'disabled' : ''} class="fab fab-open ck-${stage}" title="${UI.esc(tip)}" aria-label="${label}">${UI.icon('clock')}<span class="fab-label">${label}</span></button>`;
     }
 
     // ---------- reminder popup ----------
@@ -95,7 +86,7 @@
 
     document.addEventListener('click', (e) => {
         const p = e.target.closest('[data-punch]');
-        if (p && (p.closest('#checkinCard') || p.closest('#checkinPop'))) return punch(p.dataset.punch);
+        if (p && (p.closest('#checkinSlot') || p.closest('#checkinPop'))) return punch(p.dataset.punch);
         if (e.target.closest('#checkinPop [data-snooze]')) {
             try { localStorage.setItem(KEY, JSON.stringify({ kind: state.remind, day: state.today, until: Date.now() + SNOOZE_MS })); } catch (err) { /* ignore */ }
             document.getElementById('checkinPop')?.remove();
