@@ -25,7 +25,7 @@ test('providersFor: right provider per country, best first', () => {
     assert.deepEqual(providersFor('RAAA2919', 'SA').slice(0, 1), ['saudi_address']);
     assert.deepEqual(providersFor('12345', 'SA').slice(0, 1), ['saudi_address']);
     assert.deepEqual(providersFor('10001', 'US').slice(0, 1), ['zippopotam']);
-    assert.deepEqual(providersFor('211', 'OM'), ['zipcodebase']);
+    assert.deepEqual(providersFor('211', 'OM'), ['oman_local', 'zipcodebase']);
     assert.deepEqual(providersFor('RAAA2919', 'SA'), ['saudi_address']);
     assert.ok(!providersFor('RAA2919', 'SA').includes('saudi_address'));
 });

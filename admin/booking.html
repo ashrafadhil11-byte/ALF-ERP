@@ -19,6 +19,7 @@
     <link href="components/ui.css" rel="stylesheet">
     <script src="components/ui.js"></script>
     <script src="components/countries.js"></script>
+    <script src="components/oman-places.js"></script>
     <script src="components/print.js"></script>
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
@@ -415,7 +416,7 @@
             $('pinBadge').classList.toggle('hidden', !c);
             const sa = c && c.c === 'SA';
             $('rcvPinLabel').textContent = !c ? 'Postal / ZIP code' : c.c === 'IN' ? 'PIN code' : c.c === 'US' ? 'ZIP code' : sa ? 'Short address or postal code' : 'Postcode / postal code';
-            $('rcvPin').placeholder = sa ? 'e.g. RAAA2919' : c && c.c === 'GB' ? 'e.g. SW1A 1AA' : c && c.c === 'CA' ? 'e.g. M5V 3L9' : '';
+            $('rcvPin').placeholder = sa ? 'e.g. RAAA2919' : c && c.c === 'GB' ? 'e.g. SW1A 1AA' : c && c.c === 'CA' ? 'e.g. M5V 3L9' : c && c.c === 'OM' ? 'e.g. 211 or Salalah' : '';
         }
         // Phone numbers carry their own country code (an Oman shipper may have an Indian mobile).
         // They follow the branch / destination country until the user picks a code.
@@ -428,7 +429,8 @@
         let rcvState = null;
         const cityBox = UI.combobox($('rcvCity'), {
             load: () => { const c = dest(); return c && rcvState ? UI.citiesOf(c.n, rcvState.value) : []; },
-            allowCustom: true, emptyText: 'Type the district / city', onSelect: refresh
+            allowCustom: true, emptyText: 'Type the district / city',
+            onSelect: (it) => { if (it && it.postalCode) $('rcvPin').value = it.postalCode; refresh(); } // Oman towns carry their postal code
         });
         const stateBox = UI.combobox($('rcvState'), {
             load: () => { const c = dest(); return c ? UI.statesOf(c.c) : []; },

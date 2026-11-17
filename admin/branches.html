@@ -25,6 +25,7 @@
     <link href="components/ui.css" rel="stylesheet">
     <script src="components/ui.js"></script>
     <script src="components/countries.js"></script>
+    <script src="components/oman-places.js"></script>
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
@@ -452,7 +453,7 @@
         const cityBox = UI.combobox($('b_city'), {
             load: () => { const c = findCountry($('b_country').value); return c && curState ? UI.citiesOf(c.n, curState.value) : []; },
             allowCustom: true, emptyText: 'No cities listed — type one',
-            onSelect: () => { suggestCode(); composeAddress(); }
+            onSelect: (it) => { if (it && it.postalCode) $('b_postal').value = it.postalCode; suggestCode(); composeAddress(); } // Oman towns carry their postal code
         });
         const countryBox = UI.combobox($('b_country'), {
             load: () => UI.countryItems(),

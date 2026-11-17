@@ -37,6 +37,8 @@
 //
 // =====================================================================
 
+import { searchOman } from '../oman-places.js';
+
 const enc = encodeURIComponent;
 const clean = (v) => String(v ?? '').trim();
 const properCase = (s) => clean(s).toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
@@ -316,6 +318,24 @@ export default {
     // =================================================================
     //  POSTAL / ADDRESS LOOKUP  (used by /api/postal-lookup)
     // =================================================================
+
+    // Oman — built-in list (api/_lib/oman-places.js): governorate → wilayat → town with Oman Post codes.
+    // Answers a 3-digit code ("211") or a place name ("Ruwi"). No network, no key; runs before Zipcodebase.
+    oman_local: {
+        label: 'Oman postal codes (built-in list)',
+        kinds: ['other'],
+        endpoints: {},
+        postal: {
+            priority: 1,
+            covers: (code, cc) => cc === 'OM',
+            async lookup(_ctx, code) { return searchOman(code); }
+        },
+        testInput: 'Postal code or place (e.g. 211)',
+        async test({ input }) {
+            const r = searchOman(input.value);
+            return { ok: r.length > 0, message: r.slice(0, 5).map(p => `${p.postalCode} ${p.postOffice}, ${p.state}`).join(' · ') || 'No match' };
+        }
+    },
 
     // India Post — 6-digit PIN → post offices. Free, no key.
     india_post: {

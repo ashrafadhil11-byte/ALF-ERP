@@ -281,10 +281,24 @@ window.UI = (() => {
         return data;
     }
     const GEO = 'https://countriesnow.space/api/v0.1/countries';
-    const statesOf = async (iso2) => ((await geo(`${GEO}/states/q?iso2=${encodeURIComponent(iso2)}`))?.states || [])
-        .map(s => ({ value: s.name, label: s.name.replace(/ (Governorate|Region|Province|District)$/i, ''), sub: s.state_code || '' }));
-    const citiesOf = async (countryName, state) => ((await geo(`${GEO}/state/cities/q?country=${encodeURIComponent(countryName)}&state=${encodeURIComponent(state)}`)) || [])
-        .map(c => ({ value: c, label: c }));
+    // Oman uses the built-in list (components/oman-places.js → window.ALF_OMAN): governorates → wilayats/towns with postal codes.
+    const omanGov = (state) => (window.ALF_OMAN || []).find(g => g.name.toLowerCase() === String(state || '').replace(/ Governorate$/i, '').toLowerCase());
+    const statesOf = async (iso2) => {
+        if (iso2 === 'OM' && window.ALF_OMAN) return window.ALF_OMAN.map(g => ({ value: g.name, label: g.name, sub: `${g.wilayats.length} wilayats` }));
+        return ((await geo(`${GEO}/states/q?iso2=${encodeURIComponent(iso2)}`))?.states || [])
+            .map(s => ({ value: s.name, label: s.name.replace(/ (Governorate|Region|Province|District)$/i, ''), sub: s.state_code || '' }));
+    };
+    const citiesOf = async (countryName, state) => {
+        if (countryName === 'Oman' && window.ALF_OMAN) {
+            const g = omanGov(state);
+            if (g) return g.wilayats.flatMap(w => w.towns.map(t => ({
+                value: t.name, label: t.name, sub: [t.name !== w.name && w.name, t.code].filter(Boolean).join(' · '),
+                postalCode: t.code, wilayat: w.name
+            })));
+        }
+        return ((await geo(`${GEO}/state/cities/q?country=${encodeURIComponent(countryName)}&state=${encodeURIComponent(state)}`)) || [])
+            .map(c => ({ value: c, label: c }));
+    };
     const countryItems = () => (window.ALF_COUNTRIES || []).map(c => ({ value: c.c, label: c.n, sub: `${c.c} · ${c.d}`, img: `https://flagcdn.com/w40/${c.c.toLowerCase()}.png`, dial: c.d }));
 
     // ---------- Camera barcode / QR scanning ----------
@@ -400,7 +414,9 @@ window.UI = (() => {
                 const mine = ++seq;
                 setBadge('Searching…');
                 let j = {};
-                try { j = await api(`/api/postal-lookup?code=${encodeURIComponent(code)}&countryCode=${encodeURIComponent(cc)}`); } catch (e) { j = { errors: [e.message] }; }
+                // Oman: answered from the built-in list (code or place name), no server round trip.
+                if (cc === 'OM' && window.ALF_OMAN_SEARCH) j = { locations: window.ALF_OMAN_SEARCH(code) };
+                else try { j = await api(`/api/postal-lookup?code=${encodeURIComponent(code)}&countryCode=${encodeURIComponent(cc)}`); } catch (e) { j = { errors: [e.message] }; }
                 if (mine !== seq) return; // a newer search is running
                 found = j.locations || [];
                 setBadge(found.length ? `${found.length} found` : 'No match');
@@ -408,7 +424,7 @@ window.UI = (() => {
                 list.innerHTML = found.length ? found.map((l, i) => `
                     <button type="button" data-i="${i}" class="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl hover:bg-[#F8F8FA] text-left">
                         <span class="min-w-0"><span class="block text-xs font-extrabold truncate">${esc([l.building, l.street, l.postOffice].filter(Boolean).join(' · ') || l.city)}</span>
-                        <span class="block text-[10px] text-gray-400 truncate">${esc([l.city, l.state].filter(Boolean).join(', '))}</span></span>
+                        <span class="block text-[10px] text-gray-400 truncate">${esc([l.wilayat || l.city, l.state].filter(Boolean).join(', '))}</span></span>
                         <span class="pill-tag pill-coral font-mono flex-shrink-0">${esc(l.shortAddress || l.postalCode || '')}</span></button>`).join('')
                     : `<p class="p-3 text-xs text-gray-400 text-center">${keyHint ? `No match. ${esc(keyHint)}` :`Nothing found for "${esc(code)}" — type the address manually.`}</p>`;
                 list.classList.remove('hidden');
