@@ -251,7 +251,7 @@
             document.getElementById('portalTitle').textContent = (PORTAL_TITLES[me.role] || 'Dashboard') + (me.is_driver ? ' • Driver' : '');
             const names = (d.branches || []).map(b => b.branch_name || b.branch_code);
             document.getElementById('portalScope').textContent = d.scope === 'ALL'
-                ? `All Branches${names.length ? ' • ' + names.slice(0, 4).join(' • ') : ''}`
+                ? 'All Branches'
                 : `Branch • ${names[0] || d.scope}`;
 
             const picker = document.getElementById('branchPicker');
