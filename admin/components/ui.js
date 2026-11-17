@@ -358,6 +358,68 @@ window.UI = (() => {
     };
     const countryItems = () => (window.ALF_COUNTRIES || []).map(c => ({ value: c.c, label: c.n, sub: `${c.c} · ${c.d}`, img: `https://flagcdn.com/w40/${c.c.toLowerCase()}.png`, dial: c.d }));
 
+    // ---------- WhatsApp: one dedicated window, reused for every chat ----------
+    // WhatsApp Web cannot be shown inside another site (it blocks embedding), so the ERP keeps a single
+    // WhatsApp window docked to the right of the screen and sends every "chat" to it.
+    let waWin = null;
+    const whatsappOpen = () => Boolean(waWin && !waWin.closed);
+    function whatsapp(phone, text) {
+        const digits = String(phone || '').replace(/\D/g, '').replace(/^00/, '');
+        const url = digits ? `https://web.whatsapp.com/send?phone=${digits}${text ? `&text=${encodeURIComponent(text)}` : ''}` : 'https://web.whatsapp.com/';
+        const w = Math.min(980, Math.round(screen.availWidth * 0.5)), h = screen.availHeight;
+        const left = (screen.availLeft || 0) + screen.availWidth - w, top = screen.availTop || 0;
+        if (!whatsappOpen() || digits) waWin = window.open(url, 'alf_whatsapp', `popup=yes,width=${w},height=${h},left=${left},top=${top}`);
+        if (!waWin) { toast(false, 'Allow pop-ups for this site to open WhatsApp.'); return null; }
+        try { waWin.focus(); } catch (e) { /* ignore */ }
+        return waWin;
+    }
+
+    // ---------- automatic phone / country / city fields ----------
+    // <input data-phone="OM">            → country-code picker (read the full number with UI.phoneValue(input))
+    // <input data-country>               → country list with flags (stores the country name; the code in input.dataset.cc)
+    // <input data-city-of="countryInputId"> → cities of the chosen country (typing a new one is allowed)
+    const citiesOfCountry = async (countryName) => {
+        if (!countryName) return [];
+        if (countryName === 'Oman' && window.ALF_OMAN) {
+            return window.ALF_OMAN.flatMap(g => g.wilayats.flatMap(w => w.towns.map(t => ({ value: t.name, label: t.name, sub: [w.name !== t.name && w.name, g.name, t.code].filter(Boolean).join(' · '), postalCode: t.code }))));
+        }
+        return ((await geo(`${GEO}/cities/q?country=${encodeURIComponent(countryName)}`)) || []).map(c => ({ value: c, label: c }));
+    };
+    const phoneValue = (el) => (el && el._phone ? el._phone.value : String(el?.value || '').trim());
+    function autoFields(root = document) {
+        root.querySelectorAll('input[data-phone]:not([data-auto])').forEach((input) => {
+            input.setAttribute('data-auto', '');
+            const start = input.value;
+            input.value = '';
+            input._phone = phoneField(input, { country: input.dataset.phone || 'OM' });
+            if (start) input._phone.setValue(start, input.dataset.phone || 'OM');
+        });
+        root.querySelectorAll('input[data-country]:not([data-auto])').forEach((input) => {
+            input.setAttribute('data-auto', '');
+            const box = combobox(input, {
+                load: () => countryItems(), allowCustom: true,
+                onSelect: (it) => {
+                    input.dataset.cc = it?.value || '';
+                    document.querySelectorAll(`input[data-city-of="${input.id}"]`).forEach(c => { c._box?.reload(); });
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+            const c = (window.ALF_COUNTRIES || []).find(x => x.n.toLowerCase() === input.value.trim().toLowerCase());
+            if (c) { input.dataset.cc = c.c; box.setValue?.(c.c); }
+        });
+        root.querySelectorAll('input[data-city-of]:not([data-auto])').forEach((input) => {
+            input.setAttribute('data-auto', '');
+            input._box = combobox(input, {
+                load: () => citiesOfCountry(document.getElementById(input.dataset.cityOf)?.value.trim()),
+                allowCustom: true, emptyText: 'Pick the country first, or type the city'
+            });
+        });
+    }
+    // forms that are drawn later (popups built in code) are picked up automatically
+    new MutationObserver((list) => {
+        if (list.some(m => [...m.addedNodes].some(n => n.nodeType === 1 && (n.matches?.('input[data-phone],input[data-country],input[data-city-of]') || n.querySelector?.('input[data-phone],input[data-country],input[data-city-of]'))))) autoFields();
+    }).observe(document.documentElement, { childList: true, subtree: true });
+
     // ---------- Camera barcode / QR scanning ----------
     // Mark any input with data-camera="submit" (submits its form), data-camera="click:buttonId" or data-camera="fill" (just fills it);
     // add data-camera-continuous to keep scanning (batch). A camera button appears inside the input.
@@ -452,7 +514,7 @@ window.UI = (() => {
     const paintIcons = (root = document) => root.querySelectorAll('[data-icon]').forEach(el => {
         el.outerHTML = icon(el.dataset.icon, el.dataset.cls || 'w-4 h-4') ;
     });
-    const boot = () => { paintIcons(); wireCameraInputs(); };
+    const boot = () => { paintIcons(); wireCameraInputs(); autoFields(); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else boot();
 
@@ -666,7 +728,7 @@ window.UI = (() => {
         });
     }
 
-    return { allowClose, markClean: unmark, api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup, phoneField, splitPhone, pickBoxes };
+    return { whatsapp, whatsappOpen, autoFields, phoneValue, citiesOfCountry, allowClose, markClean: unmark, api, esc, clean, toast, beep, openModal, closeModal, confirm, role, isAdmin, icon, paintIcons, menu, camera, wireCameraInputs, combobox, statesOf, citiesOf, countryItems, postalLookup, phoneField, splitPhone, pickBoxes };
 })();
 
 // Smooth page switches for browsers without cross-document view transitions (see ui.css "Motion").

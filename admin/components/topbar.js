@@ -49,14 +49,14 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         
         <!-- Top-Right: Animated Collapsible Search + Quick Add + Clickable Profile -->
-        <div class="flex items-center gap-3 lg:gap-3.5 self-start sm:self-center">
+        <div class="flex items-center justify-end gap-2 sm:gap-3 lg:gap-3.5 self-end sm:self-center min-w-0">
             
             <!-- Check in / out (admin/components/checkin.js) -->
             <div id="checkinSlot" class="flex-shrink-0"></div>
 
             <!-- Animated Collapsible Search Bar -->
             <div id="collapsibleSearchWrapper" 
-                 class="relative flex items-center bg-[#F8F8FA] border border-gray-200/70 rounded-full h-11 w-11 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] shadow-sm">
+                 class="relative hidden sm:flex items-center bg-[#F8F8FA] border border-gray-200/70 rounded-full h-11 w-11 overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] shadow-sm">
                 
                 <button type="button" onclick="expandTopSearch()" 
                         title="Search ERP (Ctrl+K)"
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             <!-- Quick add: new booking -->
             <a href="booking.html" title="New booking" aria-label="New booking" 
-               class="w-11 h-11 bg-[#F8F8FA] rounded-full border border-gray-200/70 flex items-center justify-center text-gray-700 hover:bg-[#111827] hover:text-white hover:border-[#111827] transition-all shadow-sm flex-shrink-0">
+               class="hidden sm:flex w-11 h-11 bg-[#F8F8FA] rounded-full border border-gray-200/70 flex items-center justify-center text-gray-700 hover:bg-[#111827] hover:text-white hover:border-[#111827] transition-all shadow-sm flex-shrink-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"></path>
                 </svg>

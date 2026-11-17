@@ -60,6 +60,7 @@ const toMin = (hm) => { const [h, m] = String(hm).split(':').map(Number); return
  * Should the user be reminded now?
  *   'in'  — from 15 min before the shift starts until the shift ends, not checked in yet
  *   'out' — shift is over (and 10 min more), checked in but not out (until midnight)
+ *   'resume' — on a break 5 min longer than the scheduled break (or 60 min)
  * Never on a weekly off day or approved leave. Night shifts (end before start) only get the check-in reminder.
  */
 export function remindFor({ record, shift, onLeave, tz, at = new Date() }) {
@@ -70,6 +71,12 @@ export function remindFor({ record, shift, onLeave, tz, at = new Date() }) {
     if (!record?.check_in) {
         const inWindow = night ? minutes >= s - 15 : (minutes >= s - 15 && minutes < e);
         return inWindow ? 'in' : null;
+    }
+    // on a break past its scheduled end (or 60 min when no break is scheduled)
+    if (record.break_started_at && !record.break_ended_at && !record.check_out) {
+        const bLen = shift.break_start && shift.break_end ? ((toMin(shift.break_end) - toMin(shift.break_start)) + 1440) % 1440 : 60;
+        const onBreakMin = Math.floor((at - new Date(record.break_started_at)) / 60e3);
+        return onBreakMin >= bLen + 5 ? 'resume' : null;
     }
     if (!record.check_out && !night && minutes >= e + 10) return 'out';
     return null;
@@ -117,7 +124,7 @@ export default async function handler(req, res) {
                 const tz = br?.timezone || 'Asia/Muscat';
                 const today = localDay(tz);
                 const [record, leave] = await Promise.all([
-                    get(`attendance?employee_id=eq.${enc(myId)}&work_date=eq.${today}&select=check_in,check_out,late_min,worked_min`).then(r => r[0] || null),
+                    get(`attendance?employee_id=eq.${enc(myId)}&work_date=eq.${today}&select=check_in,check_out,late_min,worked_min,break_started_at,break_ended_at,break_min,break_over_min`).then(r => r[0] || null),
                     get(`leave_requests?employee_id=eq.${enc(myId)}&status=eq.approved&from_date=lte.${today}&to_date=gte.${today}&select=leave_type&limit=1`).then(r => r[0] || null)
                 ]);
                 const shift = { start: String(me.shift_start || '09:00').slice(0, 5), end: String(me.shift_end || '18:00').slice(0, 5), break_start: me.break_start ? String(me.break_start).slice(0, 5) : null, break_end: me.break_end ? String(me.break_end).slice(0, 5) : null, grace_min: me.grace_min ?? 10, weekly_off: me.weekly_off || [5] };
@@ -194,8 +201,12 @@ export default async function handler(req, res) {
         if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
         switch (b.action) {
             case 'punch': {
-                if (!['in', 'out'].includes(b.kind)) throw new UserError('Unknown punch.');
+                if (!['in', 'out', 'break', 'resume'].includes(b.kind)) throw new UserError('Unknown punch.');
                 if (!me.branch) throw new UserError('Your account has no branch — ask an admin.');
+                if (b.kind === 'break' || b.kind === 'resume') {   // breaks: no location needed
+                    const out = await rpc('attendance_punch', { p_emp: myId, p_kind: b.kind, p_branch: me.branch, p_lat: null, p_lng: null, p_distance: null });
+                    return res.status(200).json({ success: true, record: out });
+                }
                 const br = await branchOf(me.branch);
                 const lat = Number(b.lat), lng = Number(b.lng);
                 let fence = { ok: true, distance: null, unset: true };

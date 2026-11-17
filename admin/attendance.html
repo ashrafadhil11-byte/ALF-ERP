@@ -140,7 +140,8 @@
         async function showMe() {
             me = await api(`/api/attendance?view=me${month ? '&month=' + month : ''}`); month = me.month;
             const r = me.record;
-            const state = !r?.check_in ? 'in' : !r.check_out ? 'out' : 'done';
+            const onBreak = Boolean(r?.break_started_at && !r.break_ended_at && !r.check_out);
+            const state = !r?.check_in ? 'in' : r.check_out ? 'done' : onBreak ? 'resume' : 'out';
             const off = me.shift.weekly_off.map(n => DOW[n - 1]).join(', ');
             const [y, m] = me.month.split('-').map(Number);
             const firstDow = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
@@ -154,8 +155,10 @@
                     <p id="clock" class="text-4xl font-extrabold tabular-nums my-2"></p>
                     <p class="text-xs text-gray-500 mb-5">Shift ${me.shift.start}–${me.shift.end}${me.shift.break_start ? ` · break ${me.shift.break_start}–${me.shift.break_end}` : ''} · ${me.shift.grace_min} min grace · off ${off || 'none'}</p>
                     ${state === 'done' ? `<div class="punch bg-emerald-50 text-emerald-700 flex flex-col items-center justify-center"><span data-icon="check" data-cls="w-8 h-8"></span><b class="mt-2">Day complete</b><span class="text-xs">${hm(r.check_in)} – ${hm(r.check_out)}</span></div>`
-                        : `<button type="button" id="punchBtn" class="punch ${state === 'in' ? 'bg-[#111827]' : 'bg-coral-500'} text-white flex flex-col items-center justify-center shadow-xl hover:scale-[1.02] transition-transform">
-                            <span data-icon="fingerprint" data-cls="w-10 h-10"></span><b class="mt-2 text-lg">${state === 'in' ? 'Check in' : 'Check out'}</b>${r?.check_in ? `<span class="text-xs opacity-80">in since ${hm(r.check_in)}</span>` : ''}</button>`}
+                        : `<button type="button" id="punchBtn" class="punch ${state === 'in' ? 'bg-[#111827]' : state === 'resume' ? 'bg-amber-500' : 'bg-coral-500'} text-white flex flex-col items-center justify-center shadow-xl hover:scale-[1.02] transition-transform">
+                            <span data-icon="fingerprint" data-cls="w-10 h-10"></span><b class="mt-2 text-lg">${state === 'in' ? 'Check in' : state === 'resume' ? 'End break' : 'Check out'}</b>${state === 'resume' ? `<span class="text-xs opacity-90">on break since ${hm(r.break_started_at)}</span>` : r?.check_in ? `<span class="text-xs opacity-80">in since ${hm(r.check_in)}</span>` : ''}</button>`}
+                    ${state === 'out' && !r.break_started_at ? `<button type="button" id="breakBtn" class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-gray-200 text-xs font-extrabold text-gray-700 hover:bg-amber-500 hover:border-amber-500 hover:text-white transition-colors">${UI.icon('clock', 'w-3.5 h-3.5')}Start break</button>` : ''}
+                    ${r?.break_started_at && r.break_ended_at ? `<p class="text-[11px] font-bold text-gray-500 mt-3">Break ${hm(r.break_started_at)}–${hm(r.break_ended_at)} · ${r.break_min} min${r.break_over_min ? ` <span class="text-amber-700">(${r.break_over_min} min over)</span>` : ''}</p>` : ''}
                     <p id="gpsNote" class="text-[11px] text-gray-400 mt-4">${me.branch ? (me.branch.has_location ? `Must be within ${me.branch.geofence_m} m of ${esc(me.branch.name || me.branch.code)} — uses your location.` : `${esc(me.branch.name || me.branch.code)} has no location set yet, so your position is not checked.`) : 'Your account has no branch.'}</p>
                     ${r?.late_min ? `<p class="text-xs font-bold text-amber-700 mt-2">Late by ${r.late_min} min today</p>` : ''}
                 </div>
@@ -181,6 +184,7 @@
             $('mPrev').onclick = () => step(-1); $('mNext').onclick = () => step(1);
             $('askLeave').onclick = () => { $('leaveForm').reset(); $('lDays').textContent = ''; openModal('leaveModal'); };
             if ($('punchBtn')) $('punchBtn').onclick = () => punch(state);
+            if ($('breakBtn')) $('breakBtn').onclick = () => punch('break');
         }
 
         function position() {
@@ -192,15 +196,18 @@
             });
         }
         async function punch(kind) {
-            const btn = $('punchBtn'); btn.disabled = true; btn.classList.add('opacity-70');
-            $('gpsNote').textContent = 'Getting your location…';
+            const btn = kind === 'break' ? $('breakBtn') : $('punchBtn'); btn.disabled = true; btn.classList.add('opacity-70');
+            const gps = kind === 'in' || kind === 'out';
+            if (gps) $('gpsNote').textContent = 'Getting your location…';
             try {
                 let c = null;
-                if (me.branch?.has_location) c = await position();
-                else c = await position().catch(() => null);
+                if (gps && me.branch?.has_location) c = await position();
+                else if (gps) c = await position().catch(() => null);
                 const out = await api('/api/attendance', { method: 'POST', body: { action: 'punch', kind, lat: c?.latitude, lng: c?.longitude, accuracy: c?.accuracy } });
                 const rec = out.record;
-                toast(true, kind === 'in' ? `Checked in at ${hm(rec.check_in)}${rec.late_min ? ` — ${rec.late_min} min late` : ''}.` : `Checked out at ${hm(rec.check_out)}. Worked ${hrs(rec.worked_min)}.`);
+                toast(true, { in: `Checked in at ${hm(rec.check_in)}${rec.late_min ? ` — ${rec.late_min} min late` : ''}.`, break: `Break started at ${hm(rec.break_started_at)}.`,
+                    resume: `Back from break${rec.break_over_min ? ` — ${rec.break_over_min} min over` : ''}.`, out: `Checked out at ${hm(rec.check_out)}. Worked ${hrs(rec.worked_min)}.` }[kind]);
+                window.Checkin?.load();
                 UI.beep?.(true);
                 show();
             } catch (e) { toast(false, e.message); btn.disabled = false; btn.classList.remove('opacity-70'); $('gpsNote').textContent = e.message; }

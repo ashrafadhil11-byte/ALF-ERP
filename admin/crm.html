@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="ALF ERP">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <script src="/pwa.js" defer></script>
+    <title>CRM · WhatsApp - Al-Farha Cargo</title>
+    <script>if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');</script>
+    <link href="/assets/app.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="components/ui.css" rel="stylesheet">
+    <script src="components/ui.js"></script>
+    <script src="components/countries.js"></script>
+    <script src="components/sidebar.js" defer></script>
+    <script src="components/topbar.js" defer></script>
+    <script src="components/profile-modal.js" defer></script>
+    <style>
+        .tpl[aria-pressed="true"] { background: #111827; color: #fff; border-color: #111827; }
+        .wa-dot { width: 8px; height: 8px; border-radius: 9999px; background: #D1D5DB; }
+        .wa-dot.on { background: #25D366; box-shadow: 0 0 0 4px rgba(37, 211, 102, .18); }
+        .cust[aria-selected="true"] { background: #FFF5F3; border-color: #FFD0C7; }
+    </style>
+</head>
+<body class="bg-[#ECECEF] min-h-screen p-3 lg:p-5 flex gap-5 antialiased text-gray-900">
+    <div id="sidebar-container" class="hidden lg:block z-20"></div>
+
+    <main class="flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white">
+        <div id="topbar-container"></div>
+        <section class="flex flex-wrap items-center justify-between gap-3 pb-5 mb-5 border-b border-gray-100 flex-shrink-0">
+            <div class="flex items-center gap-3.5 bg-[#F8F8FA] p-1.5 pr-5 rounded-full border border-gray-200/70 shadow-sm">
+                <div class="w-10 h-10 rounded-full bg-[#25D366] text-white flex items-center justify-center"><span data-icon="message"></span></div>
+                <div>
+                    <div class="flex items-center gap-2"><span class="text-xs font-extrabold tracking-tight">CRM · WhatsApp</span><span class="w-1.5 h-1.5 rounded-full bg-coral-500"></span></div>
+                    <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Chat with customers from one WhatsApp window</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2.5">
+                <span class="flex items-center gap-2 text-[11px] font-bold text-gray-500 bg-[#F8F8FA] border border-gray-100 rounded-full px-3.5 h-11"><span id="waDot" class="wa-dot"></span><span id="waState">WhatsApp window closed</span></span>
+                <button type="button" id="waOpen" class="fab fab-open fab-wa !bg-[#25D366] !border-[#25D366] !text-white"><span data-icon="message"></span><span class="fab-label">Open WhatsApp</span></button>
+            </div>
+        </section>
+
+        <div class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-5 overflow-y-auto lg:overflow-visible">
+            <!-- customers -->
+            <section class="min-h-0 flex flex-col bg-[#F8F8FA] border border-gray-100 rounded-[2rem] p-4">
+                <input id="q" class="field mb-3" placeholder="Search customer by name, phone or civil ID" autocomplete="off" aria-label="Search customers">
+                <div id="list" class="flex-1 min-h-0 overflow-y-auto pretty-scroll space-y-2 pr-1"></div>
+            </section>
+
+            <!-- compose -->
+            <section class="min-h-0 flex flex-col overflow-y-auto pretty-scroll bg-white border border-gray-100 rounded-[2rem] p-5 shadow-[0_18px_40px_-24px_rgba(17,24,39,.25)]">
+                <p class="sd-label">Message</p>
+                <div id="who" class="mt-2 mb-4 flex items-center gap-3 min-w-0">
+                    <span class="w-11 h-11 rounded-2xl bg-[#F8F8FA] border border-gray-100 flex items-center justify-center text-gray-400 flex-shrink-0"><span data-icon="user"></span></span>
+                    <div class="min-w-0"><p class="text-sm font-extrabold truncate">Pick a customer</p><p class="text-[11px] text-gray-400">or type any number below</p></div>
+                </div>
+                <label class="ui-label" for="phone">WhatsApp number</label>
+                <input id="phone" class="field" data-phone="OM" placeholder="Mobile number">
+                <p class="ui-label mt-4">Quick message</p>
+                <div id="tpls" class="flex flex-wrap gap-1.5"></div>
+                <div id="awbWrap" class="hidden mt-3"><label class="ui-label" for="awb">AWB</label><input id="awb" class="field font-mono" placeholder="Tracking number"></div>
+                <label class="ui-label mt-4" for="text">Text <span class="normal-case font-medium text-gray-400">(edit before sending)</span></label>
+                <textarea id="text" rows="6" class="field resize-none" data-nodirty></textarea>
+                <button type="button" id="send" class="btn btn-coral !py-3.5 mt-4 justify-center"><span data-icon="message"></span>Open chat in WhatsApp</button>
+                <p class="text-[10px] text-gray-400 leading-relaxed mt-3">Chats open in one WhatsApp window that stays signed in (scan the QR code the first time). The message is filled in — press send in WhatsApp.</p>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const { api, esc, toast } = UI;
+        const $ = (id) => document.getElementById(id);
+        let customers = [], picked = null, tpl = 'hello';
+        const TPL = {
+            hello: ['Hello', (c) => `Hello ${c},\n\nThis is Al-Farha Cargo. How can we help you today?`],
+            booked: ['Booking confirmed', (c, a) => `Hello ${c},\n\nYour booking with *Al-Farha Cargo* is confirmed.\n📦 *Tracking ID:* ${a || '—'}\n\nTrack anytime: ${location.origin}/track.html?awb=${encodeURIComponent(a || '')}\n\nThank you for choosing Al-Farha Cargo.`, true],
+            transit: ['In transit', (c, a) => `Hello ${c},\n\nGood news — your shipment *${a || ''}* is on its way.\nTrack it here: ${location.origin}/track.html?awb=${encodeURIComponent(a || '')}`, true],
+            delivery: ['Out for delivery', (c, a) => `Hello ${c},\n\nYour shipment *${a || ''}* is out for delivery today. Please keep your phone reachable.`, true],
+            payment: ['Payment reminder', (c) => `Hello ${c},\n\nA friendly reminder that a payment is due on your account with Al-Farha Cargo. Please contact us or visit the branch. Thank you.`],
+            review: ['Thank you / review', (c) => `Hello ${c},\n\nThank you for shipping with *Al-Farha Cargo*. We would love your feedback — it helps us serve you better.`]
+        };
+
+        // ---------- WhatsApp window state ----------
+        const paintWa = () => {
+            const on = UI.whatsappOpen();
+            $('waDot').classList.toggle('on', on);
+            $('waState').textContent = on ? 'WhatsApp window open' : 'WhatsApp window closed';
+            $('waOpen').querySelector('.fab-label').textContent = on ? 'Show WhatsApp' : 'Open WhatsApp';
+        };
+        $('waOpen').onclick = () => { UI.whatsapp(); setTimeout(paintWa, 400); };
+        setInterval(paintWa, 2000); paintWa();
+
+        // ---------- templates ----------
+        $('tpls').innerHTML = Object.entries(TPL).map(([k, [label]]) => `<button type="button" class="tpl px-3 py-1.5 rounded-full border border-gray-200 bg-white text-[11px] font-extrabold text-gray-600 hover:border-gray-300 transition-colors" data-tpl="${k}" aria-pressed="${k === tpl}">${label}</button>`).join('');
+        const fill = () => {
+            const [, make, needsAwb] = TPL[tpl];
+            $('awbWrap').classList.toggle('hidden', !needsAwb);
+            $('text').value = make(picked?.name || 'Customer', $('awb').value.trim());
+        };
+        $('tpls').onclick = (e) => { const b = e.target.closest('[data-tpl]'); if (!b) return; tpl = b.dataset.tpl; document.querySelectorAll('[data-tpl]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); fill(); };
+        $('awb').oninput = fill;
+
+        // ---------- customers ----------
+        async function load() {
+            try { customers = (await api(`/api/customers?q=${encodeURIComponent($('q').value.trim())}`)).customers || []; } catch (e) { toast(false, e.message); customers = []; }
+            $('list').innerHTML = customers.map(c => `<button type="button" class="cust w-full flex items-center gap-3 bg-white border border-gray-100 rounded-2xl px-4 py-3 text-left hover:border-gray-200 hover:shadow-sm transition-all" data-id="${c.id}" aria-selected="${picked?.id === c.id}">
+                <span class="w-10 h-10 rounded-2xl bg-[#111827] text-white flex items-center justify-center text-xs font-extrabold flex-shrink-0">${esc((c.name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase())}</span>
+                <span class="min-w-0 flex-1"><span class="block text-[13px] font-extrabold truncate">${esc(c.name)}</span><span class="block text-[11px] text-gray-400 truncate">${esc(c.whatsapp || c.phone || 'No number')} · ${c.stats?.shipments ?? 0} shipments</span></span>
+                <span class="w-9 h-9 rounded-full bg-[#25D366]/10 text-[#128C7E] flex items-center justify-center flex-shrink-0">${UI.icon('message', 'w-4 h-4')}</span></button>`).join('')
+                || `<p class="text-center text-xs text-gray-400 py-10">${$('q').value ? 'No customer matches.' : 'Customers appear here as bookings are made.'}</p>`;
+        }
+        let t; $('q').oninput = () => { clearTimeout(t); t = setTimeout(load, 300); };
+        $('list').onclick = (e) => {
+            const b = e.target.closest('[data-id]'); if (!b) return;
+            picked = customers.find(c => c.id === +b.dataset.id);
+            document.querySelectorAll('.cust').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+            const num = picked.whatsapp || picked.phone || '';
+            if (num) $('phone')._phone?.setValue(num); else $('phone')._phone?.reset();
+            $('who').innerHTML = `<span class="w-11 h-11 rounded-2xl bg-coral-500 text-white flex items-center justify-center text-sm font-extrabold flex-shrink-0">${esc((picked.name || '?').split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase())}</span>
+                <div class="min-w-0"><p class="text-sm font-extrabold truncate">${esc(picked.name)}</p><p class="text-[11px] text-gray-400 truncate">${esc(picked.customer_no || '')}${picked.civil_id ? ' · ' + esc(picked.civil_id) : ''}</p></div>`;
+            fill();
+        };
+        $('send').onclick = () => {
+            const num = UI.phoneValue($('phone'));
+            if (!num.replace(/\D/g, '')) return toast(false, 'Enter the WhatsApp number.');
+            UI.whatsapp(num, $('text').value);
+            setTimeout(paintWa, 400);
+        };
+        fill(); load();
+    </script>
+</body>
+</html>

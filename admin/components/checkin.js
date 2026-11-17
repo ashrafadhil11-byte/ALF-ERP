@@ -1,5 +1,5 @@
 // File: admin/components/checkin.js — check in / out from anywhere in the app.
-//  • Top bar (every page): Check in / Check out button; after check-out it shows the hours worked.
+//  • Top bar (every page): Check in → Start break / End break → Check out; after check-out it shows the hours worked.
 //  • Every page: a reminder popup when your shift has started and you have not checked in,
 //    or your shift is over and you have not checked out. "Later" hides it for 30 minutes.
 // Data: GET /api/attendance?view=status (the server decides when to remind, in the branch's time zone).
@@ -31,12 +31,18 @@
 
     async function punch(kind) {
         if (busy) return;
-        busy = true; paintCard(); paintPopup();
+        busy = kind; paintCard(); paintPopup();
         try {
-            const c = state?.branch?.has_location ? await position() : await position().catch(() => null);
+            const needsGps = kind === 'in' || kind === 'out';
+            const c = !needsGps ? null : state?.branch?.has_location ? await position() : await position().catch(() => null);
             const out = await UI.api('/api/attendance', { method: 'POST', body: { action: 'punch', kind, lat: c?.latitude, lng: c?.longitude, accuracy: c?.accuracy } });
             const r = out.record || {};
-            UI.toast(true, kind === 'in' ? `Checked in at ${hm(r.check_in)}${r.late_min ? ` — ${r.late_min} min late` : ''}.` : `Checked out at ${hm(r.check_out)}. Worked ${hrs(r.worked_min)}.`);
+            UI.toast(true, {
+                in: `Checked in at ${hm(r.check_in)}${r.late_min ? ` — ${r.late_min} min late` : ''}.`,
+                break: `Break started at ${hm(r.break_started_at)}.`,
+                resume: `Back from break at ${hm(r.break_ended_at)}${r.break_over_min ? ` — ${r.break_over_min} min over` : ''}.`,
+                out: `Checked out at ${hm(r.check_out)}. Worked ${hrs(r.worked_min)}.`
+            }[kind]);
             UI.beep?.(true);
             busy = false;
             await load();
@@ -44,26 +50,43 @@
         } catch (e) { busy = false; UI.toast(false, e.message); paintCard(); paintPopup(); }
     }
 
-    // ---------- top bar button (every page) ----------
+    // where the day stands: in → work → (break → work) → done
+    const stageOf = (r) => !r?.check_in ? 'in' : r.check_out ? 'done' : r.break_started_at && !r.break_ended_at ? 'onbreak' : 'work';
+    const ICON_BREAK = '<svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 010 8h-1"/><path d="M3 8h14v9a4 4 0 01-4 4H7a4 4 0 01-4-4z"/><path d="M6 2v2M10 2v2M14 2v2"/></svg>';
+
+    // ---------- top bar buttons (every page) ----------
     function paintCard() {
         const el = document.getElementById('checkinSlot');
         if (!el) return;
         if (!state || state.on_leave) { el.innerHTML = ''; return; }
-        const r = state.record, s = state.shift;
-        const stage = !r?.check_in ? 'in' : !r.check_out ? 'out' : 'done';
-        const label = busy ? 'Locating…' : stage === 'in' ? 'Check in' : stage === 'out' ? 'Check out' : `Done · ${hrs(r.worked_min)}`;
-        const tip = stage === 'in' ? `Shift ${s.start}–${s.end}${s.break_start ? ` · break ${s.break_start}–${s.break_end}` : ''}` : stage === 'out' ? `In since ${hm(r.check_in)}${r.late_min ? ` (${r.late_min} min late)` : ''} · shift ends ${s.end}` : `${hm(r.check_in)} – ${hm(r.check_out)}`;
-        el.innerHTML = stage === 'done'
-            ? `<a href="attendance.html" class="fab ck-done" title="${UI.esc(tip)}">${UI.icon('check')}<span class="fab-label">${UI.esc(label)}</span></a>`
-            : `<button type="button" data-punch="${stage}" ${busy ? 'disabled' : ''} class="fab fab-open ck-${stage}" title="${UI.esc(tip)}" aria-label="${label}">${UI.icon('clock')}<span class="fab-label">${label}</span></button>`;
+        const r = state.record, s = state.shift, stage = stageOf(r);
+        const brk = s.break_start ? ` · break ${s.break_start}–${s.break_end}` : '';
+        const btn = (kind, cls, icon, label, tip, open = true) => `<button type="button" data-punch="${kind}" ${busy ? 'disabled' : ''} class="fab ${open ? 'fab-open' : ''} ${cls}" title="${UI.esc(tip)}" aria-label="${label}">${icon}<span class="fab-label">${busy === kind ? (kind === 'in' || kind === 'out' ? 'Locating…' : 'Saving…') : label}</span></button>`;
+        if (stage === 'done') {
+            el.innerHTML = `<a href="attendance.html" class="fab ck-done" title="${UI.esc(`${hm(r.check_in)} – ${hm(r.check_out)}`)}">${UI.icon('check')}<span class="fab-label">Done · ${hrs(r.worked_min)}</span></a>`;
+        } else if (stage === 'in') {
+            el.innerHTML = btn('in', 'ck-in', UI.icon('clock'), 'Check in', `Shift ${s.start}–${s.end}${brk}`);
+        } else if (stage === 'onbreak') {
+            el.innerHTML = btn('resume', 'ck-break', ICON_BREAK, 'End break', `On break since ${hm(r.break_started_at)}${brk}`);
+        } else {
+            // working: a small round "Start break" (opens on hover) next to Check out
+            const canBreak = !r.break_started_at;
+            el.innerHTML = `<div class="flex items-center gap-2">${canBreak ? btn('break', 'ck-brk-start', ICON_BREAK, 'Start break', `Start your break${brk}`, false) : ''}
+                ${btn('out', 'ck-out', UI.icon('clock'), 'Check out', `In since ${hm(r.check_in)}${r.late_min ? ` (${r.late_min} min late)` : ''} · shift ends ${s.end}`)}</div>`;
+        }
     }
 
     // ---------- reminder popup ----------
+    const POP = {
+        in: { title: 'Time to check in', btn: 'Check in now', tone: 'bg-[#111827]', cls: 'btn-dark' },
+        out: { title: 'Don’t forget to check out', btn: 'Check out now', tone: 'bg-coral-500', cls: 'btn-coral' },
+        resume: { title: 'Your break is over', btn: 'End break', tone: 'bg-amber-500', cls: 'btn-dark' }
+    };
     function paintPopup() {
         let box = document.getElementById('checkinPop');
         const kind = state?.remind;
         const onAttendancePage = /attendance\.html$/.test(location.pathname);
-        if (!kind || snoozed(kind) || onAttendancePage) { box?.remove(); return; }
+        if (!kind || !POP[kind] || snoozed(kind) || onAttendancePage) { box?.remove(); return; }
         if (!box) {
             box = document.createElement('div');
             box.id = 'checkinPop';
@@ -72,14 +95,14 @@
             box.className = 'fixed z-[70] right-4 bottom-24 lg:bottom-6 w-[calc(100%-2rem)] max-w-sm bg-white rounded-[1.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-gray-100 p-4 ui-fade';
             document.body.appendChild(box);
         }
-        const s = state.shift;
-        const title = kind === 'in' ? 'Time to check in' : 'Don’t forget to check out';
+        const s = state.shift, P = POP[kind];
         const text = kind === 'in' ? `Shift ${s.start}–${s.end}. Check in at ${UI.esc(state.branch?.name || 'your branch')}.`
+            : kind === 'resume' ? `You started your break at ${hm(state.record?.break_started_at)}${s.break_end ? ` — it was due to end at ${s.break_end}` : ''}.`
             : `Your shift ended at ${s.end}. Check out before you leave.`;
         box.innerHTML = `<div class="flex gap-3">
-            <span class="w-11 h-11 rounded-2xl ${kind === 'in' ? 'bg-[#111827]' : 'bg-coral-500'} text-white flex items-center justify-center flex-shrink-0">${UI.icon('clock', 'w-5 h-5')}</span>
-            <div class="min-w-0 flex-1"><p class="text-sm font-extrabold">${title}</p><p class="text-xs text-gray-500 mt-0.5">${text}</p>
-            <div class="flex gap-2 mt-3"><button type="button" data-punch="${kind}" ${busy ? 'disabled' : ''} class="btn ${kind === 'in' ? 'btn-dark' : 'btn-coral'} btn-sm">${busy ? 'Getting location…' : kind === 'in' ? 'Check in now' : 'Check out now'}</button>
+            <span class="w-11 h-11 rounded-2xl ${P.tone} text-white flex items-center justify-center flex-shrink-0">${kind === 'resume' ? ICON_BREAK.replace('w-4 h-4', 'w-5 h-5') : UI.icon('clock', 'w-5 h-5')}</span>
+            <div class="min-w-0 flex-1"><p class="text-sm font-extrabold">${P.title}</p><p class="text-xs text-gray-500 mt-0.5">${text}</p>
+            <div class="flex gap-2 mt-3"><button type="button" data-punch="${kind}" ${busy ? 'disabled' : ''} class="btn ${P.cls} btn-sm">${busy ? 'Saving…' : P.btn}</button>
             <button type="button" data-snooze class="btn btn-light btn-sm">Later</button></div></div>
             <button type="button" data-snooze class="icon-btn !w-7 !h-7 flex-shrink-0" aria-label="Close reminder">${UI.icon('x', 'w-3 h-3')}</button></div>`;
     }
@@ -92,7 +115,6 @@
             document.getElementById('checkinPop')?.remove();
         }
     });
-    // The Attendance page tells us when it punches, so the card / popup stay in step.
 
     const start = () => {
         if (!localStorage.getItem('cargo_auth_token')) return;

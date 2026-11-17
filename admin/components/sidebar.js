@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
         staff: '<circle cx="9" cy="7" r="4"/><path d="M3 21v-2a6 6 0 0112 0v2M19 8v6M22 11h-6"/>',
         link: '<path d="M10 14a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1 1M14 10a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1-1"/>',
         pulse: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+        chat: '<path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.6 8.6 0 01-3.9-.9L3 21l1.9-5.1a8.4 8.4 0 01-.9-3.9 8.5 8.5 0 019-8.5 8.4 8.4 0 019 8z"/>',
         chev: '<path d="M6 9l6 6 6-6"/>'
     };
 
@@ -41,8 +42,11 @@ document.addEventListener('DOMContentLoaded', () => {
             ['Delivery & POD', 'delivery.html', 'truck', true],
             ['Consolidation & Bulk', 'consolidation.html', 'layers', true]
         ] },
-        { id: 'biz', label: 'Customers & money', items: [
+        { id: 'crm', label: 'CRM', items: [
             ['Customers', 'customers.html', 'users', true],
+            ['WhatsApp', 'crm.html', 'chat', true]
+        ] },
+        { id: 'biz', label: 'Money & stock', items: [
             ['Accounts', 'accounts.html', 'cash', role !== 'staff'],
             ['Warehouse', 'warehouse.html', 'warehouse', isWarehouse || isAdmin]
         ] },

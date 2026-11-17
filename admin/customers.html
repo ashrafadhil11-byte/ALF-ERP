@@ -18,6 +18,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="components/ui.css" rel="stylesheet">
     <script src="components/ui.js"></script>
+    <script src="components/countries.js"></script>
+    <script src="components/oman-places.js"></script>
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
@@ -75,7 +77,7 @@
                     <div><label class="ui-label" for="fName">Name</label><input id="fName" class="field" required></div>
                     <div><label class="ui-label">Phone</label><input id="fPhone" class="field soft" readonly title="The phone links bookings to this customer"></div>
                     <div><label class="ui-label" for="fCivil">Civil ID / passport</label><input id="fCivil" class="field"></div>
-                    <div><label class="ui-label" for="fWa">WhatsApp</label><input id="fWa" class="field"></div>
+                    <div><label class="ui-label" for="fWa">WhatsApp</label><input id="fWa" class="field" data-phone="OM" placeholder="WhatsApp number"></div>
                     <div><label class="ui-label" for="fEmail">Email</label><input id="fEmail" type="email" class="field"></div>
                     <div><label class="ui-label" for="fTags">Tags</label><input id="fTags" class="field" placeholder="e.g. VIP, corporate"></div>
                     <div class="sm:col-span-2 lg:col-span-3"><label class="ui-label" for="fAddr">Address</label><input id="fAddr" class="field"></div>
@@ -159,7 +161,7 @@
             $('pKpis').innerHTML = kpi('Shipments', d.stats?.shipments ?? 0) + kpi('Shipped', `${Math.round(+(d.stats?.kg || 0))} kg`)
                 + kpi('Invoiced', d.spent.map(s => `<span class="block money text-base">${money(s.currency, s.amount)}</span>`).join('') || '—')
                 + kpi('Balance due', d.balance.map(s => `<span class="block money text-base">${money(s.currency, s.amount)}</span>`).join('') || '<span class="text-emerald-600">Nothing</span>', d.balance.length ? 'text-[#D55C48]' : '');
-            $('fName').value = c.name || ''; $('fPhone').value = c.phone || ''; $('fCivil').value = c.civil_id || ''; $('fWa').value = c.whatsapp || '';
+            $('fName').value = c.name || ''; $('fPhone').value = c.phone || ''; $('fCivil').value = c.civil_id || ''; if (c.whatsapp) $('fWa')._phone?.setValue(c.whatsapp); else $('fWa')._phone?.reset(); if (!$('fWa')._phone) $('fWa').value = c.whatsapp || '';
             $('fEmail').value = c.email || ''; $('fTags').value = (c.tags || []).join(', '); $('fAddr').value = c.address || ''; $('fNotes').value = c.notes || '';
             $('fBlocked').checked = c.blocked; $('blockWrap').classList.toggle('hidden', !isOps); $('mergeBtn').classList.toggle('hidden', !isOps);
             $('pRcvCount').textContent = `· ${d.contacts.length}`;
@@ -184,7 +186,7 @@
             e.preventDefault();
             const c = current.customer;
             try {
-                await api('/api/customers', { method: 'POST', body: { action: 'save', id: c.id, name: $('fName').value, civil_id: $('fCivil').value, whatsapp: $('fWa').value, email: $('fEmail').value, tags: $('fTags').value, address: $('fAddr').value, notes: $('fNotes').value, ...(isOps ? { blocked: $('fBlocked').checked } : {}) } });
+                await api('/api/customers', { method: 'POST', body: { action: 'save', id: c.id, name: $('fName').value, civil_id: $('fCivil').value, whatsapp: UI.phoneValue($('fWa')), email: $('fEmail').value, tags: $('fTags').value, address: $('fAddr').value, notes: $('fNotes').value, ...(isOps ? { blocked: $('fBlocked').checked } : {}) } });
                 toast(true, 'Saved.'); await openProfile(c.id); load();
             } catch (err) { toast(false, err.message); }
         };

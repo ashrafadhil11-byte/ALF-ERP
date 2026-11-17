@@ -70,3 +70,28 @@ test('staff & users: break saved, cleared, and half-filled break refused', async
     await users(req('PATCH', { id, break_start: '13:00', break_end: '' }), r);
     assert.equal(r.code, 400);
 });
+
+import attendance, { remindFor } from '../api/_routes/attendance.js';
+test('attendance: Start / End break need no location; past the scheduled break the reminder says end it', async () => {
+    const calls = fake({ id: 'u1', role: 'staff', branch: 'SLL', full_name: 'Ali' }, {
+        '/rest/v1/branches?branch_code=eq.SLL': () => [{ branch_code: 'SLL', lat: 17, lng: 54, geofence_m: 200 }],
+        'rpc/attendance_punch': () => ({ id: 1, break_started_at: new Date().toISOString() })
+    });
+    const r = res();
+    await attendance(req('POST', { action: 'punch', kind: 'break' }), r);   // no GPS sent, branch has a fence
+    assert.equal(r.body.success, true);
+    assert.equal(calls.find(c => c.url.includes('attendance_punch')).body.p_kind, 'break');
+    const shift = { start: '09:00', end: '18:00', break_start: '13:00', break_end: '14:00', weekly_off: [5] };
+    const at = new Date('2026-11-17T10:10:00Z');   // 14:10 Muscat, Tuesday
+    assert.equal(remindFor({ record: { check_in: 'x', break_started_at: '2026-11-17T09:00:00Z' }, shift, tz: 'Asia/Muscat', at }), 'resume');   // 70 min on break
+    assert.equal(remindFor({ record: { check_in: 'x', break_started_at: '2026-11-17T09:30:00Z' }, shift, tz: 'Asia/Muscat', at }), null);      // 40 min
+});
+
+import accounts from '../api/_routes/accounts.js';
+test('suppliers / agents keep city with the country and the full phone number', async () => {
+    const calls = fake({ id: 'u1', role: 'super_admin', branch: null, full_name: 'Boss' }, { '/rest/v1/suppliers': () => [{ id: 9 }] });
+    const r = res();
+    await accounts(req('POST', { action: 'supplier_save', name: 'Gulf Express', kind: 'agent', phone: '+971 501234567', country: 'United Arab Emirates', city: 'Dubai' }), r);
+    const row = calls.find(c => c.url.includes('/rest/v1/suppliers') && c.opts.method === 'POST').body;
+    assert.deepEqual([row.phone, row.country, row.city], ['+971 501234567', 'United Arab Emirates', 'Dubai']);
+});

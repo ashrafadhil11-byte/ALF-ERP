@@ -18,6 +18,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="components/ui.css" rel="stylesheet">
     <script src="components/ui.js"></script>
+    <script src="components/countries.js"></script>
+    <script src="components/oman-places.js"></script>
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
@@ -154,18 +156,18 @@
                 <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Shipper</legend>
                     <div><label class="ui-label" for="f_shipper">Name <span class="req">*</span></label><input id="f_shipper" class="field" placeholder="Sender's name"></div>
-                    <div><label class="ui-label" for="f_shipper_phone">Phone</label><input id="f_shipper_phone" class="field" type="tel" placeholder="968 9XXXXXXX"></div>
-                    <div><label class="ui-label" for="f_origin_city">Origin city</label><input id="f_origin_city" class="field" placeholder="e.g. Salalah"></div>
-                    <div><label class="ui-label" for="f_origin_country">Origin country</label><input id="f_origin_country" class="field" placeholder="e.g. Oman" list="countryList"></div>
+                    <div><label class="ui-label" for="f_shipper_phone">Phone</label><input id="f_shipper_phone" class="field" data-phone="OM" placeholder="Mobile number"></div>
+                    <div><label class="ui-label" for="f_origin_city">Origin city</label><input id="f_origin_city" class="field" data-city-of="f_origin_country" placeholder="Select or type city"></div>
+                    <div><label class="ui-label" for="f_origin_country">Origin country</label><input id="f_origin_country" class="field" data-country placeholder="Select country"></div>
                 </fieldset>
 
                 <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <legend class="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Consignee</legend>
                     <div><label class="ui-label" for="f_consignee">Name <span class="req">*</span></label><input id="f_consignee" class="field" placeholder="Receiver's name"></div>
-                    <div><label class="ui-label" for="f_consignee_phone">Phone</label><input id="f_consignee_phone" class="field" type="tel"></div>
+                    <div><label class="ui-label" for="f_consignee_phone">Phone</label><input id="f_consignee_phone" class="field" data-phone="IN" placeholder="Mobile number"></div>
                     <div class="sm:col-span-2"><label class="ui-label" for="f_consignee_address">Address</label><input id="f_consignee_address" class="field" placeholder="House, street, post office, district, state, PIN"></div>
-                    <div><label class="ui-label" for="f_dest_city">Destination city</label><input id="f_dest_city" class="field" placeholder="e.g. Kochi"></div>
-                    <div><label class="ui-label" for="f_dest_country">Destination country</label><input id="f_dest_country" class="field" placeholder="e.g. India" list="countryList"></div>
+                    <div><label class="ui-label" for="f_dest_city">Destination city</label><input id="f_dest_city" class="field" data-city-of="f_dest_country" placeholder="Select or type city"></div>
+                    <div><label class="ui-label" for="f_dest_country">Destination country</label><input id="f_dest_country" class="field" data-country placeholder="Select country"></div>
                 </fieldset>
 
                 <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -184,7 +186,6 @@
             </div>
         </form>
     </div>
-    <datalist id="countryList"><option>Oman</option><option>India</option><option>Nepal</option><option>Sri Lanka</option><option>Bangladesh</option><option>Pakistan</option><option>Philippines</option><option>United Arab Emirates</option><option>Saudi Arabia</option><option>Qatar</option><option>Kuwait</option><option>Bahrain</option></datalist>
 
     <!-- CSV UPLOAD -->
     <div id="csvModal" class="ui-modal">
@@ -257,7 +258,10 @@
         // ---------- shipment form ----------
         function fillForm(row = {}) {
             $('f_awb').value = row.awb || '';
-            FIELDS.forEach(k => { $('f_' + k).value = row[k] ?? (k === 'package_type' ? 'Parcel' : ''); });
+            FIELDS.forEach(k => {
+                const el = $('f_' + k), v = row[k] ?? (k === 'package_type' ? 'Parcel' : '');
+                if (el._phone) { if (v) el._phone.setValue(v); else el._phone.reset(); } else el.value = v;
+            });
             if (row.package_type && ![...$('f_package_type').options].some(o => o.value === row.package_type)) $('f_package_type').add(new Option(row.package_type));
             setFormIntake(row.intake_mode || intake);
             if (row.branch_code) $('f_branch').value = row.branch_code;
@@ -303,7 +307,7 @@
         $('fetchInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('fetchBtn').click(); } });
 
         function readForm() {
-            const fields = Object.fromEntries(FIELDS.map(k => [k, $('f_' + k).value]));
+            const fields = Object.fromEntries(FIELDS.map(k => [k, UI.phoneValue($('f_' + k))]));
             fields.intake_mode = getFormIntake();
             return { awb: clean($('f_awb').value), fields, branch: $('f_branch').value };
         }
@@ -518,7 +522,7 @@
             let phone = String(b.shipper_phone || '').replace(/[^0-9]/g, '');
             if (phone.length === 8) phone = '968' + phone; // Omani local number
             const text = `Hello ${b.shipper || 'Customer'},\n\nYour booking with *Al-Farha Cargo* is confirmed.\n\n📦 *Tracking ID:* ${awb}\n🎯 *To:* ${b.consignee || ''}, ${[b.dest_city, b.dest_country].filter(Boolean).join(', ')}\n\nThank you for choosing Al-Farha Cargo.`;
-            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+            UI.whatsapp(phone, text);   // the CRM's WhatsApp window
         };
 
         // ---------- shipment details (logistics view) ----------

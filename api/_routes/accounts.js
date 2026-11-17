@@ -417,7 +417,7 @@ export default async function handler(req, res) {
                     name: str(b.name, 80), phone: str(b.phone, 30) || null, notes: str(b.notes, 200) || null, active: b.active !== false,
                     kind: ['supplier', 'agent', 'both'].includes(b.kind) ? b.kind : 'supplier',
                     contact_person: str(b.contact_person, 80) || null, email: str(b.email, 120) || null, address: str(b.address, 300) || null,
-                    country: str(b.country, 60) || null, tax_no: str(b.tax_no, 40) || null,
+                    country: str(b.country, 60) || null, city: str(b.city, 80) || null, tax_no: str(b.tax_no, 40) || null,
                     payment_terms_days: Math.max(0, Math.min(365, parseInt(b.payment_terms_days, 10) || 0)),
                     services: (Array.isArray(b.services) ? b.services : []).filter(x => SERVICES.includes(x))
                 };

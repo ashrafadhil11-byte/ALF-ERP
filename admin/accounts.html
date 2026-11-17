@@ -19,6 +19,7 @@
     <link href="components/ui.css" rel="stylesheet">
     <script src="components/countries.js"></script>
     <script src="components/ui.js"></script>
+    <script src="components/oman-places.js"></script>
     <script src="components/sidebar.js" defer></script>
     <script src="components/topbar.js" defer></script>
     <script src="components/profile-modal.js" defer></script>
@@ -533,7 +534,7 @@
             if (!ctx.full && !ctx.my_branch) return toast(false, 'No branch on your account.');
             form('New invoice', 'For extra charges or customers without a booking. Bookings are invoiced automatically.',
                 `<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${branchSelect()}
-                    ${field('iName', 'Customer', '<input id="iName" class="field">')}${field('iPhone', 'Phone', '<input id="iPhone" class="field" placeholder="+968 …">')}
+                    ${field('iName', 'Customer', '<input id="iName" class="field">')}${field('iPhone', 'Phone', '<input id="iPhone" class="field" data-phone="OM" placeholder="Mobile number">')}
                     ${field('iAwb', 'AWB (optional)', '<input id="iAwb" class="field font-mono">')}
                     ${field('iPay', 'Payment', '<select id="iPay" class="field"><option value="cash">Paid now — cash</option><option value="card">Paid now — card</option><option value="bank">Paid now — bank transfer</option><option value="credit">Credit (pay later)</option></select>')}
                 </div>
@@ -541,7 +542,7 @@
                 <button type="button" class="btn btn-light btn-sm mt-2" onclick="document.getElementById('iLines').insertAdjacentHTML('beforeend', lineRowHtml())"><span data-icon="plus"></span>Add line</button>`,
                 async () => {
                     const lines = [...document.querySelectorAll('#iLines [data-line]')].map(r => Object.fromEntries([...r.querySelectorAll('[data-k]')].map(i => [i.dataset.k, i.value])));
-                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'invoice', branch: xb(), customer_name: $('iName').value, customer_phone: $('iPhone').value, awb: $('iAwb').value, pay_method: $('iPay').value, lines } });
+                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'invoice', branch: xb(), customer_name: $('iName').value, customer_phone: UI.phoneValue($('iPhone')), awb: $('iAwb').value, pay_method: $('iPay').value, lines } });
                     toast(true, `${r.invoice_no} created${r.payment ? ' and paid (' + r.payment.receipt_no + ')' : ''}.`);
                     setTimeout(() => openInvoice(r.id), 300);
                 }, 'Create invoice');
@@ -832,13 +833,13 @@
                 <button type="button" class="icon-btn self-center" onclick="this.closest('[data-sl]').remove()" aria-label="Remove">${UI.icon('x', 'w-3.5 h-3.5')}</button></div>`;
             window._srow = row;
             form('Counter sale', `Packing materials sold at ${curBranch()} (walk-in customers).`,
-                `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">${field('saName', 'Customer', '<input id="saName" class="field" placeholder="Walk-in">')}${field('saPhone', 'Phone', '<input id="saPhone" class="field">')}
+                `<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">${field('saName', 'Customer', '<input id="saName" class="field" placeholder="Walk-in">')}${field('saPhone', 'Phone', '<input id="saPhone" class="field" data-phone="OM" placeholder="Mobile number">')}
                     ${field('saPay', 'Payment', '<select id="saPay" class="field"><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank</option><option value="credit">Credit</option></select>')}</div>
                  <p class="sd-label mt-5 mb-2">Items</p><div id="saLines" class="space-y-2">${row()}</div>
                  <div class="flex justify-between items-center mt-2"><button type="button" class="btn btn-light btn-sm" onclick="document.getElementById('saLines').insertAdjacentHTML('beforeend', _srow())"><span data-icon="plus"></span>Add item</button><span id="saTotal" class="text-sm font-extrabold"></span></div>`,
                 async () => {
                     const lines = [...document.querySelectorAll('#saLines [data-sl]')].map(x => ({ kind: 'material', product_id: x.querySelector('[data-k=product_id]').value, qty: x.querySelector('[data-k=qty]').value, rate: x.querySelector('[data-k=rate]').value }));
-                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'invoice', branch: curBranch(), customer_name: $('saName').value || 'Walk-in', customer_phone: $('saPhone').value, pay_method: $('saPay').value, lines } });
+                    const r = await api('/api/accounts', { method: 'POST', body: { action: 'invoice', branch: curBranch(), customer_name: $('saName').value || 'Walk-in', customer_phone: UI.phoneValue($('saPhone')), pay_method: $('saPay').value, lines } });
                     toast(true, `${r.invoice_no} — ${money(r.currency, r.total)}${r.payment ? ' paid' : ''}.`); cache.materials = null;
                     setTimeout(() => openInvoice(r.id), 300);
                 }, 'Complete sale');
@@ -857,17 +858,18 @@
                     ${field('suName', 'Name <span class="req">*</span>', `<input id="suName" class="field" required value="${esc(s.name || '')}">`)}
                     ${field('suKind', 'Type', `<select id="suKind" class="field">${[['supplier', 'Supplier'], ['agent', 'Agent (airline, shipping line, customs, delivery)'], ['both', 'Both']].map(([k, l]) => `<option value="${k}" ${k === s.kind ? 'selected' : ''}>${l}</option>`).join('')}</select>`)}
                     ${field('suContact', 'Contact person', `<input id="suContact" class="field" value="${esc(s.contact_person || '')}">`)}
-                    ${field('suPhone', 'Phone', `<input id="suPhone" class="field" value="${esc(s.phone || '')}">`)}
+                    ${field('suPhone', 'Phone', `<input id="suPhone" class="field" data-phone="OM" value="${esc(s.phone || '')}">`)}
                     ${field('suEmail', 'Email', `<input id="suEmail" type="email" class="field" value="${esc(s.email || '')}">`)}
-                    ${field('suCountry', 'Country', `<input id="suCountry" class="field" value="${esc(s.country || '')}">`)}
-                    <div class="sm:col-span-2">${field('suAddr', 'Address', `<input id="suAddr" class="field" value="${esc(s.address || '')}">`)}</div>
+                    ${field('suCountry', 'Country', `<input id="suCountry" class="field" data-country placeholder="Select country" value="${esc(s.country || '')}">`)}
+                    ${field('suCity', 'City', `<input id="suCity" class="field" data-city-of="suCountry" placeholder="Select or type city" value="${esc(s.city || '')}">`)}
+                    <div>${field('suAddr', 'Address', `<input id="suAddr" class="field" value="${esc(s.address || '')}">`)}</div>
                     ${field('suTax', 'Tax / VAT no.', `<input id="suTax" class="field" value="${esc(s.tax_no || '')}">`)}
                     ${field('suTerms', 'Payment terms (days, 0 = cash)', `<input id="suTerms" type="number" min="0" max="365" class="field" value="${s.payment_terms_days || 0}">`)}
                     <div class="sm:col-span-2"><p class="ui-label">Services</p><div class="flex flex-wrap gap-2">${SERVICES.map(([k, l]) => `<label class="flex items-center gap-2 bg-[#F8F8FA] rounded-xl px-3 py-2 text-xs font-bold cursor-pointer"><input type="checkbox" class="w-4 h-4" data-svc="${k}" ${(s.services || []).includes(k) ? 'checked' : ''}>${l}</label>`).join('')}</div></div>
                     <div class="sm:col-span-2">${field('suNotes', 'Notes', `<input id="suNotes" class="field" value="${esc(s.notes || '')}">`)}</div>
                     <label class="flex items-center gap-2 text-xs font-bold"><input id="suActive" type="checkbox" class="w-4 h-4" ${s.active ? 'checked' : ''}>Active</label></div>`,
                 async () => {
-                    await api('/api/accounts', { method: 'POST', body: { action: 'supplier_save', id: id || null, name: $('suName').value, kind: $('suKind').value, contact_person: $('suContact').value, phone: $('suPhone').value, email: $('suEmail').value, country: $('suCountry').value, address: $('suAddr').value, tax_no: $('suTax').value, payment_terms_days: $('suTerms').value, services: [...document.querySelectorAll('[data-svc]:checked')].map(x => x.dataset.svc), notes: $('suNotes').value, active: $('suActive').checked } });
+                    await api('/api/accounts', { method: 'POST', body: { action: 'supplier_save', id: id || null, name: $('suName').value, kind: $('suKind').value, contact_person: $('suContact').value, phone: UI.phoneValue($('suPhone')), city: $('suCity').value, email: $('suEmail').value, country: $('suCountry').value, address: $('suAddr').value, tax_no: $('suTax').value, payment_terms_days: $('suTerms').value, services: [...document.querySelectorAll('[data-svc]:checked')].map(x => x.dataset.svc), notes: $('suNotes').value, active: $('suActive').checked } });
                     toast(true, 'Saved.'); cache.suppliers = null;
                 });
         };
