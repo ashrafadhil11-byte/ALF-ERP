@@ -347,3 +347,56 @@ a.sx-chip:hover { background: #E86D58; border-color: #E86D58; color: #fff; }
     .sx-foot { padding: 12px 14px; } .sx-foot .fab:not(.fab-primary) { min-width: 40px; height: 40px; padding: 0 11px; }
 }
 @media (prefers-reduced-motion: reduce) { .sx-body > *, .sx-ev, .sx-dot, .sx-rail-fill, .sx-join svg { animation: none !important; } .sx-panel { transition: none; } }
+
+/* shipment card — compact */
+/* shipment card — compact, frozen top (matches the employee identity card) */
+.sx-panel { max-width: 448px; }
+.sx-top { flex-shrink: 0; }
+.sx-hero { height: 112px; padding: 18px 20px; }
+.sx-badge { font-size: 10px; padding: 6px 12px; letter-spacing: .1em; }
+.sx-close { width: 34px; height: 34px; }
+.sx-body { padding: 0 20px 14px; margin-top: -60px; gap: 12px; }
+.sx-id { padding: 16px; gap: 14px; border-radius: 1.6rem; }
+.sx-avatar { width: 54px; height: 54px; border-radius: 1.1rem; }
+.sx-awb { font-size: 19px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sx-copy { width: 26px; height: 26px; }
+.sx-k { font-size: 10px; margin-bottom: 4px; }
+.sx-v { font-size: 13px; }
+.sx-tile { padding: 12px 14px; border-radius: 1.1rem; }
+.sx-ic { width: 30px; height: 30px; }
+.sx-chip { font-size: 11px; padding: 4px 10px; }
+.sx-end { padding: 12px 14px; border-radius: 1.1rem; }
+.sx-city { font-size: 14px; }
+.sx-country { font-size: 11px; margin-top: 2px; }
+/* the arrow between origin and destination: a chevron in a small white disc, no line */
+.sx-route { gap: 8px; }
+.sx-join { width: 30px; height: 30px; margin: -15px 0 0 -15px; background: #fff; color: #E86D58; border: 1px solid #F1F2F4;
+    box-shadow: 0 0 0 4px #fff, 0 6px 16px -6px rgba(17, 24, 39, .25); }
+.sx-join svg { width: 14px; height: 14px; animation: sx-nudge 2.4s var(--ease-out) infinite; }
+.sx-route:hover .sx-join { transform: scale(1.08); background: #E86D58; color: #fff; }
+@keyframes sx-nudge { 0%, 60%, 100% { transform: translateX(0); } 30% { transform: translateX(2px); } }
+.sx-progress { padding: 14px 14px 12px; border-radius: 1.3rem; }
+.sx-progress > div:first-child { margin-bottom: 12px; }
+.sx-rail { top: 14px; }
+.sx-dot { width: 30px; height: 30px; }
+.sx-dot svg { width: 13px; height: 13px; }
+.sx-step { gap: 6px; }
+.sx-step-name { font-size: 10px; }
+.sx-step.now .sx-dot { box-shadow: 0 0 0 4px #FFE8E3; }
+.sx-tabs { padding: 4px; border-radius: 1rem; }
+.sx-tab-ind { top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / var(--n)); border-radius: .8rem; }
+.sx-tab { font-size: 12px; padding: 8px 6px; }
+.sx-count { min-width: 18px; height: 16px; font-size: 9px; }
+.sx-scroll { border-top: 1px solid #F4F5F7; }
+.sx-panes { padding: 14px 20px 20px; }
+.sx-day { padding: 4px 0 8px 40px; }
+.sx-ev { padding: 0 0 16px 40px; }
+.sx-timeline::before { left: 13px; }
+.sx-ev-dot { width: 28px; height: 28px; }
+.sx-foot { padding: 12px 16px; }
+.sx-foot .fab { height: 38px; min-width: 38px; padding: 0 11px; font-size: 11px; }
+.sx-foot .fab svg { width: 15px; height: 15px; }
+@media (max-width: 520px) {
+    .sx-body { padding: 0 14px 12px; margin-top: -56px; } .sx-panes { padding: 12px 14px 18px; }
+    .sx-hero { height: 104px; padding: 16px; }
+}
