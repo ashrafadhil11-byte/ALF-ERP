@@ -1,0 +1,5 @@
+/* from admin/integrations.html <style> — only on this page. :where() keeps the same specificity as the original rules. */
+:where(body[data-page="integrations"]) .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+:where(body[data-page="integrations"]) .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+:where(body[data-page="integrations"]) .field { width: 100%; padding: .75rem 1rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: .75rem; font-size: .875rem; }
+:where(body[data-page="integrations"]) .field:focus { outline: none; box-shadow: 0 0 0 2px #E86D58; border-color: transparent; }

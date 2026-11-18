@@ -125,6 +125,21 @@ A page only switches over when all of these pass:
 - **Vercel:** builds `web/` into `/app` (`buildCommand`), and links into `/app/*` open the React app. Not deployed yet.
 - **Review pages:** `/app/` (the frame; `?as=<page>.html` highlights that page in the menu) and `/app/parts` (try the fields and popups).
 
+**Phase 1 — live in production since 17 Nov 2026 (commit a11f2d5).**
+
+**Phase 2 — done locally, not pushed (18 Nov 2026)**
+
+- **Converted pages:** Activity Log, CRM · WhatsApp, Scan & Update, Customers and Integrations, at `/app/activity`, `/app/crm`, `/app/status-update`, `/app/customers` and `/app/integrations`.
+- **Menus:** the old pages' menu (`admin/components/sidebar.js`, `REACT_PAGES`) and the React menu (`web/src/lib/pages.ts`, `CONVERTED`) both open these five there. The old `.html` pages still work as a fallback.
+- **Page styles:** each page's own `<style>` moved to `pages/<page>.css`. It is scoped to that page with `:where(body[data-page="…"])`, which keeps the same specificity, so it can't leak into other pages (Integrations restyles `.field`).
+- **Checks:**
+  - Page screenshots: 16 of 16 identical, covering desktop and phone plus their popups.
+  - Step-by-step use (`tests/visual/flows.mjs`): 18 of 18 identical at 0%. The steps open a log entry, open a customer, edit and get asked before closing, search for a merge, pick a WhatsApp template, scan an AWB, accept the box picker, pick the agent milestone, submit, and open the integration edit and add forms.
+  - Server requests: for each save the requests sent are byte-for-byte the same as the old pages'.
+  - Exact text spacing: React splits text such as "2 · 2 shipments" into several pieces, which moves letters by a fraction of a pixel. Those texts are built as one piece.
+- **One deliberate fix:** on Customers, after **Save details**, closing the profile no longer asks "Discard unsaved changes?". The old page forgot to clear its unsaved mark after saving.
+- **Demo page removed:** `/app/parts` is gone. `/app/` on its own goes to the dashboard (still the old page). `/app/?as=<page>.html` stays for the frame check.
+
 ### How to run
 
 ```bash
@@ -138,6 +153,9 @@ node tests/visual/compare.mjs                                # differences → t
 node tests/visual/capture.mjs --frame --out frame-old       # frame only (sidebar, top bar), old pages
 node tests/visual/capture.mjs --frame --target new --out frame-new
 node tests/visual/compare.mjs --base frame-old --cur frame-new --diff frame-diff
+node tests/visual/flows.mjs --target old --out flows-old     # the same clicks on old and React pages
+node tests/visual/flows.mjs --target new --out flows-new
+node tests/visual/compare.mjs --base flows-old --cur flows-new --diff flows-diff
 ```
 
 The layout check reports two existing items on the old pages; the React pages must report the same, no more:

@@ -1,7 +1,7 @@
 // The page frame every signed-in page shares: sidebar, main panel with the top bar, phone bottom bar, profile drawer
 // and the check-in reminder. The elements and their order match the old pages exactly, because the shared ui.css
 // lays them out as children of <body> (the React root uses display:contents).
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { pageByPath, type PageFile } from '../../lib/pages';
 import { Sidebar } from './Sidebar';
@@ -45,6 +45,11 @@ export function AppFrame({ children, mainClassName = MAIN_CLASS, onSearch, after
         window.addEventListener('resize', resize);
         return () => window.removeEventListener('resize', resize);
     }, [menuOpen]);
+    // page-only styles (pages/*.css) apply under :where(body[data-page="<page>"]) — like the old pages' own <style>
+    useLayoutEffect(() => {
+        document.body.dataset.page = (current || '').replace(/\.html$/, '');
+        return () => { delete document.body.dataset.page; };
+    }, [current]);
     // a page change closes the phone menu
     useEffect(() => { setMenuOpen(false); }, [pathname]);
 

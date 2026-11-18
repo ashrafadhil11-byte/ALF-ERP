@@ -7,3 +7,5 @@ tests/visual/current/
 tests/visual/diff/
 *.tsbuildinfo
 tests/visual/frame-*/
+tests/visual/flows*/
+tests/visual/p2-*/

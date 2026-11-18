@@ -1,0 +1,2 @@
+/* from admin/activity.html <style> — only on this page. :where() keeps the same specificity as the original rules. */
+:where(body[data-page="activity"]) pre.details { white-space: pre-wrap; word-break: break-word; font-size: 11px; }

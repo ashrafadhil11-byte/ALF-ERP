@@ -1,0 +1,5 @@
+/* from admin/crm.html <style> — only on this page. :where() keeps the same specificity as the original rules. */
+:where(body[data-page="crm"]) .tpl[aria-pressed="true"] { background: #111827; color: #fff; border-color: #111827; }
+:where(body[data-page="crm"]) .wa-dot { width: 8px; height: 8px; border-radius: 9999px; background: #D1D5DB; }
+:where(body[data-page="crm"]) .wa-dot.on { background: #25D366; box-shadow: 0 0 0 4px rgba(37, 211, 102, .18); }
+:where(body[data-page="crm"]) .cust[aria-selected="true"] { background: #FFF5F3; border-color: #FFD0C7; }

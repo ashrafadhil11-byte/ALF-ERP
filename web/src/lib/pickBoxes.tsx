@@ -33,8 +33,8 @@ function BoxPicker({ d, all, boxes, title, confirmText, done }: { d: Resp; all: 
             <div className="panel max-w-md" role="dialog" aria-modal="true" aria-labelledby="pbTitle">
                 <div className="flex items-start justify-between gap-3"><div>
                     <h3 id="pbTitle" className="text-lg font-extrabold">{title}</h3>
-                    <p className="text-xs text-gray-500 mt-0.5"><b className="font-mono">{d.booking.awb}</b> · {d.booking.consignee || ''} · {all.length} boxes. Untick boxes that are not here.</p></div>
-                    <span className="pill-tag pill-dark" data-count>{n} of {boxes.length}</span></div>
+                    <p className="text-xs text-gray-500 mt-0.5"><b className="font-mono">{d.booking.awb}</b>{` · ${d.booking.consignee || ''} · ${all.length} boxes. Untick boxes that are not here.`}</p></div>
+                    <span className="pill-tag pill-dark" data-count>{`${n} of ${boxes.length}`}</span></div>
                 <div className="flex gap-2 mt-4">
                     <button type="button" className="btn btn-light btn-sm" onClick={() => setTicked(new Set(boxes.map(b => b.piece_no)))}>All</button>
                     <button type="button" className="btn btn-light btn-sm" onClick={() => setTicked(new Set())}>None</button>
@@ -43,8 +43,8 @@ function BoxPicker({ d, all, boxes, title, confirmText, done }: { d: Resp; all: 
                     <label key={b.piece_no} className="flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-4 py-2.5 cursor-pointer has-[:checked]:bg-[#FFF5F3] has-[:checked]:ring-1 has-[:checked]:ring-[#FFD0C7]">
                         <input type="checkbox" className="w-4 h-4 accent-[#E86D58]" value={b.piece_no} checked={ticked.has(b.piece_no)}
                             onChange={(e) => setTicked(t => { const x = new Set(t); if (e.target.checked) x.add(b.piece_no); else x.delete(b.piece_no); return x; })} />
-                        <span className="font-extrabold text-sm w-16">Box {b.piece_no}</span>
-                        <span className="text-[11px] text-gray-500 flex-1">{b.weight ? `${+b.weight} kg` : ''} {dims(b)}</span>
+                        <span className="font-extrabold text-sm w-16">{`Box ${b.piece_no}`}</span>
+                        <span className="text-[11px] text-gray-500 flex-1">{`${b.weight ? `${+b.weight} kg` : ''} ${dims(b)}`}</span>
                         <span className="text-[10px] font-bold text-gray-400 text-right">{b.status || ''}</span>
                     </label>))}
                 </div>

@@ -12,6 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const isAdmin = role === 'super_admin' || role === 'head_office';
     const isWarehouse = localStorage.getItem('cargo_is_warehouse') === '1';
 
+    // Pages already moved to the React app (web/) open there. Keep in step with CONVERTED in web/src/lib/pages.ts.
+    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html']);
+    const link = (page) => REACT_PAGES.has(page) ? '/app/' + page.replace(/\.html$/, '') : page;
+
     const svg = (d, extra = '') => `<svg class="w-[18px] h-[18px] flex-shrink-0 ${extra}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
     const I = {
         home: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
@@ -65,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try { folded = JSON.parse(localStorage.getItem('alf_nav_folded') || '{}'); } catch (e) { folded = {}; }
     const item = ([label, page, icon]) => {
         const on = currentPage === page;
-        return `<a href="${page}" ${on ? 'aria-current="page"' : ''} class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors ${on ? 'bg-[#111827] text-white font-semibold shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 font-medium'}">
+        return `<a href="${link(page)}" ${on ? 'aria-current="page"' : ''} class="nav-item flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-[13px] transition-colors ${on ? 'bg-[#111827] text-white font-semibold shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 font-medium'}">
             ${svg(I[icon], on ? 'text-[#E86D58]' : '')}<span class="truncate">${label}</span></a>`;
     };
     const group = (g) => {
@@ -120,6 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('sidebar-container') || document.getElementById('bottom-nav')) return;
     const page = window.location.pathname.split('/').pop() || 'super-dashboard.html';
+    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html']);   // see above
+    const link = (p) => REACT_PAGES.has(p) ? '/app/' + p.replace(/\.html$/, '') : p;
     const ic = (d) => `<svg class="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
     const items = [
         { href: 'super-dashboard.html', label: 'Home', d: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>' },
@@ -136,14 +142,14 @@ document.addEventListener('DOMContentLoaded', () => {
     nav.innerHTML = `<div class="grid grid-cols-5 max-w-lg mx-auto h-16 items-center">${items.map(it => {
         const active = it.href && it.href.split('?')[0] === page && !it.href.includes('?');
         if (it.primary) {
-            return `<a href="${it.href}" class="flex flex-col items-center justify-center gap-0.5 -mt-6" aria-label="${it.label}">
+            return `<a href="${link(it.href)}" class="flex flex-col items-center justify-center gap-0.5 -mt-6" aria-label="${it.label}">
                 <span class="w-14 h-14 rounded-full ${active ? 'bg-coral-500' : 'bg-[#111827]'} text-white flex items-center justify-center shadow-lg ring-4 ring-white">${ic(it.d)}</span>
                 <span class="text-[10px] font-extrabold ${active ? 'text-coral-500' : 'text-gray-500'}">${it.label}</span></a>`;
         }
         const cls = `flex flex-col items-center justify-center gap-1 h-full text-[10px] font-extrabold ${active ? 'text-coral-500' : 'text-gray-500'}`;
         return it.menu
             ? `<button type="button" onclick="toggleMobileNav(true)" class="${cls}">${ic(it.d)}${it.label}</button>`
-            : `<a href="${it.href}" class="${cls}" ${active ? 'aria-current="page"' : ''}>${ic(it.d)}${it.label}</a>`;
+            : `<a href="${link(it.href)}" class="${cls}" ${active ? 'aria-current="page"' : ''}>${ic(it.d)}${it.label}</a>`;
     }).join('')}</div>`;
     document.body.appendChild(nav);
     document.body.classList.add('max-lg:pb-24'); // keep content clear of the bar

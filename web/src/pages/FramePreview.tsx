@@ -8,6 +8,8 @@ export function FramePreview() {
     const [params] = useSearchParams();
     const as = params.get('as');
     const page = as && pageByFile(as) ? (as as PageFile) : undefined;
+    // /app/ on its own is not a page yet: go to the dashboard (still the old page) instead of an empty frame
+    if (!page) { location.replace('/admin/super-dashboard.html'); return null; }
     // these two pages use a slightly roomier main panel (p-6); the pages themselves will pass it when converted
     const roomy = page === 'super-dashboard.html' || page === 'integrations.html';
     return (
