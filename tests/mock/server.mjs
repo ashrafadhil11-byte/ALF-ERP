@@ -226,6 +226,7 @@ http.createServer((req, res) => {
   if (u.pathname === '/api/dashboard-layout') return send({ config: null });
   if (u.pathname === '/api/integrations') return send(ints);
   if (u.pathname === '/api/codes') return send(req.method==='GET' ? { destinations: [['AE','United Arab Emirates','2'],['IN','India','3'],['SA','Saudi Arabia','4'],['PK','Pakistan','5'],['BD','Bangladesh','6'],['LK','Sri Lanka','7'],['PH','Philippines','8'],['EG','Egypt','9']].map(([country_code,country_name,code])=>({country_code,country_name,code,active:true})), cargo_types: [['1','Air'],['2','Sea'],['3','Road']].map(([code,name],i)=>({code,name,active:true,sort:(i+1)*10})) } : { success: true });
+  if (u.pathname === '/api/create-user') return send({ success: true, user: { id: 'n1' } });
   if (u.pathname === '/api/users') return send(req.method==='GET' ? { users: [
      {id:'1',full_name:'Muhammed Adhil',username:'ashrafadhil',role:'super_admin',branch:null,contact_number:'+968 9309',recovery_email:'owner@example.com',active:true,is_driver:false,last_sign_in_at:new Date().toISOString(),email_confirmed:true,is_me:true},
      {id:'2',full_name:'Fathima Salim',username:'fathima',role:'branch_manager',branch:'MCT',contact_number:'+968 9111',recovery_email:'f@example.com',active:true,is_driver:false,last_sign_in_at:new Date(Date.now()-864e5*3).toISOString(),email_confirmed:true},

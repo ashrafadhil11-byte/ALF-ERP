@@ -63,7 +63,7 @@
         const brk = s.break_start ? ` · break ${s.break_start}–${s.break_end}` : '';
         const btn = (kind, cls, icon, label, tip, open = true) => `<button type="button" data-punch="${kind}" ${busy ? 'disabled' : ''} class="fab ${open ? 'fab-open' : ''} ${cls}" title="${UI.esc(tip)}" aria-label="${label}">${icon}<span class="fab-label">${busy === kind ? (kind === 'in' || kind === 'out' ? 'Locating…' : 'Saving…') : label}</span></button>`;
         if (stage === 'done') {
-            el.innerHTML = `<a href="attendance.html" class="fab ck-done" title="${UI.esc(`${hm(r.check_in)} – ${hm(r.check_out)}`)}">${UI.icon('check')}<span class="fab-label">Done · ${hrs(r.worked_min)}</span></a>`;
+            el.innerHTML = `<a href="/app/attendance" class="fab ck-done" title="${UI.esc(`${hm(r.check_in)} – ${hm(r.check_out)}`)}">${UI.icon('check')}<span class="fab-label">Done · ${hrs(r.worked_min)}</span></a>`;
         } else if (stage === 'in') {
             el.innerHTML = btn('in', 'ck-in', UI.icon('clock'), 'Check in', `Shift ${s.start}–${s.end}${brk}`);
         } else if (stage === 'onbreak') {

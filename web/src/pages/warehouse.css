@@ -1,0 +1,5 @@
+/* from admin/warehouse.html <style> — only on this page. :where() keeps the same specificity as the original rules. */
+:where(body[data-page="warehouse"]) .opt[aria-pressed="true"] { background: #111827; color: #fff; }
+:where(body[data-page="warehouse"]) .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+:where(body[data-page="warehouse"]) .pin-box { letter-spacing: .6em; text-align: center; font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+:where(body[data-page="warehouse"]) .low { background: #FFF5F3; }

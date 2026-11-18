@@ -6,7 +6,7 @@
 //
 // Clicking outside, Esc, or a button calling useDismiss() ask first when something was typed (see lib/guard.ts).
 // Setting open=false from code (after a save) closes without asking.
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, type FormHTMLAttributes, type ReactNode } from 'react';
 import { allowClose, dismissers, markClean } from '../lib/guard';
 
 const DismissContext = createContext<() => void>(() => {});
@@ -19,10 +19,12 @@ type Props = {
     onClose: () => void;
     panelClassName?: string;
     labelledBy?: string;
+    /** the panel itself is a <form> (like the old <form class="panel">); these are its attributes */
+    form?: FormHTMLAttributes<HTMLFormElement>;
     children: ReactNode;
 };
 
-export function Modal({ id, open, onClose, panelClassName = '', labelledBy, children }: Props) {
+export function Modal({ id, open, onClose, panelClassName = '', labelledBy, form, children }: Props) {
     const ref = useRef<HTMLDivElement>(null);
     const onCloseRef = useRef(onClose);
     onCloseRef.current = onClose;
@@ -42,9 +44,9 @@ export function Modal({ id, open, onClose, panelClassName = '', labelledBy, chil
     return (
         <DismissContext.Provider value={dismiss}>
             <div id={id} ref={ref} className={`ui-modal${open ? ' open' : ''}`}>
-                <div className={`panel ${panelClassName}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy}>
-                    {children}
-                </div>
+                {form
+                    ? <form {...form} className={`panel ${panelClassName}`}>{children}</form>
+                    : <div className={`panel ${panelClassName}`} role="dialog" aria-modal="true" aria-labelledby={labelledBy}>{children}</div>}
             </div>
         </DismissContext.Provider>
     );

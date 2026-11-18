@@ -415,7 +415,7 @@
                     const rows = d.requests.map(r => {
                         const iAmWh = ctx.full || me === r.warehouse, iAmBr = ctx.full || me === r.branch_code;
                         const acts = [
-                            r.status === 'requested' && iAmWh ? `<a href="/admin/warehouse.html" class="btn btn-dark btn-sm">Open warehouse</a>` : '',
+                            r.status === 'requested' && iAmWh ? `<a href="/app/warehouse" class="btn btn-dark btn-sm">Open warehouse</a>` : '',
                             r.status === 'requested' && iAmBr && !iAmWh ? `<button type="button" class="btn btn-light btn-sm" onclick="reqAction('stock_cancel', ${r.id}, '${esc(r.request_no)}')">Cancel</button>` : '',
                             r.status === 'dispatched' && iAmBr ? `<button type="button" class="btn btn-coral btn-sm" onclick="reqAction('stock_receive', ${r.id}, '${esc(r.request_no)}')">Receive</button>` : ''
                         ].join(' ');

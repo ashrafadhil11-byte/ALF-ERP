@@ -1,0 +1,11 @@
+/* from admin/attendance.html <style> — only on this page. :where() keeps the same specificity as the original rules. */
+:where(body[data-page="attendance"]) .opt[aria-pressed="true"] { background: #111827; color: #fff; }
+:where(body[data-page="attendance"]) .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+:where(body[data-page="attendance"]) .cal .d { border-radius: 12px; padding: 6px; min-height: 52px; font-size: 10px; background: #F8F8FA; }
+:where(body[data-page="attendance"]) .s-present { background: #ECFDF5 !important; }
+:where(body[data-page="attendance"]) .s-late { background: #FFFBEB !important; }
+:where(body[data-page="attendance"]) .s-absent { background: #FFF5F3 !important; }
+:where(body[data-page="attendance"]) .s-leave { background: #EFF6FF !important; }
+:where(body[data-page="attendance"]) .s-off { background: #F3F4F6 !important; color: #9CA3AF; }
+:where(body[data-page="attendance"]) .punch { width: 180px; height: 180px; border-radius: 9999px; }
+:where(body[data-page="attendance"]) .day-chip[aria-pressed="true"] { background: #111827; color: #fff; }

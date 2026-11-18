@@ -6,11 +6,6 @@ import { DialogHost } from './lib/dialogs';
 import { Toaster } from './lib/toast';
 import { anyDirty, confirmDiscard, installGuard, markClean, DIRTY_SELECTOR } from './lib/guard';
 import { FramePreview } from './pages/FramePreview';
-import { Activity } from './pages/Activity';
-import { Crm } from './pages/Crm';
-import { StatusUpdate } from './pages/StatusUpdate';
-import { Customers } from './pages/Customers';
-import { Integrations } from './pages/Integrations';
 
 /** Moving to another React page with an unsaved popup or form open asks first (like leaving an old page did). */
 function NavigationGuard() {
@@ -44,11 +39,17 @@ export const router = createBrowserRouter([
         element: <Shell />,
         children: [
             { path: '/', element: <FramePreview /> },
-            { path: '/activity', element: <Activity /> },
-            { path: '/crm', element: <Crm /> },
-            { path: '/status-update', element: <StatusUpdate /> },
-            { path: '/customers', element: <Customers /> },
-            { path: '/integrations', element: <Integrations /> },
+            // each page is downloaded the first time it is opened (the router waits for it, so the current page stays until then)
+            { path: '/activity', lazy: () => import('./pages/Activity').then(m => ({ Component: m.Activity })) },
+            { path: '/crm', lazy: () => import('./pages/Crm').then(m => ({ Component: m.Crm })) },
+            { path: '/status-update', lazy: () => import('./pages/StatusUpdate').then(m => ({ Component: m.StatusUpdate })) },
+            { path: '/customers', lazy: () => import('./pages/Customers').then(m => ({ Component: m.Customers })) },
+            { path: '/integrations', lazy: () => import('./pages/Integrations').then(m => ({ Component: m.Integrations })) },
+            { path: '/super-dashboard', lazy: () => import('./pages/dashboard/Dashboard').then(m => ({ Component: m.Dashboard })) },
+            { path: '/attendance', lazy: () => import('./pages/Attendance').then(m => ({ Component: m.Attendance })) },
+            { path: '/warehouse', lazy: () => import('./pages/Warehouse').then(m => ({ Component: m.Warehouse })) },
+            { path: '/create-user', lazy: () => import('./pages/Users').then(m => ({ Component: m.Users })) },
+            { path: '/delivery', lazy: () => import('./pages/Delivery').then(m => ({ Component: m.Delivery })) },
             { path: '*', element: <Navigate to="/" replace /> }
         ]
     }

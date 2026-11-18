@@ -140,6 +140,27 @@ A page only switches over when all of these pass:
 - **One deliberate fix:** on Customers, after **Save details**, closing the profile no longer asks "Discard unsaved changes?". The old page forgot to clear its unsaved mark after saving.
 - **Demo page removed:** `/app/parts` is gone. `/app/` on its own goes to the dashboard (still the old page). `/app/?as=<page>.html` stays for the frame check.
 
+**Phase 2 — live in production since 18 Nov 2026 (commit 032eb72).**
+
+**Phase 3 — done locally, not pushed (18 Nov 2026)**
+
+- **Converted pages:** Dashboard (10 widgets and Customize mode), Attendance, Warehouse, Staff & Users and Delivery & POD, at `/app/super-dashboard`, `/app/attendance`, `/app/warehouse`, `/app/create-user` and `/app/delivery`.
+- **Links switched to the new pages:** the menus, the logo, the phone bottom bar, the check-in "Done" button, the "Open warehouse" link on Accounts and the admin-only redirects. Sign-in and the installed app's start page now open `/app/super-dashboard`. The old `.html` pages still work as a fallback.
+- **Faster first load:** each page is downloaded the first time it is opened. The main bundle is about 101 KB compressed.
+- **`Modal` can render its panel as a `<form>`:** the old popups that were `<form class="panel">` keep their exact structure.
+- **Checks:**
+  - Page and popup screenshots: 46 of 48 identical, covering all 10 pages at desktop and phone size.
+    - The Dashboard's sync badge can read "Cloud Synced" or "Live", depending on which request finishes last. The old page does the same.
+    - Integrations on phone differs by a few pixels.
+  - Frame: 36 of 36 identical.
+  - Step-by-step: 68 of 77 identical. The rest are pop-up messages caught as they faded, plus near-zero (0.00%) differences on the Dashboard.
+  - Server requests: identical on every page, including the drawn delivery signature.
+- **Changed on purpose:**
+  - Cancelling a leave request: the confirmation box no longer shows the word "undefined".
+  - The Dashboard's Latest Bookings search box shows what is typed in the top search.
+  - On Staff & Users, a user whose branch no longer exists shows a blank Branch box, as before.
+- **Sample server:** `tests/mock/server.mjs` now has a `/api/create-user` endpoint.
+
 ### How to run
 
 ```bash

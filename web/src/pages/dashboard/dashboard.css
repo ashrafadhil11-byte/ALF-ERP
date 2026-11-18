@@ -1,0 +1,23 @@
+/* from admin/super-dashboard.html <style> — only on this page. :where() keeps the same specificity as the original rules. */
+:where(body[data-page="super-dashboard"]) .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+:where(body[data-page="super-dashboard"]) .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+:where(body[data-page="super-dashboard"]) .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
+:where(body[data-page="super-dashboard"]) .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* SMARTPHONE-STYLE 4-COLUMN DENSE BENTO GRID */
+:where(body[data-page="super-dashboard"]) .smart-widget-grid {
+    display: grid;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    grid-auto-rows: 185px;
+    grid-auto-flow: dense;
+    gap: 1.25rem;
+}
+:where(body[data-page="super-dashboard"]) .widget-cell { grid-row: span var(--w-rows, 2); }
+@media (min-width: 768px) {
+    :where(body[data-page="super-dashboard"]) .smart-widget-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    :where(body[data-page="super-dashboard"]) .widget-cell { grid-column: span min(var(--w-cols, 1), 2); grid-row: span var(--w-rows, 2); }
+}
+@media (min-width: 1280px) {
+    :where(body[data-page="super-dashboard"]) .smart-widget-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    :where(body[data-page="super-dashboard"]) .widget-cell { grid-column: span var(--w-cols, 1); grid-row: span var(--w-rows, 2); }
+}

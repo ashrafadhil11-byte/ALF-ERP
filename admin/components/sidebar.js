@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isWarehouse = localStorage.getItem('cargo_is_warehouse') === '1';
 
     // Pages already moved to the React app (web/) open there. Keep in step with CONVERTED in web/src/lib/pages.ts.
-    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html']);
+    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html']);
     const link = (page) => REACT_PAGES.has(page) ? '/app/' + page.replace(/\.html$/, '') : page;
 
     const svg = (d, extra = '') => `<svg class="w-[18px] h-[18px] flex-shrink-0 ${extra}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.innerHTML = `
     <aside class="h-[calc(100dvh-2.5rem)] w-60 bg-white rounded-[2rem] shadow-[0_20px_50px_-12px_rgba(0,0,0,0.05)] flex flex-col p-4 sticky top-5 border border-gray-100/80">
-        <a href="super-dashboard.html" class="flex justify-center items-center py-3 mb-2 flex-shrink-0" aria-label="Home">
+        <a href="${link('super-dashboard.html')}" class="flex justify-center items-center py-3 mb-2 flex-shrink-0" aria-label="Home">
             <img src="../assets/LOGO%20BG%20W.svg" alt="Al-Farha Cargo" class="h-9 w-auto object-contain">
         </a>
         <nav class="flex-1 min-h-0 overflow-y-auto custom-scrollbar -mx-1 px-1 space-y-1" aria-label="Main menu">
@@ -124,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('sidebar-container') || document.getElementById('bottom-nav')) return;
     const page = window.location.pathname.split('/').pop() || 'super-dashboard.html';
-    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html']);   // see above
+    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html']);   // see above
     const link = (p) => REACT_PAGES.has(p) ? '/app/' + p.replace(/\.html$/, '') : p;
     const ic = (d) => `<svg class="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
     const items = [

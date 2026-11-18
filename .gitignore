@@ -9,3 +9,8 @@ tests/visual/diff/
 tests/visual/frame-*/
 tests/visual/flows*/
 tests/visual/p2-*/
+tests/visual/final-*/
+tests/visual/p3*/
+tests/visual/cu*/
+tests/visual/wh-*/
+tests/visual/dl-*/

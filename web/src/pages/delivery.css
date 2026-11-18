@@ -1,0 +1,4 @@
+/* from admin/delivery.html <style> — only on this page. :where() keeps the same specificity as the original rules. */
+:where(body[data-page="delivery"]) .tab[aria-selected="true"] { background: #111827; color: #fff; }
+:where(body[data-page="delivery"]) .opt[aria-pressed="true"] { background: #111827; color: #fff; }
+:where(body[data-page="delivery"]) #sigPad { touch-action: none; }

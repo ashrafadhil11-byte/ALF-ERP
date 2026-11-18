@@ -17,7 +17,7 @@
         (function checkAuth() {
             const role = localStorage.getItem('cargo_user_role');
             if (!localStorage.getItem('cargo_auth_token')) window.location.replace('../login.html');
-            else if (role !== 'super_admin' && role !== 'head_office') window.location.replace('super-dashboard.html');
+            else if (role !== 'super_admin' && role !== 'head_office') window.location.replace('/app/super-dashboard');
         })();
     </script>
     <link href="/assets/app.css" rel="stylesheet">

@@ -21,6 +21,79 @@ const only = arg('page', null);
 
 // Each flow: [page name, [step name, action(page)] …]. A screenshot follows every step.
 const FLOWS = {
+    delivery: [
+        ['select-two', async (p) => { const boxes = p.locator('#readyRows [data-sel]'); await boxes.nth(0).check(); if (await boxes.count() > 1) await boxes.nth(1).check(); }],
+        ['search', async (p) => { await p.type('#pickInput', 'sal'); }],
+        ['dispatch-form', async (p) => { await p.fill('#pickInput', ''); await p.dispatchEvent('#pickInput', 'input'); await p.click('#selSend'); }],
+        ['dispatch-agent', async (p) => { await p.click('[data-mode="agent"]'); await p.click('#dAgent'); await p.type('#dAgent', 'aram'); }],
+        ['dispatch-agent-picked', async (p) => { await p.keyboard.press('Enter'); await p.fill('#dRef', 'AX-77'); }],
+        ['dispatched', async (p) => { await p.click('#dispatchBtn'); }],
+        ['out-tab', async (p) => { await p.click('[data-tab="out"]'); }],
+        ['pod', async (p) => { await p.click('#outCards [data-outcome="delivered"]'); }],
+        ['pod-signed', async (p) => {
+            const b = await p.locator('#sigPad').boundingBox();
+            await p.mouse.move(b.x + 30, b.y + 60); await p.mouse.down(); await p.mouse.move(b.x + 120, b.y + 30, { steps: 8 }); await p.mouse.move(b.x + 220, b.y + 90, { steps: 8 }); await p.mouse.up();
+            await p.fill('#pIdNo', '998877');
+        }],
+        ['pod-saved', async (p) => { await p.click('#podBtn'); await p.waitForTimeout(800); }],
+        ['failed-form', async (p) => { await p.keyboard.press('Escape'); await p.waitForTimeout(400); const f = p.locator('#outCards [data-outcome="failed"]'); if (await f.count()) await f.first().click(); }],
+        ['done-tab', async (p) => { await p.keyboard.press('Escape'); await p.waitForTimeout(400); await p.click('[data-tab="done"]'); }],
+        ['collected', async (p) => { await p.click('[data-tab="ready"]'); await p.waitForTimeout(300); const c = p.locator('[data-collect]'); if (await c.count()) await c.first().click(); }]
+    ],
+    'create-user': [
+        ['filter-all-staff', async (p) => { await p.selectOption('#activeFilter', ''); await p.selectOption('#roleFilter', 'staff'); }],
+        ['search', async (p) => { await p.selectOption('#roleFilter', ''); await p.fill('#search', 'sara'); }],
+        ['row-menu', async (p) => { await p.fill('#search', ''); await p.waitForTimeout(200); await p.click('#rows tr:nth-child(2) button[aria-label^="Actions"]'); }],
+        ['edit', async (p) => { await p.click('.row-menu button:has-text("Edit user")'); }],
+        ['edit-warehouse-on', async (p) => { await p.fill('#e_contact', '91112233'); await p.check('#e_wh'); await p.click('#e_off [data-dow="6"]'); await p.fill('#e_brStart', '13:00'); await p.fill('#e_brEnd', '14:00'); }],
+        ['edit-role-change-asks', async (p) => { await p.selectOption('#e_role', 'head_office'); await p.click('#editForm button.btn-dark'); }],
+        ['edit-saved', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['create-form', async (p) => { await p.click('button:has-text("Add User")'); await p.waitForTimeout(300); await p.selectOption('#c_role', 'branch_manager'); }],
+        ['create-fill', async (p) => { await p.fill('#c_fullName', 'Noor Al Harthy'); await p.fill('#c_contact', '91234567'); await p.fill('#c_email', 'noor@example.com'); await p.fill('#c_username', 'nalharthy'); await p.fill('#c_password', 'Temp-pass-123'); await p.selectOption('#c_branch', { index: 1 }); }],
+        ['create-confirm', async (p) => { await p.click('#createBtn'); }],
+        ['create-done', async (p) => { await p.click('[data-confirm] [data-v="1"]'); await p.waitForTimeout(1200); }],
+        ['deactivate-asks', async (p) => { await p.click('#rows tr:nth-child(2) button[aria-label^="Actions"]'); await p.waitForTimeout(200); await p.click('.row-menu button.danger'); }]
+    ],
+    warehouse: [
+        ['pin-mismatch', async (p) => { await p.fill('#gPin', '1234'); await p.fill('#gPin2', '1235'); await p.click('#gBtn'); }],
+        ['set-pin', async (p) => { await p.fill('#gPin', '1234'); await p.fill('#gPin2', '1234'); await p.click('#gBtn'); }],
+        ['send-form', async (p) => { await p.click('[data-send]'); }],
+        ['send-edit-close-asks', async (p) => { await p.fill('#sLines [data-q]', '3'); await p.mouse.click(8, 400); }],
+        ['send-go', async (p) => { await p.click('[data-confirm] [data-v="0"]'); await p.waitForTimeout(300); await p.click('#sGo'); }],
+        ['stock', async (p) => { await p.click('[data-tab="stock"]'); }],
+        ['price-save', async (p) => { await p.fill('[data-item="1"] [data-price]', '0.800'); await p.click('[data-item="1"] [data-save]'); }],
+        ['new-item', async (p) => { await p.click('#newItem'); await p.waitForTimeout(300); await p.fill('#iSku', 'TAPE-B'); await p.fill('#iName', 'Brown tape'); await p.fill('#iPrice', '0.4'); await p.click('#itemForm button.btn-coral'); }],
+        ['purchases', async (p) => { await p.click('[data-tab="purchases"]'); }],
+        ['buy-form', async (p) => { await p.click('#newBuy'); await p.waitForTimeout(300); await p.click('#bAdd'); await p.fill('#bLines [data-bl]:nth-child(1) [data-qty]', '10'); await p.fill('#bLines [data-bl]:nth-child(1) [data-cost]', '0.5'); await p.fill('#bRef', 'MP-9'); }],
+        ['buy-save', async (p) => { await p.click('#buyForm button.btn-coral'); }],
+        ['change-pin', async (p) => { await p.click('#changePinBtn'); }],
+        ['change-cancel', async (p) => { await p.click('#gCancel'); }],
+        ['lock', async (p) => { await p.click('#lockBtn'); }]
+    ],
+    attendance: [
+        ['month-back', async (p) => { await p.click('#mPrev'); }],
+        ['leave-form', async (p) => { await p.click('#askLeave'); await p.waitForTimeout(300); await p.fill('#lFrom', '2026-11-20'); await p.dispatchEvent('#lFrom', 'change'); await p.fill('#lReason', 'Family visit'); }],
+        ['leave-send', async (p) => { await p.click('#leaveForm button.btn-coral'); }],
+        ['today', async (p) => { await p.click('[data-tab="today"]'); }],
+        ['correct', async (p) => { await p.click('[data-fix="day:0"]'); await p.waitForTimeout(300); await p.fill('#fxReason', 'Phone battery died'); }],
+        ['correct-save', async (p) => { await p.click('#fixForm button.btn-coral'); }],
+        ['report', async (p) => { await p.click('[data-tab="report"]'); }],
+        ['leave-tab', async (p) => { await p.click('[data-tab="leave"]'); }],
+        ['approve', async (p) => { const b = p.locator('[data-decide^="approved"]').first(); if (await b.count()) await b.click(); }],
+        ['shifts', async (p) => { await p.click('[data-tab="shifts"]'); }],
+        ['shift-edit', async (p) => { await p.click('[data-shift="0"]'); await p.waitForTimeout(300); await p.click('#shOff [data-dow="6"]'); }],
+        ['shift-save', async (p) => { await p.click('#shiftForm button.btn-coral'); }],
+        ['back-to-me-break', async (p) => { await p.click('[data-tab="me"]'); await p.waitForTimeout(800); const b = p.locator('#breakBtn'); if (await b.count()) await b.click(); }]
+    ],
+    'super-dashboard': [
+        ['scrolled-middle', async (p) => { await p.evaluate(() => { document.querySelector('.dash-scroll').scrollTop = 600; }); }],
+        ['scrolled-bottom', async (p) => { await p.evaluate(() => { const s = document.querySelector('.dash-scroll'); s.scrollTop = s.scrollHeight; }); }],
+        ['customize', async (p) => { await p.evaluate(() => { document.querySelector('.dash-scroll').scrollTop = 0; }); await p.click('#editLayoutBtn'); }],
+        ['resize-pill', async (p) => { await p.click('[data-widget-id="global-shipments"] button:has-text("2×3")'); }],
+        ['catalog', async (p) => { await p.click('#editLayoutBtn'); await p.click('button[title="Add or remove widgets"]'); }],
+        ['catalog-remove', async (p) => { await p.click('#widget-catalog-list > div:nth-child(2) button'); }],
+        ['search-bookings', async (p) => { await p.click('#widget-modal button:has-text("Done")'); await p.evaluate(() => { const s = document.querySelector('.dash-scroll'); s.scrollTop = s.scrollHeight; }); await p.type('input[placeholder^="Search AWB, consignee"]', 'afc'); }]
+    ],
     activity: [
         ['row-detail', async (p) => { await p.click('#rows tr[data-i="0"]'); }],
         ['failed-filter', async (p) => { await p.keyboard.press('Escape'); await p.waitForTimeout(400); await p.check('#fFailed'); }]
