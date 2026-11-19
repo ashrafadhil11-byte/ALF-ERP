@@ -50,17 +50,21 @@ function readFolded(): Record<string, boolean> {
 }
 
 export function Sidebar({ current }: { current: PageFile | undefined }) {
-    const [folded, setFolded] = useState(readFolded);
+    // remembered folds; the group of the current page starts open, and any group can then be folded or opened
+    const folded = useRef(readFolded());
+    const [openMap, setOpenMap] = useState<Record<string, boolean>>(() =>
+        Object.fromEntries(groups().map(g => [g.id, g.items.some(i => i[1] === current) || !folded.current[g.id]])));
     const nav = useRef<HTMLElement>(null);
     const prefetched = useRef(new Set<string>());
 
     // keep the current page's link in view when the menu is long
     useEffect(() => { nav.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' }); }, []);
 
-    const toggle = (id: string, open: boolean) => {
-        const next = { ...folded, [id]: !open };
-        setFolded(next);
-        try { localStorage.setItem('alf_nav_folded', JSON.stringify(next)); } catch { /* ignore */ }
+    const toggle = (id: string) => {
+        const open = !openMap[id];
+        setOpenMap(m => ({ ...m, [id]: open }));
+        folded.current = { ...folded.current, [id]: !open };
+        try { localStorage.setItem('alf_nav_folded', JSON.stringify(folded.current)); } catch { /* ignore */ }
     };
 
     // faster page changes: start loading an old page as soon as the pointer rests on its link
@@ -89,10 +93,10 @@ export function Sidebar({ current }: { current: PageFile | undefined }) {
             <nav ref={nav} onPointerOver={prefetch} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar -mx-1 px-1 space-y-1" aria-label="Main menu">
                 {groups().map(g => {
                     if (!g.label) return <div key={g.id} className="space-y-0.5">{g.items.map(item)}</div>;
-                    const open = g.items.some(i => i[1] === current) || !folded[g.id];
+                    const open = openMap[g.id] ?? true;
                     return (
                         <div key={g.id} className="nav-group" data-group={g.id}>
-                            <button type="button" onClick={() => toggle(g.id, open)} aria-expanded={open}
+                            <button type="button" onClick={() => toggle(g.id)} aria-expanded={open}
                                 className="nav-head w-full flex items-center justify-between px-3.5 pt-3 pb-1.5 text-[10px] font-extrabold uppercase tracking-wider text-gray-400 hover:text-gray-600">
                                 <span>{g.label}</span>{navSvg('chev', `nav-chev transition-transform ${open ? '' : '-rotate-90'}`)}
                             </button>
