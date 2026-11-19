@@ -2,6 +2,7 @@
 // receivers, shipments and invoices; merge a duplicate. Data: GET/POST /api/customers
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { LoyaltyCard, LoyaltySettingsButton, type LoyaltyStatus, type PointsRow } from '../components/Loyalty';
 import { AppFrame } from '../components/frame/AppFrame';
 import { Modal, useDismiss } from '../components/Modal';
 import { Icon } from '../components/Icon';
@@ -18,7 +19,7 @@ import './customers.css';
 type Amount = { currency: string; amount: number };
 type Customer = { id: number; name?: string; customer_no?: string; phone?: string; civil_id?: string; whatsapp?: string; email?: string; tags?: string[]; address?: string; notes?: string; blocked?: boolean;
     branch_code?: string; first_booking_at?: string; created_at?: string; last_booking_at?: string; balance: Amount[]; stats?: { shipments?: number; kg?: number; last_shipment_at?: string } };
-type Profile = { customer: Customer; stats?: { shipments?: number; kg?: number }; spent: Amount[]; balance: Amount[];
+type Profile = { customer: Customer; stats?: { shipments?: number; kg?: number }; spent: Amount[]; balance: Amount[]; loyalty?: LoyaltyStatus | null; points?: PointsRow[];
     contacts: { id: number; name: string; times_used: number; phone?: string; address?: string; city?: string; country?: string }[];
     bookings: { awb: string; booked_at?: string; consignee?: string; dest_city?: string; dest_country?: string; pieces?: number; chargeable_weight?: number; weight?: number; current_status?: string }[];
     invoices: { invoice_no: string; awb?: string; issued_at?: string; currency: string; total: number; balance: number; status: string }[] };
@@ -136,6 +137,7 @@ export function Customers() {
                     {kpi('Invoiced', d.spent.length ? amounts(d.spent) : '—')}
                     {kpi('Balance due', d.balance.length ? amounts(d.balance) : <span className="text-emerald-600">Nothing</span>, d.balance.length ? 'text-[#D55C48]' : '')}
                 </>}</div>
+                {d && c && <LoyaltyCard customerId={c.id} loyalty={d.loyalty || null} points={d.points || []} canAdjust={isOps} onChanged={() => openProfile(c.id)} />}
                 <form id="pForm" onSubmit={save} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 bg-[#F8F8FA] rounded-[1.5rem] p-4">
                     <div><label className="ui-label" htmlFor="fName">Name</label><input id="fName" className="field" required value={f.name} onChange={set('name')} /></div>
                     <div><label className="ui-label">Phone</label><input id="fPhone" className="field soft" readOnly title="The phone links bookings to this customer" value={c?.phone || ''} /></div>
@@ -215,6 +217,7 @@ export function Customers() {
                             <p className="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Built from every booking • matched by phone or civil ID</p>
                         </div>
                     </div>
+                    {['super_admin', 'head_office'].includes(session.role()) && <LoyaltySettingsButton />}
                 </section>
 
                 <div className="flex flex-col sm:flex-row gap-2 mb-4">

@@ -77,6 +77,10 @@
     {
       "path": "/api/carrier-sync",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/summary",
+      "schedule": "0 16 * * *"
     }
   ]
 }

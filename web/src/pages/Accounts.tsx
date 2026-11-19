@@ -375,7 +375,7 @@ function AccountsPage() {
         setTimeout(() => $('vReason')?.focus(), 50);
     };
     async function openInvoice(id: any) {
-        const { invoice: i, payments, branch } = await api(`/api/accounts?view=invoice&id=${id}`);
+        const { invoice: i, payments, branch, points_used: used = [], loyalty: ly } = await api(`/api/accounts?view=invoice&id=${id}`);
         cache.current.invoice = { i, payments, branch };
         const KT: Record<string, string> = { package: 'Package', charge: 'Charge', material: 'Material' };
         const open = ['unpaid', 'partial'].includes(i.status);
@@ -390,8 +390,22 @@ function AccountsPage() {
                 {+i.tax > 0 && <div className="flex justify-between"><span>{`Tax ${i.tax_rate}%`}</span><span className="money">{fmt(i.currency, i.tax)}</span></div>}
                 <div className="flex justify-between font-extrabold text-sm border-t border-gray-200 pt-1"><span>Total</span><span className="money">{money(i.currency, i.total)}</span></div>
                 <div className="flex justify-between"><span>Paid</span><span className="money">{fmt(i.currency, i.paid)}</span></div>
+                {used.length > 0 && <div className="flex justify-between text-emerald-700"><span>{`of which points (${used.reduce((t: number, u: any) => t - u.points, 0)})`}</span><span className="money">{fmt(i.currency, used.reduce((t: number, u: any) => t + +u.amount, 0))}</span></div>}
                 <div className={`flex justify-between font-extrabold ${+i.balance ? 'text-[#D55C48]' : ''}`}><span>Balance due</span><span className="money">{money(i.currency, i.balance)}</span></div></div>
             {payments.length > 0 && <><p className="sd-label mt-4 mb-1">Receipts</p><div className="space-y-1">{payments.map((p: any, n: number) => <div key={n} className={`flex justify-between text-xs ${p.void ? 'line-through opacity-50' : ''}`}><span>{`${p.receipt_no} · ${METHOD_LABEL[p.method]} · ${day(p.received_at)}`}</span><span className="money">{fmt(i.currency, p.amount)}</span></div>)}</div></>}
+            {open && ly?.active && (() => {
+                const val = +(ly.point_value?.[i.currency] || 0);
+                if (!val) return null;
+                const can = Math.min(+ly.balance, Math.floor(+i.balance / val));
+                return <div id="loyaltyBox" className="rounded-2xl p-4 mt-4 border border-amber-100 bg-amber-50/60 flex flex-wrap items-end gap-3">
+                    <div className="flex-1 min-w-[180px]"><p className="sd-label text-amber-700">{`Loyalty · ${ly.tier}`}</p>
+                        <p className="text-sm font-extrabold">{`${(+ly.balance).toLocaleString()} points`}<span className="text-xs font-bold text-gray-500">{` = ${money(i.currency, +ly.balance * val)}`}</span></p>
+                        {can < ly.min_redeem && <p className="text-[11px] text-gray-500">{`Points can be used from ${ly.min_redeem}.`}</p>}</div>
+                    {can >= ly.min_redeem && <>
+                        <div className="w-32">{field('lPts', 'Use points', <input id="lPts" type="number" min={ly.min_redeem} max={can} step="1" className="field" defaultValue={can} />)}</div>
+                        <button type="button" className="btn btn-dark" onClick={() => usePoints(i.id)}><Icon name="star" />Use points</button></>}
+                </div>;
+            })()}
             {open && <div className="bg-[#F8F8FA] rounded-2xl p-4 mt-4 grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
                 <div className="sm:col-span-1">{field('pAmt', 'Amount', <input id="pAmt" type="number" step="0.001" min="0" className="field" defaultValue={i.balance} />)}</div>
                 <div>{field('pMethod', 'Method', <select id="pMethod" className="field"><option value="cash">Cash</option><option value="card">Card</option><option value="bank">Bank</option></select>)}</div>
@@ -403,6 +417,13 @@ function AccountsPage() {
                 {i.status !== 'void' && !payments.some((p: any) => !p.void) && <button type="button" className="btn btn-danger" onClick={() => voidDoc('invoice_void', i.id, i.invoice_no)}>Void</button>}</>);
     }
     const openInvoiceSafe = (id: any) => openInvoice(id).catch(err => toast(false, err.message));
+    const usePoints = async (id: any) => {
+        try {
+            const r = await post({ action: 'loyalty_redeem', invoice_id: id, points: val('lPts') });
+            toast(true, `${r.points} points used: ${money(r.currency, r.amount)} off ${r.invoice_no}.`);
+            await openInvoice(id); if (tabRef.current !== 'overview') show(false);
+        } catch (e) { toast(false, (e as Error).message); }
+    };
     const takePayment = async (id: any) => {
         try {
             const r = await post({ action: 'payment', invoice_id: id, amount: val('pAmt'), method: val('pMethod'), reference: val('pRef') });

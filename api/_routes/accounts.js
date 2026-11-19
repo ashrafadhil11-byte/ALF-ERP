@@ -152,8 +152,10 @@ export default async function handler(req, res) {
             }
             if (view === 'invoice') {
                 const inv = own((await get(`invoices?id=eq.${enc(q.id)}&select=*`))[0]);
-                const [payments, br] = await Promise.all([get(`payments?invoice_id=eq.${inv.id}&select=*&order=received_at.asc`), get(`branches?branch_code=eq.${enc(inv.branch_code)}&select=branch_name,address,phone_number`)]);
-                return res.status(200).json({ invoice: inv, payments, branch: br[0] || null });
+                const [payments, br, points, loyalty] = await Promise.all([get(`payments?invoice_id=eq.${inv.id}&select=*&order=received_at.asc`), get(`branches?branch_code=eq.${enc(inv.branch_code)}&select=branch_name,address,phone_number`),
+                    get(`loyalty_ledger?invoice_id=eq.${inv.id}&kind=eq.redeem&select=id,points,amount,created_at,created_by_name`),
+                    inv.customer_id ? rpc('loyalty_status', { p_customer: inv.customer_id }).catch(() => null) : null]);
+                return res.status(200).json({ invoice: inv, payments, branch: br[0] || null, points_used: points, loyalty });
             }
             if (view === 'payments') {
                 return res.status(200).json({ payments: await get(`payments?received_at=gte.${from}&received_at=lt.${enc(nextDay(to))}${bf(branch)}&select=*,invoices(invoice_no,awb)&order=received_at.desc&limit=300`) });
@@ -331,6 +333,12 @@ export default async function handler(req, res) {
                 const inv = own((await get(`invoices?id=eq.${enc(b.invoice_id)}&select=id,branch_code`))[0]);
                 const out = await rpc('payment_record', { p_invoice_id: inv.id, p_amount: num(b.amount), p_method: PAY_MAP[b.method] || b.method, p_reference: b.reference || null, p_user_name: userName });
                 return res.status(200).json({ success: true, ...out });
+            }
+            case 'loyalty_redeem': {
+                const inv = own((await get(`invoices?id=eq.${enc(b.invoice_id)}&select=id,branch_code`))[0]);
+                const pts = Math.floor(num(b.points) || 0);
+                if (pts <= 0) throw new UserError('Enter how many points to use.');
+                return res.status(200).json({ success: true, ...(await rpc('loyalty_redeem', { p_invoice_id: inv.id, p_points: pts, p_user_name: userName })) });
             }
             case 'invoice_void':
             case 'payment_void':

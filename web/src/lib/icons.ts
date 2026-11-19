@@ -8,6 +8,7 @@ export const ICONS = {
     bell: "<path d=\"M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9\"/><path d=\"M13.7 21a2 2 0 01-3.4 0\"/>",
     volume: "<path d=\"M11 5L6 9H2v6h4l5 4V5z\"/><path d=\"M15.5 8.5a5 5 0 010 7M19 5a10 10 0 010 14\"/>",
     volumeOff: "<path d=\"M11 5L6 9H2v6h4l5 4V5z\"/><path d=\"M22 9l-6 6M16 9l6 6\"/>",
+    chart: "<path d=\"M3 3v18h18\"/><path d=\"M7 15l4-4 3 3 5-6\"/>",
     send: "<path d=\"M22 2L11 13\"/><path d=\"M22 2l-7 20-4-9-9-4 20-7z\"/>",
     search: "<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M21 21l-4.3-4.3\"/>",
     reply: "<path d=\"M9 14L4 9l5-5\"/><path d=\"M4 9h11a5 5 0 015 5v6\"/>",

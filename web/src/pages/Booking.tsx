@@ -48,6 +48,16 @@ export function Booking() {
     const rcvState = useRef<Item | null>(null);
     const [stateOn, setStateOn] = useState(false), [statePh, setStatePh] = useState('Select destination first');
     const senderPh = useRef<PhoneHandle>(null), rcvPh = useRef<PhoneHandle>(null), waPh = useRef<PhoneHandle>(null);
+    // opened from a pickup (Pickups → Make booking): fill the sender, link the booking back when saved
+    const pickupId = useRef<string | null>(new URLSearchParams(location.search).get('pickup'));
+    useEffect(() => {
+        if (!pickupId.current) return;
+        api<{ pickup: { pickup_no: string; customer_name: string; phone: string; notes?: string; picked_pieces?: number; pieces?: number } }>(`/api/pickups?id=${encodeURIComponent(pickupId.current)}`).then(({ pickup: pk }) => {
+            setV(x => ({ ...x, senderName: x.senderName || pk.customer_name, notes: x.notes || [`From pickup ${pk.pickup_no}`, pk.notes].filter(Boolean).join(' · ') }));
+            setTimeout(() => { if (!senderPh.current?.value) senderPh.current?.setValue(pk.phone); }, 300);
+            toast(true, `Booking for pickup ${pk.pickup_no} — sender filled in.`);
+        }).catch(() => { pickupId.current = null; });
+    }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
     const branch = () => branches.find(b => b.branch_code === (isAdmin ? branchCode : myBranch)) || {};
     const dest = () => findCountry(destBox.current?.text);
@@ -279,6 +289,10 @@ export function Booking() {
                 receiver_parts: { house: v.house.trim(), street: v.street.trim(), landmark: v.landmark.trim(), pin: v.pin.trim(), po: v.po.trim(), state: (stateBox.current?.text || '').trim(), city },
                 charge_lines: charges.current.map(({ kind, description, qty, rate, product_id }) => ({ kind, description, qty, rate, product_id })) } });
             if (!out.awb) throw new Error('The booking was saved but no reference came back. Check Shipments before booking again.');
+            if (pickupId.current) {
+                api('/api/pickups', { method: 'POST', body: { action: 'booked', id: pickupId.current, awb: out.awb } }).catch(() => toast(false, 'Booked, but the pickup could not be marked — mark it on the Pickups page.'));
+                pickupId.current = null;
+            }
             setDone({ ...fields, awb: out.awb, booked_at: new Date().toISOString(), cargo_name: t.name, declared_value: fields.declared_value || null, amount: fields.amount || null });
             markClean(form.current);   // saved — leaving the page no longer asks
             setDoneSub(`${fields.consignee} · ${fields.dest_city}, ${c!.n}` + (out.invoice ? ` · ${out.invoice.invoice_no}${out.invoice.payment ? ' (paid, ' + out.invoice.payment.receipt_no + ')' : ' (balance due)'}` : ''));

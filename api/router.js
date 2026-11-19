@@ -20,10 +20,12 @@ import delivery from './_routes/delivery.js';
 import integrations from './_routes/integrations.js';
 import login from './_routes/login.js';
 import mainOffice from './_routes/main-office.js';
+import pickups from './_routes/pickups.js';
 import notifications from './_routes/notifications.js';
 import postalLookup from './_routes/postal-lookup.js';
 import profile from './_routes/profile.js';
 import status from './_routes/status.js';
+import summary from './_routes/summary.js';
 import track from './_routes/track.js';
 import transfers from './_routes/transfers.js';
 import users from './_routes/users.js';
@@ -49,9 +51,11 @@ const ROUTES = {
     login,
     'main-office': mainOffice,
     notifications,
+    pickups,
     'postal-lookup': postalLookup,
     profile,
     status,
+    summary,
     track,
     transfers,
     users,

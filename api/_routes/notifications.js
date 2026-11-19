@@ -47,7 +47,8 @@ export default async function handler(req, res) {
     const pageFor = (code) => code === mo ? 'main-office.html' : 'accounts.html';
     const money = (cur, v) => `${cur || ''} ${(+v || 0).toFixed(3)}`.trim();
 
-    const [cashIn, cashDone, reqNew, reqDone, matNew, matSent, matGot, cargoDone, shares] = await Promise.all([
+    const isManager = isAdmin || session.role === 'branch_manager';
+    const [cashIn, cashDone, reqNew, reqDone, matNew, matSent, matGot, cargoDone, shares, pkMine, pkNew, sums] = await Promise.all([
         inLocs('to_branch') ? get(`cash_transfers?status=eq.sent&sent_at=gte.${enc(since)}${inLocs('to_branch')}&select=id,transfer_no,from_branch,to_branch,currency,amount,sent_at,sent_by_name,reference&order=sent_at.desc&limit=20`) : none(),
         inLocs('from_branch') ? get(`cash_transfers?status=eq.received&received_at=gte.${enc(since)}${inLocs('from_branch')}&select=id,transfer_no,from_branch,to_branch,currency,amount,received_amount,received_at,received_by_name&order=received_at.desc&limit=20`) : none(),
         mo ? get(`payment_requests?status=eq.requested&requested_at=gte.${enc(since)}&select=id,request_no,branch_code,currency,amount,payee,reason,requested_at,requested_by_name&order=requested_at.desc&limit=20`) : none(),
@@ -56,11 +57,34 @@ export default async function handler(req, res) {
         branch ? get(`stock_requests?status=in.(dispatched,rejected)&branch_code=eq.${enc(branch)}&requested_at=gte.${enc(new Date(Date.now() - 30 * 864e5).toISOString())}&select=id,request_no,warehouse,status,dispatched_at,dispatched_by,requested_at,reject_reason,total,currency&order=requested_at.desc&limit=20`) : none(),
         wh ? get(`stock_requests?status=eq.received&received_at=gte.${enc(since)}&warehouse=eq.${enc(wh)}&select=id,request_no,branch_code,received_at,received_by&order=received_at.desc&limit=20`) : none(),
         inLocs('from_branch') ? get(`transfer_manifests?status=in.(received,partial)&received_at=gte.${enc(since)}${inLocs('from_branch')}&select=id,manifest_no,to_branch,status,received_at,received_by_name,transfers(status,missing_pieces)&order=received_at.desc&limit=20`) : none(),
-        branch ? get(`cost_bill_shares?branch_code=eq.${enc(branch)}&select=amount,cost_bills!inner(id,bill_no,branch_code,cost_type,currency,created_at,created_by_name,status)&cost_bills.created_at=gte.${enc(since)}&cost_bills.status=neq.void&limit=20`) : none()
+        branch ? get(`cost_bill_shares?branch_code=eq.${enc(branch)}&select=amount,cost_bills!inner(id,bill_no,branch_code,cost_type,currency,created_at,created_by_name,status)&cost_bills.created_at=gte.${enc(since)}&cost_bills.status=neq.void&limit=20`) : none(),
+        // pickups: a driver hears about the ones given to them; managers about new requests in their branch
+        emp.is_driver ? get(`pickup_requests?driver_id=eq.${enc(me)}&status=eq.assigned&assigned_at=gte.${enc(since)}&select=id,pickup_no,customer_name,address,city,pickup_date,slot,assigned_at&order=assigned_at.desc&limit=20`) : none(),
+        isManager && (branch || isAdmin) ? get(`pickup_requests?status=eq.requested&created_at=gte.${enc(since)}${isAdmin && !branch ? '' : `&branch_code=eq.${enc(branch)}`}&select=id,pickup_no,branch_code,customer_name,city,pickup_date,slot,created_at,created_by_name&order=created_at.desc&limit=20`) : none(),
+        // the evening summary: managers get their branch, head office the company total
+        isManager && (isAdmin || branch) ? get(`daily_summaries?created_at=gte.${enc(since)}&${isAdmin ? 'branch_code=is.null' : `branch_code=eq.${enc(branch)}`}&select=id,day,branch_code,data,created_at&order=day.desc&limit=7`) : none()
     ]);
     const mine = (who) => Boolean(who) && who === myName;
     const recent = (iso) => iso && iso >= since;
+    const SLOTS = { morning: 'morning', afternoon: 'afternoon', evening: 'evening', any: 'any time' };
     const between = [
+        ...sums.map(x => {
+            const d = x.data || {}, got = Object.entries(d.received || {}).reduce((m, [k, v]) => { const c = k.split(' ')[0]; m[c] = (m[c] || 0) + +v; return m; }, {});
+            const late = d.branch ? (!d.cash_closed && (d.bookings || Object.keys(d.received || {}).length) ? 'cash not closed' : '') : (d.cash_not_closed || []).length ? `cash not closed: ${d.cash_not_closed.join(', ')}` : '';
+            return {
+                id: `ds-${x.id}`, kind: late ? 'warn' : 'done', at: x.created_at, href: `summary.html?date=${x.day}`,
+                title: `Daily summary · ${x.day}${x.branch_code ? ' · ' + x.branch_code : ''}`,
+                body: [`${d.bookings || 0} bookings`, ...Object.entries(got).map(([c, v]) => `${c} ${v.toFixed(3)} received`), d.exceptions ? `${d.exceptions} exceptions` : '', late].filter(Boolean).join(' · ')
+            };
+        }),
+        ...pkMine.map(p => ({
+            id: `pk-${p.id}`, kind: 'inbound', at: p.assigned_at, href: 'pickups.html',
+            title: `Pickup for you · ${p.customer_name}`, body: [p.pickup_no, p.pickup_date, SLOTS[p.slot], [p.address, p.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')
+        })),
+        ...pkNew.filter(p => !mine(p.created_by_name)).map(p => ({
+            id: `pn-${p.id}`, kind: 'request', at: p.created_at, href: 'pickups.html',
+            title: `New pickup request · ${p.customer_name}`, body: [p.pickup_no, p.branch_code, p.pickup_date, SLOTS[p.slot], 'assign a driver'].filter(Boolean).join(' · ')
+        })),
         ...cashIn.filter(t => !mine(t.sent_by_name)).map(t => ({
             id: `cs-${t.id}`, kind: 'cash', at: t.sent_at, href: `${pageFor(t.to_branch)}?tab=${t.to_branch === mo ? 'approvals' : 'money'}`,
             title: `Cash on the way · ${money(t.currency, t.amount)} from ${t.from_branch}`,

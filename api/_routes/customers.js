@@ -5,6 +5,7 @@
 //   POST { action:'save', id, name?, email?, whatsapp?, civil_id?, address?, city?, country?, notes?, tags?, blocked? }
 //   POST { action:'merge', keep, drop }                 (branch manager and above)
 //   POST { action:'contact_delete', id }
+//   GET ?view=loyalty_settings · POST { action:'loyalty_adjust', id, points, note } (managers) · { action:'loyalty_settings', … } (head office)
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 
 const enc = encodeURIComponent;
@@ -21,11 +22,18 @@ export default async function handler(req, res) {
     const rest = `${process.env.SUPABASE_URL}/rest/v1`;
     const userName = session.employee?.full_name || session.user.email;
     const get = async (path) => { const r = await fetch(`${rest}/${path}`, { headers: serviceHeaders() }); return r.ok ? r.json() : []; };
+    const rpc = async (fn, body) => {
+        const r = await fetch(`${rest}/rpc/${fn}`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify(body) });
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new UserError(out.message || `${fn} failed.`);
+        return out;
+    };
     const COLS = 'id,customer_no,name,phone,civil_id,email,whatsapp,address,city,country,branch_code,notes,tags,blocked,merged_into,first_booking_at,last_booking_at,created_at';
 
     try {
         const q = req.query || {};
         if (req.method === 'GET') {
+            if (q.view === 'loyalty_settings') return res.status(200).json({ settings: (await get('loyalty_settings?id=eq.1&select=*'))[0] || null });
             if (q.lookup) {
                 const v = q.lookup === 'civil' ? civil(q.value) : digits(q.value);
                 if (!v || v.length < 5) return res.status(200).json({ customer: null });
@@ -41,16 +49,18 @@ export default async function handler(req, res) {
             if (q.id) {
                 const c = (await get(`customers?id=eq.${enc(q.id)}&select=${COLS}`))[0];
                 if (!c) throw new UserError('Customer not found.', 404);
-                const [contacts, bookings, invoices, stats, merged] = await Promise.all([
+                const [contacts, bookings, invoices, stats, merged, loyalty, points] = await Promise.all([
                     get(`customer_contacts?customer_id=eq.${c.id}&select=*&order=last_used_at.desc&limit=100`),
                     get(`bookings?customer_id=eq.${c.id}&select=awb,booked_at,consignee,dest_city,dest_country,pieces,weight,chargeable_weight,current_status,current_status_code,branch_code,amount&order=booked_at.desc&limit=200`),
                     get(`invoices?customer_id=eq.${c.id}&select=id,invoice_no,awb,issued_at,currency,total,paid,balance,status&order=issued_at.desc&limit=200`),
                     get(`customer_stats?customer_id=eq.${c.id}&select=*`),
-                    get(`customers?merged_into=eq.${c.id}&select=id,customer_no,name,phone`)
+                    get(`customers?merged_into=eq.${c.id}&select=id,customer_no,name,phone`),
+                    rpc('loyalty_status', { p_customer: c.id }).catch(() => null),
+                    get(`loyalty_ledger?customer_id=eq.${c.id}&select=id,kind,points,currency,amount,note,created_at,created_by_name,invoices(invoice_no)&order=created_at.desc&limit=50`)
                 ]);
                 const live = invoices.filter(i => i.status !== 'void');
                 return res.status(200).json({
-                    customer: c, contacts, bookings, invoices, merged, stats: stats[0] || null,
+                    customer: c, contacts, bookings, invoices, merged, stats: stats[0] || null, loyalty, points,
                     spent: sumBy(live, 'total'), balance: sumBy(live.filter(i => ['unpaid', 'partial'].includes(i.status)), 'balance')
                 });
             }
@@ -106,6 +116,30 @@ export default async function handler(req, res) {
             const out = await r.json().catch(() => ({}));
             if (!r.ok) throw new UserError(out.message || 'Merge failed.');
             return res.status(200).json({ success: true });
+        }
+        if (b.action === 'loyalty_adjust') {
+            // managers correct a balance (goodwill, mistakes); always with a reason, never below zero
+            if (!OPS.includes(session.role)) throw new UserError('Only managers can adjust points.', 403);
+            const pts = Math.trunc(Number(b.points) || 0);
+            if (!pts || Math.abs(pts) > 100000) throw new UserError('Enter the points to add (or minus to take away).');
+            if (!str(b.note, 200)) throw new UserError('Give a reason.');
+            const c = (await get(`customers?id=eq.${enc(b.id)}&merged_into=is.null&select=id`))[0];
+            if (!c) throw new UserError('Customer not found.', 404);
+            const st = await rpc('loyalty_status', { p_customer: c.id });
+            if (+st.balance + pts < 0) throw new UserError(`The customer has only ${st.balance} points.`);
+            const r = await fetch(`${rest}/loyalty_ledger`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify({ customer_id: c.id, kind: 'adjust', points: pts, note: str(b.note, 200), created_by_name: userName }) });
+            if (!r.ok) throw new UserError('Could not save.');
+            return res.status(200).json({ success: true, balance: +st.balance + pts });
+        }
+        if (b.action === 'loyalty_settings') {
+            if (!ADMIN_ROLES.includes(session.role)) throw new UserError('Only head office can change loyalty settings.', 403);
+            const money = (o) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).map(([k, v]) => [String(k).toUpperCase().slice(0, 3), Math.max(0, Number(v) || 0)]).filter(([k, v]) => /^[A-Z]{3}$/.test(k) && v > 0));
+            const tiers = (Array.isArray(b.tiers) ? b.tiers : []).slice(0, 6).map(t => ({ name: str(t.name, 20), min: Math.max(0, Math.trunc(+t.min || 0)), bonus: Math.min(200, Math.max(0, +t.bonus || 0)) })).filter(t => t.name).sort((x, y) => x.min - y.min);
+            if (!tiers.length || tiers[0].min !== 0) throw new UserError('The first tier must start at 0 points.');
+            const patch = { active: Boolean(b.active), earn_rate: money(b.earn_rate), point_value: money(b.point_value), min_redeem: Math.max(1, Math.trunc(+b.min_redeem || 100)), tiers, updated_at: new Date().toISOString(), updated_by: userName };
+            const r = await fetch(`${rest}/loyalty_settings?id=eq.1`, { method: 'PATCH', headers: serviceHeaders(), body: JSON.stringify(patch) });
+            if (!r.ok) throw new UserError('Could not save.');
+            return res.status(200).json({ success: true, settings: patch });
         }
         if (b.action === 'contact_delete') {
             await fetch(`${rest}/customer_contacts?id=eq.${enc(b.id)}`, { method: 'DELETE', headers: serviceHeaders() });
