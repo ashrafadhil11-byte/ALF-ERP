@@ -12,7 +12,7 @@
 //        | { action:'count', product_id, counted, note } | { action:'purchase', supplier_id?, pay_method, lines, bill_ref?, date? }
 //        | { action:'item', sku, name, unit, sell_price }
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
-import { validPin, hashPin, checkPin, signToken, warehouseOf, MAX_TRIES, LOCK_MINUTES } from '../_lib/pin.js';
+import { warehouseOf, isSuperAdmin, pinAction } from '../_lib/pin.js';
 
 const enc = encodeURIComponent;
 class UserError extends Error { constructor(m, s = 400) { super(m); this.status = s; } }
@@ -33,7 +33,8 @@ export default async function handler(req, res) {
         if (!r.ok) throw new UserError(out.message || `${fn} failed.`);
         return out;
     };
-    const hasAccess = Boolean(e.is_warehouse && e.warehouse_code);
+    // assigned warehouse operators, and super admins (any warehouse, with their own PIN)
+    const hasAccess = Boolean(e.is_warehouse && e.warehouse_code) || isSuperAdmin(session);
 
     try {
         const q = req.query || {};
@@ -41,11 +42,16 @@ export default async function handler(req, res) {
 
         // ---------- access / PIN ----------
         if (req.method === 'GET' && (!q.view || q.view === 'status')) {
-            const wh = hasAccess ? (await get(`branches?branch_code=eq.${enc(e.warehouse_code)}&select=branch_code,branch_name,currency`))[0] : null;
+            const open = warehouseOf(session, req);
+            // super admins choose the warehouse; operators always get their own
+            const choices = isSuperAdmin(session) ? await get('branches?branch_type=eq.warehouse&select=branch_code,branch_name,currency&order=branch_name') : [];
+            const code = open || e.warehouse_code || choices[0]?.branch_code || null;
+            const wh = hasAccess && code ? (choices.find(c => c.branch_code === code) || (await get(`branches?branch_code=eq.${enc(code)}&select=branch_code,branch_name,currency`))[0]) : null;
             return res.status(200).json({
-                access: hasAccess, warehouse: e.warehouse_code || null, warehouse_name: wh?.branch_name || null, currency: wh?.currency || null,
+                access: hasAccess, warehouse: code, warehouse_name: wh?.branch_name || null, currency: wh?.currency || null,
+                warehouses: choices,
                 has_pin: Boolean(e.wh_pin_hash), locked_until: e.wh_pin_locked_until && new Date(e.wh_pin_locked_until) > new Date() ? e.wh_pin_locked_until : null,
-                unlocked: Boolean(warehouseOf(session, req))
+                unlocked: Boolean(open)
             });
         }
         if (req.method === 'POST' && b.action === 'reset_pin') {
@@ -55,26 +61,18 @@ export default async function handler(req, res) {
             return res.status(200).json({ success: true });
         }
         if (!hasAccess) throw new UserError('You are not a warehouse operator. Ask an admin to give you warehouse access.', 403);
-        if (req.method === 'POST' && b.action === 'set_pin') {
-            if (!validPin(b.pin)) throw new UserError('PIN must be 4 to 6 digits.');
-            if (/^(\d)\1+$/.test(b.pin) || '0123456789'.includes(b.pin) || '9876543210'.includes(b.pin)) throw new UserError('Choose a less obvious PIN (not 1111 or 1234).');
-            if (e.wh_pin_hash && !checkPin(b.current_pin, e.wh_pin_hash)) throw new UserError('Current PIN is wrong.');
-            await patchEmp(e.id || session.user.id, { wh_pin_hash: hashPin(b.pin), wh_pin_failed: 0, wh_pin_locked_until: null });
-            return res.status(200).json({ success: true, ...signToken(session.user.id, e.warehouse_code) });
-        }
-        if (req.method === 'POST' && b.action === 'unlock') {
-            if (!e.wh_pin_hash) throw new UserError('Set your warehouse PIN first.');
-            if (e.wh_pin_locked_until && new Date(e.wh_pin_locked_until) > new Date()) {
-                throw new UserError(`Too many wrong PINs — try again after ${new Date(e.wh_pin_locked_until).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Muscat' })}.`, 423);
+        // set / unlock the personal PIN; a super admin also says which warehouse they are opening
+        if (req.method === 'POST' && (b.action === 'set_pin' || b.action === 'unlock')) {
+            let area = e.warehouse_code;
+            if (isSuperAdmin(session) && b.warehouse && b.warehouse !== e.warehouse_code) {
+                const w = (await get(`branches?branch_code=eq.${enc(b.warehouse)}&branch_type=eq.warehouse&select=branch_code`))[0];
+                if (!w) throw new UserError('Choose a warehouse.');
+                area = w.branch_code;
             }
-            if (!checkPin(b.pin, e.wh_pin_hash)) {
-                const tries = (e.wh_pin_failed || 0) + 1;
-                const lock = tries >= MAX_TRIES;
-                await patchEmp(e.id || session.user.id, { wh_pin_failed: lock ? 0 : tries, wh_pin_locked_until: lock ? new Date(Date.now() + LOCK_MINUTES * 60e3).toISOString() : null });
-                throw new UserError(lock ? `Wrong PIN. Locked for ${LOCK_MINUTES} minutes.` : `Wrong PIN. ${MAX_TRIES - tries} tries left.`, 401);
-            }
-            await patchEmp(e.id || session.user.id, { wh_pin_failed: 0, wh_pin_locked_until: null });
-            return res.status(200).json({ success: true, ...signToken(session.user.id, e.warehouse_code) });
+            if (!area) throw new UserError('Choose a warehouse.');
+            if (b.action === 'unlock' && !e.wh_pin_hash) throw new UserError('Set your warehouse PIN first.');
+            try { return res.status(200).json({ success: true, ...(await pinAction(b, { ...e, id: e.id || session.user.id }, patchEmp, area)) }); }
+            catch (err) { throw new UserError(err.message, err.status || 400); }
         }
 
         // ---------- operations: unlocked only ----------

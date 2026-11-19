@@ -27,6 +27,7 @@ export function Login() {
             localStorage.setItem('cargo_auth_token', token);
             localStorage.setItem('cargo_user_role', result.role || 'staff');
             localStorage.setItem('cargo_is_warehouse', result.is_warehouse ? '1' : '');
+            localStorage.setItem('cargo_is_cashier', result.is_cashier ? '1' : '');
             // one dashboard for every role; it adapts to the role
             window.location.href = '/app/super-dashboard';
         } catch (err) {

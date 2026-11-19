@@ -41,10 +41,17 @@ export default async function handler(req, res) {
         if (!r.ok) throw new UserError(out.message || `${fn} failed.`);
         return out;
     };
+    let moCode = null;   // set below: the Main Office location (its books are only handled on the Main Office page)
     const need = (roles) => { if (!roles.includes(role)) throw new UserError('You do not have access to accounts.', 403); };
     // Admins may look at one branch or all (null); everyone else is fixed to their own branch.
     const scope = (asked) => {
-        if (full) return asked ? String(asked).toUpperCase() : null;
+        if (full) {
+            const code = asked ? String(asked).toUpperCase() : null;
+            // Main Office books: only the super admin's read-only reports; everything else is on the Main Office page
+            const reportOnly = req.method === 'GET' && (req.query || {}).view === 'ledger' && role === 'super_admin';
+            if (code && code === moCode && !reportOnly) throw new UserError('Main Office money is handled on the Main Office page.', 403);
+            return code;
+        }
         if (!session.branch) throw new UserError('Your account has no branch assigned.', 403);
         return session.branch;
     };
@@ -62,11 +69,15 @@ export default async function handler(req, res) {
     const own = (doc) => {
         if (!doc) throw new UserError('Not found.', 404);
         if (!full && doc.branch_code !== session.branch) throw new UserError('This belongs to another branch.', 403);
+        if (moCode && (doc.branch_code === moCode || doc.paid_from_branch === moCode)) throw new UserError('Paid by Main Office — it can only be changed on the Main Office page.', 403);
         return doc;
     };
     const bf = (b) => (b ? `&branch_code=eq.${enc(b)}` : '');
+    // Main Office money is handled only on the Main Office page (cashiers, PIN): nothing here writes to its books
+    const mainOffice = async () => (await get('branches?branch_type=eq.main_office&select=branch_code,branch_name,currency'))[0] || null;
 
     try {
+        moCode = (await mainOffice())?.branch_code || null;
         const q = req.query || {};
         if (req.method === 'GET') {
             const view = q.view || 'overview';
@@ -116,7 +127,7 @@ export default async function handler(req, res) {
                     get(`expenses?void=is.false&expense_date=gte.${from}${bf(branch)}&select=currency,amount`),
                     get(`invoices?status=in.(unpaid,partial)${bf(branch)}&select=currency,balance,due_date`),
                     rpc('ledger_summary', { p_branch: branch, p_from: from, p_to: to }),
-                    get('branches?select=branch_code,branch_name,currency,status&order=branch_name.asc')
+                    get('branches?select=branch_code,branch_name,currency,status&branch_type=neq.main_office&order=branch_name.asc')
                 ]);
                 const cur = {};
                 const at = (c) => (cur[c] ||= { currency: c, invoiced: 0, collected: 0, cash: 0, card: 0, bank: 0, expenses: 0, receivable: 0, overdue: 0, income: 0, cost: 0 });
@@ -127,7 +138,7 @@ export default async function handler(req, res) {
                 ledger.forEach(l => { const c = at(l.currency); if (l.type === 'income') c.income += l.credit - l.debit; if (l.type === 'expense') c.cost += l.debit - l.credit; });
                 const round = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, typeof v === 'number' ? Math.round(v * 1000) / 1000 : v]));
                 return res.status(200).json({
-                    branch, from, to, full, role,
+                    branch, from, to, full, role, main_office: role === 'super_admin' ? (await mainOffice()) : null,
                     currencies: Object.values(cur).map(c => round({ ...c, profit: c.income - c.cost })),
                     branches: branches.filter(b => b.status !== 'Dismissed'),
                     my_branch: session.branch || null
@@ -148,11 +159,13 @@ export default async function handler(req, res) {
                 return res.status(200).json({ payments: await get(`payments?received_at=gte.${from}&received_at=lt.${enc(nextDay(to))}${bf(branch)}&select=*,invoices(invoice_no,awb)&order=received_at.desc&limit=300`) });
             }
             if (view === 'expenses') {
-                const [expenses, accounts] = await Promise.all([
+                const [expenses, accounts, banks] = await Promise.all([
                     get(`expenses?expense_date=gte.${from}&expense_date=lte.${to}${bf(branch)}&select=*,accounts(name)&order=expense_date.desc,id.desc&limit=300`),
-                    get('accounts?type=eq.expense&active=is.true&select=code,name&order=code')
+                    get('accounts?type=eq.expense&active=is.true&select=code,name&order=code'),
+                    // branches' own bank accounts, offered as "Paid by" (Main Office accounts are never offered here)
+                    get(`money_accounts?active=is.true${moCode ? `&branch_code=neq.${enc(moCode)}` : ''}&select=branch_code,account_code,name`)
                 ]);
-                return res.status(200).json({ expenses, categories: accounts });
+                return res.status(200).json({ expenses, categories: accounts, banks });
             }
             if (view === 'balances') {
                 const open = await get(`invoices?status=in.(unpaid,partial)${bf(branch)}&select=id,invoice_no,awb,customer_name,customer_phone,currency,balance,issued_at,due_date,branch_code&order=issued_at.asc&limit=1000`);
@@ -165,6 +178,25 @@ export default async function handler(req, res) {
                     c.invoices.push(i);
                 });
                 return res.status(200).json({ customers: Object.values(map).sort((a, b) => b.balance - a.balance) });
+            }
+            // the branch's cash & bank, its running balance with Main Office, transfers and payment requests
+            if (view === 'money') {
+                const b = writeBranch(q.branch);
+                const mo = await mainOffice();
+                const [money, transfers, requests, offices, categories, moBanks] = await Promise.all([
+                    rpc('money_balances', { p_branch: b }),
+                    get(`cash_transfers?or=(from_branch.eq.${enc(b)},to_branch.eq.${enc(b)})&select=*&order=sent_at.desc&limit=100`),
+                    get(`payment_requests?branch_code=eq.${enc(b)}&select=*,accounts(name)&order=requested_at.desc&limit=100`),
+                    rpc('interoffice_balances', {}),
+                    get('accounts?type=eq.expense&active=is.true&select=code,name&order=code'),
+                    mo ? get(`money_accounts?branch_code=eq.${enc(mo.branch_code)}&active=is.true&select=account_code,name,bank_name`) : []
+                ]);
+                return res.status(200).json({
+                    branch: b, main_office: mo, money, transfers, requests, categories,
+                    office: offices.find(o => o.branch_code === b) || null,
+                    // where cash can be sent: Main Office Cash, or straight into a Main Office bank account (names only — no balances)
+                    destinations: mo ? [{ account_code: '1000', name: 'Main Office Cash' }, ...moBanks.map(m => ({ account_code: m.account_code, name: m.name + (m.bank_name ? ` (${m.bank_name})` : '') }))] : []
+                });
             }
             if (view === 'cash') {
                 const b = writeBranch(q.branch);
@@ -304,18 +336,57 @@ export default async function handler(req, res) {
             case 'payment_void':
             case 'expense_void': {
                 const table = { invoice_void: 'invoices', payment_void: 'payments', expense_void: 'expenses' }[b.action];
-                own((await get(`${table}?id=eq.${enc(b.id)}&select=id,branch_code`))[0]);
+                own((await get(`${table}?id=eq.${enc(b.id)}&select=id,branch_code${table === 'expenses' ? ',paid_from_branch' : ''}`))[0]);
                 await rpc(b.action, { p_id: +b.id, p_reason: b.reason || '', p_user_name: userName });
                 return res.status(200).json({ success: true });
             }
             case 'expense': {
                 const br = await branchRow(writeBranch(b.branch));
+                if (String(b.method || '').startsWith('acct:')) {   // one of the branch's own bank accounts
+                    return res.status(200).json({ success: true, ...(await rpc('expense_record_from', {
+                        p_branch: br.branch_code, p_account: b.account_code, p_amount: num(b.amount), p_pay_branch: br.branch_code, p_pay_account: String(b.method).slice(5),
+                        p_paid_to: b.paid_to || null, p_reference: b.reference || null, p_date: b.date || null, p_notes: b.notes || null, p_user_name: userName
+                    })) });
+                }
                 const out = await rpc('expense_record', {
                     p_branch: br.branch_code, p_account: b.account_code, p_currency: br.currency || 'OMR', p_amount: num(b.amount),
                     p_method: PAY_MAP[b.method] || b.method, p_paid_to: b.paid_to || null, p_reference: b.reference || null,
                     p_date: b.date || null, p_notes: b.notes || null, p_user_name: userName
                 });
                 return res.status(200).json({ success: true, ...out });
+            }
+            // ---------- the branch's money and Main Office (send cash, confirm a float, ask Main Office to pay) ----------
+            case 'cash_send': {
+                const br = await branchRow(writeBranch(b.branch));
+                if (!moCode) throw new UserError('There is no Main Office yet.');
+                const to = String(b.to_account || '1000');
+                if (to !== '1000' && !(await get(`money_accounts?branch_code=eq.${enc(moCode)}&account_code=eq.${enc(to)}&active=is.true&select=id`)).length) throw new UserError('Choose where it goes.');
+                return res.status(200).json({ success: true, ...(await rpc('money_transfer', {
+                    p_from_branch: br.branch_code, p_from_account: String(b.from_account || '1000'), p_to_branch: moCode, p_to_account: to,
+                    p_amount: num(b.amount), p_reference: b.reference || null, p_notes: b.notes || null, p_date: b.date || null, p_user_name: userName
+                })) });
+            }
+            case 'cash_receive': {
+                const t = (await get(`cash_transfers?id=eq.${enc(b.id)}&select=to_branch`))[0];
+                if (!t) throw new UserError('Transfer not found.', 404);
+                if (t.to_branch === moCode || (!full && t.to_branch !== session.branch)) throw new UserError('This is for another branch.', 403);
+                return res.status(200).json({ success: true, ...(await rpc('transfer_receive', { p_id: +b.id, p_received: num(b.received), p_notes: b.notes || null, p_user_name: userName })) });
+            }
+            case 'cash_cancel': {
+                const t = (await get(`cash_transfers?id=eq.${enc(b.id)}&select=from_branch`))[0];
+                if (!t || (!full && t.from_branch !== session.branch) || t.from_branch === moCode) throw new UserError('Transfer not found.', 404);
+                await rpc('transfer_cancel', { p_id: +b.id, p_reason: b.reason || '', p_user_name: userName });
+                return res.status(200).json({ success: true });
+            }
+            case 'pay_request': {
+                const br = await branchRow(writeBranch(b.branch));
+                if (!moCode) throw new UserError('There is no Main Office yet.');
+                return res.status(200).json({ success: true, ...(await rpc('payment_request_create', { p_branch: br.branch_code, p_account: String(b.account_code || ''), p_amount: num(b.amount), p_payee: b.payee || null, p_reason: b.reason || '', p_user_name: userName })) });
+            }
+            case 'pay_request_cancel': {
+                own((await get(`payment_requests?id=eq.${enc(b.id)}&select=id,branch_code`))[0]);
+                await rpc('payment_request_decline', { p_id: +b.id, p_status: 'cancelled', p_reason: null, p_user_name: userName });
+                return res.status(200).json({ success: true });
             }
             case 'cash_close': {
                 const out = await rpc('cash_close', { p_branch: writeBranch(b.branch), p_currency: b.currency, p_date: b.date || today(), p_counted: num(b.counted), p_notes: b.notes || null, p_user_name: userName });

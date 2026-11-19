@@ -3,6 +3,7 @@
 //   PATCH { id, full_name?, contact_number?, role?, branch?, is_driver?, active? }
 //   POST  { action:'reset_password', id }  emails a password-reset link
 //   PATCH also takes { is_warehouse, warehouse_code }  — warehouse operator (they still need their own PIN)
+//                and { is_cashier }                     — Main Office cashier (super admin only; also needs their PIN)
 import { requireSession, serviceHeaders, normalizeRole, ADMIN_ROLES } from '../_lib/auth.js';
 
 const enc = encodeURIComponent;
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
     try {
         if (req.method === 'GET') {
             const [er, ar] = await Promise.all([
-                fetch(`${rest}/employees?select=id,full_name,username,role,branch,contact_number,recovery_email,is_driver,is_warehouse,warehouse_code,wh_pin_hash,shift_start,shift_end,break_start,break_end,grace_min,weekly_off,active,created_at&order=full_name.asc`, { headers: serviceHeaders() }),
+                fetch(`${rest}/employees?select=id,full_name,username,role,branch,contact_number,recovery_email,is_driver,is_warehouse,warehouse_code,is_cashier,wh_pin_hash,shift_start,shift_end,break_start,break_end,grace_min,weekly_off,active,created_at&order=full_name.asc`, { headers: serviceHeaders() }),
                 fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=1000`, { headers: serviceHeaders() })
             ]);
             const employees = er.ok ? await er.json() : [];
@@ -132,6 +133,11 @@ export default async function handler(req, res) {
                 } else {
                     Object.assign(patch, { warehouse_code: null, wh_pin_hash: null, wh_pin_failed: 0, wh_pin_locked_until: null });
                 }
+            }
+            if ('is_cashier' in body) {
+                // who may handle Main Office money is the super admin's call
+                if (session.role !== 'super_admin') throw new UserError('Only the super admin can give Main Office access.', 403);
+                patch.is_cashier = Boolean(body.is_cashier);
             }
             if ('active' in body) {
                 if (isSelf && !body.active) throw new UserError('You cannot deactivate yourself.');

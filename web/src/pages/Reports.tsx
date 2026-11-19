@@ -32,7 +32,8 @@ function ReportsPage() {
     const [n, setN] = useState(0);
     const seq = useRef(0);
 
-    useEffect(() => { api('/api/accounts?view=overview').then(o => setBranches(o.branches || [])).catch(() => { /* the filter just stays on all branches */ }); }, []);
+    // the super admin may also report on Main Office's own books
+    useEffect(() => { api('/api/accounts?view=overview').then(o => setBranches([...(o.branches || []), ...(o.main_office ? [o.main_office] : [])])).catch(() => { /* the filter just stays on all branches */ }); }, []);
     useEffect(() => {
         const mine = ++seq.current;
         setD(null); setError('');

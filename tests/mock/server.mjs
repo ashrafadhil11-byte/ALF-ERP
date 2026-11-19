@@ -31,9 +31,59 @@ http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname === '/__role') { role = u.searchParams.get('r'); return res.end('ok'); }
   const send = (o) => { res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(o)); };
+  // ---------- Main Office (sample data) ----------
+  if (u.pathname === '/api/main-office') {
+    const tokOk = Boolean(req.headers['x-office-token']);
+    const exp = new Date(performance.timeOrigin + performance.now() + 30 * 60e3).toISOString(), T = (h) => new Date(Date.now() - h * 36e5).toISOString(), D = (d) => new Date(Date.now() - d * 864e5).toISOString().slice(0, 10);
+    const MO = { branch_code: 'ALFHO', branch_name: 'Al-Farha Main Office', currency: 'OMR' };
+    const money = [{ account_code: '1000', name: 'Cash', kind: 'cash', currency: 'OMR', balance: 1240.5 }, { account_code: '1021', name: 'Bank Muscat — current', kind: 'bank', bank_name: 'Bank Muscat', account_no: '0412-118822-001', currency: 'OMR', balance: 18350.75 }, { account_code: '1022', name: 'NBO — savings', kind: 'bank', bank_name: 'National Bank of Oman', account_no: '7781-0021', currency: 'OMR', balance: 5200 }];
+    if (req.method === 'POST') { let b = ''; req.on('data', c => b += c); req.on('end', () => { const j = JSON.parse(b || '{}');
+      if (j.action === 'unlock' || j.action === 'set_pin') return send({ success: true, token: 'mock.' + Date.now(), expires_at: exp });
+      if (!tokOk) { res.statusCode = 423; return send({ error: 'Main Office is locked — enter your PIN.' }); }
+      const out = { receive: { transfer_no: 'TRF-ALFSNY-000014', difference: +j.received - 85 }, pay_request: { request_no: 'PRQ-ALFTMT-000003', expense_no: 'EXP-ALFTMT-000021' }, pay_bill: { payment_no: 'SPY-ALFSLL-000009', amount: +j.amount },
+        expense: { expense_no: 'EXP-ALFHO-000012' }, transfer: { transfer_no: 'TRF-ALFHO-000007', status: j.to_branch !== 'ALFHO' && j.to_account === '1000' ? 'sent' : 'received' }, bank_add: { account_code: '1023' }, bill_split: { bill_no: 'CST-ALFHO-000003', total: (j.shares || []).reduce((t, x) => t + +x.amount, 0) }, cash_close: { difference: (+j.counted - 1240.5).toFixed(3) } }[j.action] || {};
+      send({ success: true, ...out }); }); return; }
+    const v = u.searchParams.get('view') || 'status';
+    if (v === 'status') return send({ access: true, main_office: MO, has_pin: false, locked_until: null, unlocked: tokOk });
+    if (!tokOk) { res.statusCode = 423; return send({ error: 'Main Office is locked — enter your PIN.' }); }
+    const offices = [{ branch_code: 'ALFSLL', branch_name: 'Al-Farha Cargo Salalah', currency: 'OMR', owes: -420, in_transit: 0 }, { branch_code: 'ALFSNY', branch_name: 'Al-Farha Cargo Sannayya', currency: 'OMR', owes: 35.5, in_transit: 85 }, { branch_code: 'ALFTMT', branch_name: 'Al-Farha Cargo Thumrait', currency: 'OMR', owes: 180, in_transit: 0 }];
+    const banks = [{ branch_code: 'ALFHO', account_code: '1021', name: 'Bank Muscat — current' }, { branch_code: 'ALFHO', account_code: '1022', name: 'NBO — savings' }, { branch_code: 'ALFSLL', account_code: '1023', name: 'Bank Dhofar — Salalah' }];
+    const branches = [{ branch_code: 'ALFHO', branch_name: 'Al-Farha Main Office', branch_type: 'main_office' }, { branch_code: 'ALFSLL', branch_name: 'Al-Farha Cargo Salalah' }, { branch_code: 'ALFSNY', branch_name: 'Al-Farha Cargo Sannayya' }, { branch_code: 'ALFTMT', branch_name: 'Al-Farha Cargo Thumrait' }];
+    if (v === 'overview') return send({ main_office: MO, money, offices, today: { opening: 980, cash_in: 345.5, cash_out: 85, expected: 1240.5, last_closed: D(1) }, pending: { transfers: 1, requests: 2 },
+      moves: [['TRF-ALFSLL-000013 from ALFSLL', '1000', 260.5, 0, 2], ['EXP-ALFTMT-000020 paid for ALFTMT · Landlord', '1021', 0, 180, 5], ['TRF-ALFHO-000006', '1000', 0, 85, 8], ['TRF-ALFHO-000006', '1021', 85, 0, 8], ['SPY-ALFSLL-000008 for CST-ALFSLL-000004 (ALFSLL)', '1021', 0, 320, 30]]
+        .map(([memo, a, dr, cr, h]) => ({ account_code: a, debit: dr, credit: cr, journal_entries: { entry_date: T(h).slice(0, 10), memo, created_by_name: 'Adhil' } })) });
+    if (v === 'approvals') return send({ money,
+      transfers: [{ id: 14, transfer_no: 'TRF-ALFSNY-000014', from_branch: 'ALFSNY', from_name: 'Al-Farha Cargo Sannayya', currency: 'OMR', amount: 85, sent_at: T(3), sent_by_name: 'Muhammed Salim', reference: 'Bag 22', notes: 'Week 46 cash', status: 'sent' }],
+      requests: [{ id: 3, request_no: 'PRQ-ALFTMT-000003', branch_code: 'ALFTMT', branch_name: 'Al-Farha Cargo Thumrait', account_code: '5200', account_name: 'Rent', currency: 'OMR', amount: 180, payee: 'Landlord', reason: 'December rent', requested_at: T(20), requested_by_name: 'Rashid Ali' },
+        { id: 4, request_no: 'PRQ-ALFSNY-000002', branch_code: 'ALFSNY', branch_name: 'Al-Farha Cargo Sannayya', account_code: '5300', account_name: 'Fuel & local transport', currency: 'OMR', amount: 12.5, payee: 'Shell', reason: 'Van fuel', requested_at: T(4), requested_by_name: 'Muhammed Salim' }] });
+    if (v === 'bills') return send({ money, bills: [
+      { kind: 'cost', id: 4, no: 'CST-ALFSLL-000004', date: D(6), branch_code: 'ALFSLL', branch_name: 'Al-Farha Cargo Salalah', currency: 'OMR', total: 640, owed: 320, party: 'Maersk Agent', ref: 'INV-889', about: 'freight · container MSKU1234567' },
+      { kind: 'cost', id: 6, no: 'CST-ALFSNY-000002', date: D(2), branch_code: 'ALFSNY', branch_name: 'Al-Farha Cargo Sannayya', currency: 'OMR', total: 95, owed: 95, party: 'Gulf Express Logistics', ref: null, about: 'trucking · AFC-849232' },
+      { kind: 'purchase', id: 9, no: 'PUR-ALFTMT-000003', date: D(1), branch_code: 'ALFTMT', branch_name: 'Al-Farha Cargo Thumrait', currency: 'OMR', total: 42, owed: 42, party: 'Muscat Packaging LLC', ref: 'MP-2240', about: 'purchase' }] });
+    if (v === 'expenses') return send({ money, branches, categories: [['5100', 'Salaries & wages'], ['5200', 'Rent'], ['5300', 'Fuel & local transport'], ['5400', 'Utilities & phone'], ['5900', 'Other expenses']].map(([code, name]) => ({ code, name })),
+      expenses: [{ id: 21, expense_no: 'EXP-ALFTMT-000020', expense_date: D(0), branch_code: 'ALFTMT', branch_name: 'Al-Farha Cargo Thumrait', accounts: { name: 'Rent' }, paid_to: 'Landlord', notes: 'November rent', paid_from_account: '1021', currency: 'OMR', amount: 180 },
+        { id: 19, expense_no: 'EXP-ALFHO-000011', expense_date: D(2), branch_code: 'ALFHO', branch_name: 'Al-Farha Main Office', accounts: { name: 'Utilities & phone' }, paid_to: 'Omantel', paid_from_account: '1000', currency: 'OMR', amount: 24.75 }] });
+    if (v === 'transfers') return send({ money, banks, branches: branches.slice(1),
+      transfers: [{ id: 14, transfer_no: 'TRF-ALFSNY-000014', transfer_date: D(0), from_branch: 'ALFSNY', from_name: 'Al-Farha Cargo Sannayya', from_account: '1000', to_branch: 'ALFHO', to_name: 'Al-Farha Main Office', to_account: '1000', currency: 'OMR', amount: 85, status: 'sent', reference: 'Bag 22' },
+        { id: 13, transfer_no: 'TRF-ALFSLL-000013', transfer_date: D(0), from_branch: 'ALFSLL', from_name: 'Al-Farha Cargo Salalah', from_account: '1000', to_branch: 'ALFHO', to_name: 'Al-Farha Main Office', to_account: '1000', currency: 'OMR', amount: 262, received_amount: 260.5, status: 'received' },
+        { id: 6, transfer_no: 'TRF-ALFHO-000006', transfer_date: D(1), from_branch: 'ALFHO', from_name: 'Al-Farha Main Office', from_account: '1000', to_branch: 'ALFHO', to_name: 'Al-Farha Main Office', to_account: '1021', currency: 'OMR', amount: 85, received_amount: 85, status: 'received', reference: 'Deposit slip 4471' }] });
+    if (v === 'accounts') return send({ main_office: MO, branches, accounts: [
+      { branch_code: 'ALFHO', branch_name: 'Al-Farha Main Office', account_code: '1000', name: 'Main Office Cash', kind: 'cash', currency: 'OMR', balance: 1240.5 },
+      { branch_code: 'ALFHO', branch_name: 'Al-Farha Main Office', account_code: '1021', name: 'Bank Muscat — current', kind: 'bank', bank_name: 'Bank Muscat', account_no: '0412-118822-001', currency: 'OMR', balance: 18350.75 },
+      { branch_code: 'ALFHO', branch_name: 'Al-Farha Main Office', account_code: '1022', name: 'NBO — savings', kind: 'bank', bank_name: 'National Bank of Oman', account_no: '7781-0021', currency: 'OMR', balance: 5200 },
+      { branch_code: 'ALFSLL', branch_name: 'Al-Farha Cargo Salalah', account_code: '1023', name: 'Bank Dhofar — Salalah', kind: 'bank', bank_name: 'Bank Dhofar', account_no: '22-881', currency: 'OMR', balance: 640 }] });
+    if (v === 'split_options') return send({ branches,
+      suppliers: [{ id: 1, name: 'Gulf Express Logistics', kind: 'agent' }, { id: 2, name: 'Maersk Agent', kind: 'agent' }, { id: 3, name: 'Muscat Packaging LLC', kind: 'supplier' }],
+      consolidations: [{ id: 31, kind: 'mawb', mawb: '176-44551234', dest_country: 'IN', closed: true }, { id: 32, kind: 'container', mawb: 'MSKU1234567', dest_country: 'PK', closed: false }] });
+    if (v === 'split_preview') { const amt = +u.searchParams.get('amount') || 0, a1 = Math.round(amt * 550) / 1000, a2 = Math.round(amt * 300) / 1000;
+      return send({ shares: [{ branch: 'ALFSLL', basis: 55, share: 0.55, amount: a1 }, { branch: 'ALFSNY', basis: 30, share: 0.3, amount: a2 }, { branch: 'ALFHO', basis: 15, share: 0.15, amount: Math.round((amt - a1 - a2) * 1000) / 1000 }] }); }
+    if (v === 'statement') return send({ lines: [['Opening balance (manual journal)', 18000, 0, 400], ['TRF-ALFHO-000006', 85, 0, 8], ['SPY-ALFSLL-000008 for CST-ALFSLL-000004 (ALFSLL)', 0, 320, 30], ['EXP-ALFTMT-000020 paid for ALFTMT', 0, 180, 5]]
+      .map(([memo, dr, cr, h]) => ({ debit: dr, credit: cr, journal_entries: { entry_date: T(h).slice(0, 10), memo } })) });
+    if (v === 'cash') return send({ date: D(0), currency: 'OMR', day: { opening: 980, cash_in: 345.5, cash_out: 85, expected: 1240.5, last_closed: D(1) }, closings: [{ id: 2, close_date: D(1), expected: 980, counted: 980, difference: 0, closed_by_name: 'Adhil' }] });
+  }
   if (u.pathname === '/api/warehouse') {
     const tokOk = Boolean(req.headers['x-warehouse-token']);
-    if (req.method === 'POST') { const exp = new Date(Date.now() + 30 * 60e3).toISOString(); return send({ success: true, token: 'mock.' + Date.now(), expires_at: exp, purchase_no: 'PUR-CWH-000004' }); }
+    if (req.method === 'POST') { const exp = new Date(performance.timeOrigin + performance.now() + 30 * 60e3).toISOString(); return send({ success: true, token: 'mock.' + Date.now(), expires_at: exp, purchase_no: 'PUR-CWH-000004' }); }
     const v = u.searchParams.get('view') || 'status';
     if (v === 'status') return send({ access: true, warehouse: 'CWH', warehouse_name: 'Central Warehouse Muscat', currency: 'OMR', has_pin: false, locked_until: null, unlocked: tokOk });
     if (!tokOk) { res.statusCode = 423; return send({ error: 'Warehouse is locked — enter your PIN.' }); }
@@ -191,12 +241,27 @@ http.createServer((req, res) => {
     if (v === 'purchases') return send({ suppliers:[{ id:1, name:'Gulf Packaging', active:true }], owed:[{ supplier_id:1, currency:'OMR', balance:30 }],
       purchases:[{ id:4, purchase_no:'PUR-ALFSLL-000004', purchase_date:new Date().toISOString().slice(0,10), suppliers:{name:'Gulf Packaging'}, bill_ref:'B-77', lines:[{qty:100,description:'Carton box — large'},{qty:1,description:'Bubble roll'}], currency:'OMR', total:60, paid:30, balance:30, status:'partial' }] });
   }
+  if (u.pathname === '/api/accounts' && req.method === 'GET' && u.searchParams.get('view') === 'money') {
+    const b = u.searchParams.get('branch') || 'ALFSNY', T = (h) => new Date(Date.now() - h * 36e5).toISOString();
+    return send({ branch: b, main_office: { branch_code: 'ALFHO', branch_name: 'Al-Farha Main Office', currency: 'OMR' },
+      money: [{ account_code: '1000', name: 'Cash', kind: 'cash', currency: 'OMR', balance: 214.25 }, ...(b === 'ALFSLL' ? [{ account_code: '1023', name: 'Bank Dhofar — Salalah', kind: 'bank', currency: 'OMR', balance: 640 }] : [])],
+      office: { branch_code: b, owes: 35.5, in_transit: 85, currency: 'OMR' },
+      destinations: [{ account_code: '1000', name: 'Main Office Cash' }, { account_code: '1021', name: 'Bank Muscat — current (Bank Muscat)' }],
+      categories: [['5200', 'Rent'], ['5300', 'Fuel & local transport'], ['5400', 'Utilities & phone'], ['5900', 'Other expenses']].map(([code, name]) => ({ code, name })),
+      transfers: [{ id: 14, transfer_no: `TRF-${b}-000014`, transfer_date: T(3).slice(0, 10), from_branch: b, from_account: '1000', to_branch: 'ALFHO', to_account: '1000', currency: 'OMR', amount: 85, status: 'sent', reference: 'Bag 22' },
+        { id: 15, transfer_no: 'TRF-ALFHO-000008', transfer_date: T(1).slice(0, 10), from_branch: 'ALFHO', from_account: '1000', to_branch: b, to_account: '1000', currency: 'OMR', amount: 50, status: 'sent', sent_by_name: 'Adhil' },
+        { id: 9, transfer_no: `TRF-${b}-000009`, transfer_date: T(170).slice(0, 10), from_branch: b, from_account: '1000', to_branch: 'ALFHO', to_account: '1021', currency: 'OMR', amount: 300, received_amount: 300, status: 'received' }],
+      requests: [{ id: 4, request_no: `PRQ-${b}-000002`, requested_at: T(4), requested_by_name: 'Muhammed Salim', accounts: { name: 'Fuel & local transport' }, payee: 'Shell', reason: 'Van fuel', currency: 'OMR', amount: 12.5, status: 'requested' },
+        { id: 2, request_no: `PRQ-${b}-000001`, requested_at: T(90), requested_by_name: 'Muhammed Salim', accounts: { name: 'Utilities & phone' }, payee: 'Omantel', reason: 'Internet', currency: 'OMR', amount: 23, status: 'paid', decided_by_name: 'Adhil' }] });
+  }
   if (u.pathname === '/api/accounts') {
     const v = u.searchParams.get('view') || 'overview', T = (d) => new Date(Date.now() - d * 864e5).toISOString();
     if (req.method === 'POST') { let b=''; req.on('data',c=>b+=c); req.on('end',()=>{ const j=JSON.parse(b||'{}');
       if (j.action==='invoice') return send({ success:true, id:101, invoice_no:'INV-ALFSLL-000101', total:3, payment: j.pay_method==='credit'?null:{ receipt_no:'RCT-ALFSLL-000090' } });
       if (j.action==='payment') return send({ success:true, receipt_no:'RCT-ALFSLL-000091', amount:+j.amount, currency:'OMR' });
       if (j.action==='expense') return send({ success:true, expense_no:'EXP-ALFSLL-000012' });
+      if (j.action==='cash_send') return send({ success:true, transfer_no:'TRF-'+(j.branch||'ALFSNY')+'-000016', status: j.to_account==='1000' ? 'sent' : 'received' });
+      if (j.action==='pay_request') return send({ success:true, request_no:'PRQ-'+(j.branch||'ALFSNY')+'-000003' });
       if (j.action==='cash_close') return send({ success:true, difference: (+j.counted - 41.25).toFixed(3) });
       if (j.action==='journal') { const d=(j.lines||[]).reduce((s,l)=>s+(+l.debit||0)-(+l.credit||0),0); if (Math.abs(d)>0.0005) { res.statusCode=400; return send({ error:'Journal does not balance.' }); } }
       send({ success:true }); }); return; }

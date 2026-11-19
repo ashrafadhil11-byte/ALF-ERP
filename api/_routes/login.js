@@ -70,7 +70,8 @@ export default async function handler(req, res) {
             access_token: data.access_token,
             user: data.user,
             role,
-            is_warehouse: Boolean(empRows[0]?.is_warehouse && empRows[0]?.warehouse_code)
+            is_warehouse: Boolean(empRows[0]?.is_warehouse && empRows[0]?.warehouse_code),
+            is_cashier: Boolean(empRows[0]?.is_cashier)
         });
 
     } catch (error) {

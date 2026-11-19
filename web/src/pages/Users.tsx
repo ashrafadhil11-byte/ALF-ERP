@@ -32,7 +32,7 @@ export const ago = (iso?: string) => {
 };
 const initials = (n?: string) => String(n || '?').split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
 
-type User = { id: string; full_name?: string; username?: string; recovery_email?: string; contact_number?: string; role: string; branch?: string; is_driver?: boolean; is_warehouse?: boolean;
+type User = { id: string; full_name?: string; username?: string; recovery_email?: string; contact_number?: string; role: string; branch?: string; is_driver?: boolean; is_warehouse?: boolean; is_cashier?: boolean;
     warehouse_code?: string; has_wh_pin?: boolean; is_me?: boolean; active: boolean; email_confirmed?: boolean; last_sign_in_at?: string;
     shift_start?: string; shift_end?: string; grace_min?: number; break_start?: string; break_end?: string; weekly_off?: number[] };
 type Branch = { branch_code: string; branch_name: string; branch_type?: string };
@@ -105,13 +105,13 @@ export function Users() {
     // ---------- edit ----------
     const [editing, setEditing] = useState<User | null>(null);
     const [editOpen, setEditOpen] = useState(false);
-    const [e, setE] = useState({ name: '', role: '', branch: '', driver: false, wh: false, whCode: '', shStart: '', shEnd: '', grace: '', brStart: '', brEnd: '', off: [] as number[] });
+    const [e, setE] = useState({ name: '', role: '', branch: '', driver: false, wh: false, cashier: false, whCode: '', shStart: '', shEnd: '', grace: '', brStart: '', brEnd: '', off: [] as number[] });
     const ePh = useRef<PhoneHandle>(null);
     const whs = branches.filter(b => b.branch_type === 'warehouse');
     const openEdit = (u: User) => {
         closeMenu();
         setEditing(u);
-        setE({ name: u.full_name || '', role: u.role, branch: isGlobal(u.role) ? '' : u.branch || '', driver: !!u.is_driver, wh: !!u.is_warehouse,
+        setE({ name: u.full_name || '', role: u.role, branch: isGlobal(u.role) ? '' : u.branch || '', driver: !!u.is_driver, wh: !!u.is_warehouse, cashier: !!u.is_cashier,
             whCode: u.warehouse_code || (whs[0]?.branch_code ?? ''), shStart: hh(u.shift_start, '09:00'), shEnd: hh(u.shift_end, '18:00'), grace: String(u.grace_min ?? 10),
             brStart: hh(u.break_start), brEnd: hh(u.break_end), off: [...(u.weekly_off || [5])] });
         ePh.current?.reset('OM'); if (u.contact_number) ePh.current?.setValue(u.contact_number, 'OM');
@@ -122,7 +122,7 @@ export function Users() {
         if (!ePh.current?.valid) return toast(false, 'Contact number looks wrong — check the country code and number.');
         const u = editing!;
         const body: Record<string, unknown> = { id: u.id, full_name: e.name, contact_number: ePh.current.value, branch: e.branch, is_driver: e.driver,
-            is_warehouse: e.wh, warehouse_code: e.whCode, shift_start: e.shStart, shift_end: e.shEnd, grace_min: +e.grace,
+            is_warehouse: e.wh, warehouse_code: e.whCode, ...(session.role() === 'super_admin' ? { is_cashier: e.cashier } : {}), shift_start: e.shStart, shift_end: e.shEnd, grace_min: +e.grace,
             break_start: e.brStart, break_end: e.brEnd, weekly_off: [1, 2, 3, 4, 5, 6, 7].filter(n => e.off.includes(n)) };
         if (!u.is_me) body.role = e.role;
         const roleChanged = body.role && body.role !== u.role;
@@ -245,6 +245,11 @@ export function Users() {
                             {editing && DOW.map((d, i) => <button key={d} type="button" data-dow={i + 1} aria-pressed={e.off.includes(i + 1)} onClick={() => setE(v => ({ ...v, off: v.off.includes(i + 1) ? v.off.filter(x => x !== i + 1) : [...v.off, i + 1] }))}
                                 className="px-3 py-1.5 rounded-full text-[11px] font-extrabold bg-white border border-gray-200 aria-pressed:bg-[#111827] aria-pressed:text-white aria-pressed:border-[#111827]">{d}</button>)}
                         </div>
+                    </div>
+                    <div className={`sm:col-span-2 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100${session.role() === 'super_admin' ? '' : ' hidden'}`}>
+                        <label className="flex items-center gap-3 cursor-pointer">
+                            <input id="e_cashier" type="checkbox" className="w-4 h-4" checked={!!e.cashier} onChange={ev => setE({ ...e, cashier: ev.target.checked })} /><span className="text-xs font-bold">Main Office cashier</span><span className="text-[11px] text-gray-400">— company cash &amp; bank, approvals and payments (opens with their PIN)</span>
+                        </label>
                     </div>
                     <div className="sm:col-span-2 bg-[#F8F8FA] rounded-2xl px-4 py-3 border border-gray-100 space-y-2">
                         <label className="flex items-center gap-3 cursor-pointer">

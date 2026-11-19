@@ -334,7 +334,7 @@ export function Branches() {
                     <div><label className="ui-label" htmlFor="b_taxRate">Tax rate %</label><input id="b_taxRate" className="field" type="number" min="0" max="100" step="0.01" placeholder="0 = no tax" value={f.taxRate} onChange={e => setF({ ...f, taxRate: e.target.value })} /></div>
                     <div><label className="ui-label">Hub</label>
                         <label className="field flex items-center gap-2 cursor-pointer"><input id="b_hub" type="checkbox" className="w-4 h-4" checked={f.hub} onChange={e => setF({ ...f, hub: e.target.checked })} /><span className="text-xs font-bold">Hub branch</span></label></div>
-                    <div className="sm:col-span-2"><label className="ui-label" htmlFor="b_type">Type</label><select id="b_type" className="field" value={f.type} onChange={e => setF({ ...f, type: e.target.value })}><option value="branch">Branch (customer counter)</option><option value="warehouse">Central warehouse (stocks materials for branches, gathers &amp; consolidates)</option></select></div>
+                    <div className="sm:col-span-2"><label className="ui-label" htmlFor="b_type">Type</label><select id="b_type" className="field" value={f.type} onChange={e => setF({ ...f, type: e.target.value })}><option value="branch">Branch (customer counter)</option><option value="warehouse">Central warehouse (stocks materials for branches, gathers &amp; consolidates)</option><option value="main_office">Main Office (company cash &amp; bank — only one)</option></select></div>
                 </fieldset>
                 <fieldset className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <legend className="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Attendance — staff check in here</legend>
@@ -431,7 +431,7 @@ export function Branches() {
                                                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                                         <span className="pill-tag pill-dark font-mono">{b.branch_code}</span>
                                                         <span className="pill-tag pill-coral" title="AWB digit">{`AWB ${b.booking_code || '—'}`}</span>
-                                                        {b.is_hub && <span className="pill-tag pill-amber">Hub</span>}{b.branch_type === 'warehouse' && <span className="pill-tag pill-dark">Central warehouse</span>}
+                                                        {b.is_hub && <span className="pill-tag pill-amber">Hub</span>}{b.branch_type === 'warehouse' && <span className="pill-tag pill-dark">Central warehouse</span>}{b.branch_type === 'main_office' && <span className="pill-tag pill-dark">Main Office</span>}
                                                     </div>
                                                 </div>
                                             </div>

@@ -18,6 +18,7 @@ import dashboard from './_routes/dashboard.js';
 import delivery from './_routes/delivery.js';
 import integrations from './_routes/integrations.js';
 import login from './_routes/login.js';
+import mainOffice from './_routes/main-office.js';
 import notifications from './_routes/notifications.js';
 import postalLookup from './_routes/postal-lookup.js';
 import profile from './_routes/profile.js';
@@ -44,6 +45,7 @@ const ROUTES = {
     delivery,
     integrations,
     login,
+    'main-office': mainOffice,
     notifications,
     'postal-lookup': postalLookup,
     profile,

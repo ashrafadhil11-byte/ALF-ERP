@@ -14,6 +14,7 @@ function groups(): Group[] {
     const role = session.role();
     const isAdmin = role === 'super_admin' || role === 'head_office';
     const isWarehouse = session.isWarehouse();
+    const isMainOffice = role === 'super_admin' || session.isCashier();
     return ([
         { id: 'top', items: [[isAdmin ? 'Global Overview' : 'Dashboard', 'super-dashboard.html', 'home', true]] },
         { id: 'ops', label: 'Operations', items: [
@@ -30,6 +31,7 @@ function groups(): Group[] {
         { id: 'biz', label: 'Money & stock', items: [
             ['Accounts', 'accounts.html', 'cash', role !== 'staff'],
             ['Reports', 'reports.html', 'chart', isAdmin],
+            ['Main Office', 'main-office.html', 'wallet', isMainOffice],
             ['Warehouse', 'warehouse.html', 'warehouse', isWarehouse || isAdmin]
         ] },
         { id: 'team', label: 'Team', items: [

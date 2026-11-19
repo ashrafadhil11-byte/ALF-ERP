@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isWarehouse = localStorage.getItem('cargo_is_warehouse') === '1';
 
     // Pages already moved to the React app (web/) open there. Keep in step with CONVERTED in web/src/lib/pages.ts.
-    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html']);
+    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html', 'main-office.html']);
     const link = (page) => REACT_PAGES.has(page) ? '/app/' + page.replace(/\.html$/, '') : page;
 
     const svg = (d, extra = '') => `<svg class="w-[18px] h-[18px] flex-shrink-0 ${extra}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
         link: '<path d="M10 14a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1 1M14 10a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1-1"/>',
         pulse: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
         chat: '<path d="M21 11.5a8.4 8.4 0 01-9 8.4 8.6 8.6 0 01-3.9-.9L3 21l1.9-5.1a8.4 8.4 0 01-.9-3.9 8.5 8.5 0 019-8.5 8.4 8.4 0 019 8z"/>',
+        wallet: '<path d="M3 7a2 2 0 012-2h13v4"/><path d="M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z"/><circle cx="16" cy="14.5" r="1.2"/>',
         chart: '<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',
         chev: '<path d="M6 9l6 6 6-6"/>'
     };
@@ -54,6 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'biz', label: 'Money & stock', items: [
             ['Accounts', 'accounts.html', 'cash', role !== 'staff'],
             ['Reports', 'reports.html', 'chart', isAdmin],
+            ['Main Office', 'main-office.html', 'wallet', role === 'super_admin' || localStorage.getItem('cargo_is_cashier') === '1'],
             ['Warehouse', 'warehouse.html', 'warehouse', isWarehouse || isAdmin]
         ] },
         { id: 'team', label: 'Team', items: [
@@ -126,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('sidebar-container') || document.getElementById('bottom-nav')) return;
     const page = window.location.pathname.split('/').pop() || 'super-dashboard.html';
-    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html']);   // see above
+    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html', 'main-office.html']);   // see above
     const link = (p) => REACT_PAGES.has(p) ? '/app/' + p.replace(/\.html$/, '') : p;
     const ic = (d) => `<svg class="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
     const items = [

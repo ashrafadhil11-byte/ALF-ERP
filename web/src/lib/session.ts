@@ -17,10 +17,11 @@ export const session = {
     role: (): Role => read('cargo_user_role') || 'staff',
     name: () => read('cargo_user_name') || '',
     isWarehouse: () => read('cargo_is_warehouse') === '1',
+    isCashier: () => read('cargo_is_cashier') === '1',
     isAdmin: () => ['super_admin', 'head_office'].includes(session.role()),
     signOut() {
-        for (const k of ['cargo_auth_token', 'cargo_user_role', 'cargo_is_warehouse']) localStorage.removeItem(k);
-        try { sessionStorage.removeItem('alf_wh_token'); } catch { /* ignore */ }
+        for (const k of ['cargo_auth_token', 'cargo_user_role', 'cargo_is_warehouse', 'cargo_is_cashier']) localStorage.removeItem(k);
+        try { sessionStorage.removeItem('alf_wh_token'); sessionStorage.removeItem('alf_mo_token'); } catch { /* ignore */ }
         location.replace('/app/login');
     }
 };

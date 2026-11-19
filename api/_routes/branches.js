@@ -11,7 +11,7 @@ function financeFields(body = {}) {
         if (Number.isFinite(r) && r >= 0 && r <= 100) out.tax_rate = r;
     }
     if (body.isHub !== undefined) out.is_hub = Boolean(body.isHub);
-    if (body.branchType !== undefined) out.branch_type = body.branchType === 'warehouse' ? 'warehouse' : 'branch';
+    if (body.branchType !== undefined) out.branch_type = ['warehouse', 'main_office'].includes(body.branchType) ? body.branchType : 'branch';
     // Attendance: where the branch is (staff check in within geofence metres of it)
     if (body.lat !== undefined || body.lng !== undefined) {
         const lat = body.lat === '' || body.lat == null ? null : Number(body.lat);

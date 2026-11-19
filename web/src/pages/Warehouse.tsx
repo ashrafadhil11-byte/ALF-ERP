@@ -46,6 +46,7 @@ export function Warehouse() {
     const [pins, setPins] = useState({ cur: '', pin: '', pin2: '' });
     const [gBusy, setGBusy] = useState(false);
     const [left, setLeft] = useState('');
+    const [whPick, setWhPick] = useState('');   // super admin: which warehouse to open
     const gCur = useRef<HTMLInputElement>(null), gPin = useRef<HTMLInputElement>(null);
 
     const [tab, setTab] = useState<Tab>('requests');
@@ -91,7 +92,7 @@ export function Warehouse() {
         (async () => {
             let st: any;
             try { st = await api('/api/warehouse?view=status'); } catch (e) { setLoadErr((e as Error).message); setPhase('error'); return; }
-            setStatus(st); setCur(st.currency || 'OMR');
+            setStatus(st); setCur(st.currency || 'OMR'); setWhPick(st.warehouse || '');
             try { localStorage.setItem('cargo_is_warehouse', st.access ? '1' : ''); } catch { /* ignore */ }
             if (!st.access) { setPhase('noaccess'); return; }
             if (!st.has_pin) return gate('set');
@@ -108,11 +109,17 @@ export function Warehouse() {
         if (mode !== 'enter' && pin !== pins.pin2.trim()) return toast(false, 'The two PINs do not match.');
         setGBusy(true);
         try {
-            const out = await api<Tok>('/api/warehouse', { method: 'POST', body: mode === 'enter' ? { action: 'unlock', pin } : { action: 'set_pin', pin, current_pin: mode === 'change' ? pins.cur.trim() : undefined } });
+            const where = status?.warehouses?.length ? { warehouse: whPick } : {};
+            const out = await api<Tok>('/api/warehouse', { method: 'POST', body: mode === 'enter' ? { action: 'unlock', pin, ...where } : { action: 'set_pin', pin, current_pin: mode === 'change' ? pins.cur.trim() : undefined, ...where } });
             tok.current = { token: out.token, expires_at: out.expires_at };
             try { sessionStorage.setItem(KEY, JSON.stringify(tok.current)); } catch { /* private mode */ }
             if (mode !== 'enter') toast(true, 'PIN saved.');
-            setStatus((s: any) => ({ ...s, has_pin: true })); open();
+            setStatus((s: any) => {
+                const w = (s.warehouses || []).find((x: any) => x.branch_code === whPick);
+                return { ...s, has_pin: true, ...(w ? { warehouse: w.branch_code, warehouse_name: w.branch_name, currency: w.currency } : {}) };
+            });
+            if (status?.warehouses?.length) setCur((status.warehouses.find((x: any) => x.branch_code === whPick) || {}).currency || 'OMR');
+            open();
         } catch (err) {
             toast(false, (err as Error).message); setPins(p => ({ ...p, pin: '' }));
             if ((err as ApiError).status === 423) { setStatus((s: any) => ({ ...s, locked_until: new Date(Date.now() + 15 * 60e3).toISOString() })); gate('enter'); }
@@ -388,6 +395,8 @@ export function Warehouse() {
                     <h2 id="gTitle" className="text-xl font-extrabold">{gTitle}</h2>
                     <p id="gText" className="text-xs text-gray-500 mt-1 mb-5">{gText}</p>
                     <form id="gForm" className={`space-y-3${showForm ? '' : ' hidden'}`} autoComplete="off" onSubmit={submitGate}>
+                        {status?.warehouses?.length > 0 && mode === 'enter' && <select id="gWarehouse" className="field" aria-label="Warehouse" value={whPick} onChange={e => setWhPick(e.target.value)}>
+                            {status.warehouses.map((w: any) => <option key={w.branch_code} value={w.branch_code}>{`${w.branch_name} (${w.branch_code})`}</option>)}</select>}
                         {pinField(gCur, 'gCurrent', 'cur', 'Current', 'Current PIN', mode !== 'change')}
                         {pinField(gPin, 'gPin', 'pin', mode === 'enter' ? '••••' : 'New PIN', 'PIN', false)}
                         {pinField(null, 'gPin2', 'pin2', 'Again', 'Repeat PIN', mode === 'enter')}

@@ -27,7 +27,7 @@ const PRICE_LABEL: Record<string, string> = { per_kg: 'Per kg', per_box: 'Per bo
 const STATUS_PILL: Record<string, string> = { paid: 'pill-green', partial: 'pill-amber', unpaid: 'pill-coral', void: 'pill-gray' };
 const TABS: [string, string, boolean?][] = [
     ['overview', 'Overview'], ['invoices', 'Invoices'], ['payments', 'Receipts'], ['expenses', 'Expenses'],
-    ['cash', 'Cash closing'], ['balances', 'Customer balances'], ['pricing', 'Pricing'], ['costs', 'Cost center'], ['parties', 'Suppliers & agents'], ['materials', 'Packing materials'], ['inventory', 'Inventory'], ['purchases', 'Purchases'],
+    ['cash', 'Cash closing'], ['money', 'Cash & bank'], ['balances', 'Customer balances'], ['pricing', 'Pricing'], ['costs', 'Cost center'], ['parties', 'Suppliers & agents'], ['materials', 'Packing materials'], ['inventory', 'Inventory'], ['purchases', 'Purchases'],
     ['journal', 'Journal', true], ['chart', 'Chart of accounts', true]
 ];
 const SERVICES = [['air', 'Air'], ['sea', 'Sea'], ['customs', 'Customs'], ['delivery', 'Delivery'], ['trucking', 'Trucking'], ['packing', 'Packing'], ['materials', 'Materials']];
@@ -254,7 +254,8 @@ function AccountsPage() {
         overview: () => api(`/api/accounts?view=overview&${qs()}`),
         invoices: () => api(`/api/accounts?view=invoices&${qs({ status: cache.current.invStatus || 'open', q: cache.current.invQ || '' })}`),
         payments: () => api(`/api/accounts?view=payments&${qs()}`),
-        expenses: async () => { const d = await api(`/api/accounts?view=expenses&${qs()}`); cache.current.categories = d.categories; return d; },
+        expenses: async () => { const d = await api(`/api/accounts?view=expenses&${qs()}`); cache.current.categories = d.categories; cache.current.banks = d.banks; return d; },
+        money: async () => curBranch() ? api(`/api/accounts?view=money&branch=${encodeURIComponent(curBranch())}`) : { none: true },
         cash: async () => {
             if (!curBranch()) return { none: true };
             const date = cache.current.cashDate || F.current.to;
@@ -351,12 +352,13 @@ function AccountsPage() {
         }, 'Create invoice');
     };
     const newExpense = async () => {
-        if (!cache.current.categories) cache.current.categories = (await api(`/api/accounts?view=expenses&${qs()}`)).categories;
+        if (!cache.current.categories) { const x = await api(`/api/accounts?view=expenses&${qs()}`); cache.current.categories = x.categories; cache.current.banks = x.banks; }
         form('Add expense', 'Posted to the ledger straight away.',
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{branchSelect()}
                 {field('eCat', req('Category'), <select id="eCat" className="field">{cache.current.categories.map((c: any) => <option key={c.code} value={c.code}>{c.name}</option>)}</select>)}
                 {field('eAmt', req('Amount'), <input id="eAmt" type="number" min="0" step="0.001" className="field" required />)}
-                {field('eMethod', 'Paid by', <select id="eMethod" className="field">{Object.entries(METHOD_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>)}
+                {field('eMethod', 'Paid by', <select id="eMethod" className="field">{Object.entries(METHOD_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    {(cache.current.banks || []).filter((b: any) => !curBranch() || b.branch_code === curBranch()).map((b: any) => <option key={b.branch_code + b.account_code} value={`acct:${b.account_code}`}>{`Bank — ${b.name}${curBranch() ? '' : ` (${b.branch_code})`}`}</option>)}</select>)}
                 {field('eDate', 'Date', <input id="eDate" type="date" className="field" defaultValue={iso(new Date())} />)}
                 {field('eTo', 'Paid to', <input id="eTo" className="field" placeholder="e.g. Shell, landlord" />)}
                 {field('eRef', 'Bill / reference no.', <input id="eRef" className="field" />)}
@@ -605,6 +607,39 @@ function AccountsPage() {
                 {field('stMethod', 'Method', <select id="stMethod" className="field"><option value="bank">Bank</option><option value="cash">Cash</option><option value="card">Card</option></select>)}{field('stRef', 'Reference', <input id="stRef" className="field" />)}</div>,
             async () => { await post({ action: 'internal_settle', warehouse, branch_code: branch, amount: val('stAmt'), method: val('stMethod'), reference: val('stRef') }); toast(true, 'Settled.'); }, 'Settle');
     };
+    // ---------- the branch and Main Office: send cash, confirm a float, ask Main Office to pay ----------
+    const moneyName = (d: any, code: string) => code === '1000' ? 'Cash' : (d.money.find((m: any) => m.account_code === code) || {}).name || 'Bank';
+    const sendCash = (d: any) => form('Send cash to Main Office', `From ${curBranch()}. It leaves your cash at once; Main Office confirms what arrives. This is not an expense.`,
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {field('scFrom', 'From', <select id="scFrom" className="field">{d.money.map((m: any) => <option key={m.account_code} value={m.account_code}>{`${m.kind === 'cash' ? 'Cash drawer' : m.name} — ${money(m.currency, m.balance)}`}</option>)}</select>)}
+            {field('scTo', 'To', <select id="scTo" className="field">{d.destinations.map((x: any) => <option key={x.account_code} value={x.account_code}>{x.name}</option>)}</select>)}
+            {field('scAmt', req('Amount'), <input id="scAmt" type="number" min="0" step="0.001" className="field" required />)}
+            {field('scDate', 'Date', <input id="scDate" type="date" className="field" defaultValue={iso(new Date())} max={iso(new Date())} />)}
+            {field('scRef', 'Reference', <input id="scRef" className="field" placeholder="Bag / slip no., carried by" />)}
+            {field('scNotes', 'Notes', <input id="scNotes" className="field" />)}</div>,
+        async () => {
+            const r = await post({ action: 'cash_send', branch: curBranch(), from_account: val('scFrom'), to_account: val('scTo'), amount: val('scAmt'), date: val('scDate'), reference: val('scRef'), notes: val('scNotes') });
+            toast(true, r.status === 'sent' ? `${r.transfer_no} sent — waiting for Main Office to confirm.` : `${r.transfer_no} done.`);
+        }, 'Send');
+    const askPay = (d: any) => form('Ask Main Office to pay', 'Main Office approves and pays it; it is then booked as your branch expense.',
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {field('prCat', req('What for'), <select id="prCat" className="field">{d.categories.map((c: any) => <option key={c.code} value={c.code}>{c.name}</option>)}</select>)}
+            {field('prAmt', req('Amount'), <input id="prAmt" type="number" min="0" step="0.001" className="field" required />)}
+            {field('prPayee', 'Pay to', <input id="prPayee" className="field" placeholder="e.g. landlord, agent" />)}
+            {field('prReason', req('Details'), <input id="prReason" className="field" required placeholder="e.g. November rent" />)}</div>,
+        async () => { const r = await post({ action: 'pay_request', branch: curBranch(), account_code: val('prCat'), amount: val('prAmt'), payee: val('prPayee'), reason: val('prReason') }); toast(true, `${r.request_no} sent to Main Office.`); }, 'Send request');
+    const receiveCash = (t: any) => form(`Confirm ${t.transfer_no}`, `Main Office sent ${money(t.currency, t.amount)}. Count it and enter what arrived.`,
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {field('rcAmt', req('Amount received'), <input id="rcAmt" type="number" min="0" step="0.001" className="field" required defaultValue={+t.amount} />)}
+            {field('rcNotes', 'Note', <input id="rcNotes" className="field" />)}</div>,
+        async () => { await post({ action: 'cash_receive', id: t.id, received: val('rcAmt'), notes: val('rcNotes') }); toast(true, `${t.transfer_no} received.`); }, 'Confirm received');
+    const cancelSend = (t: any) => form(`Cancel ${t.transfer_no}?`, 'The cash comes back into your drawer.', field('ccReason', req('Reason'), <input id="ccReason" className="field" required />),
+        async () => { await post({ action: 'cash_cancel', id: t.id, reason: val('ccReason') }); toast(true, `${t.transfer_no} cancelled.`); }, 'Cancel transfer');
+    const cancelRequest = async (r: any) => {
+        if (!await confirm({ title: `Withdraw ${r.request_no}?`, message: 'Main Office will not pay it.', confirmText: 'Withdraw' })) return;
+        try { await post({ action: 'pay_request_cancel', id: r.id }); toast(true, 'Withdrawn.'); show(); } catch (e) { toast(false, (e as Error).message); }
+    };
+
     const closeCash = async (e: React.FormEvent<HTMLFormElement>, cur: string, date: string) => {
         e.preventDefault();
         const f = e.currentTarget, counted = (f.elements.namedItem('counted') as HTMLInputElement).value;
@@ -673,6 +708,38 @@ function AccountsPage() {
                     <td className="p-3" data-label="Method">{METHOD_LABEL[e.method]}</td>
                     <td className="p-3 text-right money font-extrabold" data-label="Amount">{money(e.currency, e.amount)}</td>
                     <td className="p-3 pr-4 text-right" data-label="">{voidOrPill(!!e.void, 'expense_void', e.id, e.expense_no)}</td></tr>)), 'No expenses in this period.')}</>,
+        money: d => {
+            if (d.none) return emptyBox('Choose a branch (top right) to see its cash and bank.');
+            if (!d.main_office) return emptyBox('There is no Main Office yet. The super admin adds it in Branch Network (type: Main Office).');
+            const me = d.branch, o = d.office || { owes: 0, in_transit: 0, currency: d.money[0]?.currency };
+            const incoming = d.transfers.filter((t: any) => t.to_branch === me && t.status === 'sent');
+            const SP: Record<string, string> = { requested: 'pill-amber', paid: 'pill-green', rejected: 'pill-coral', cancelled: 'pill-gray', sent: 'pill-amber', received: 'pill-green' };
+            return <>{toolbar(<p className="text-xs text-gray-500">{'Cash and bank of '}<b>{me}</b>{'. Money sent to Main Office is a transfer, never an expense.'}</p>,
+                <>{addBtn('Send cash to Main Office', () => sendCash(d), 'btn btn-coral', 'cash')}{addBtn('Ask Main Office to pay', () => askPay(d), 'btn btn-light')}</>)}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                    {d.money.map((m: any) => <div key={m.account_code} className="bg-[#F8F8FA] rounded-[1.5rem] p-4"><p className="sd-label">{m.kind === 'cash' ? 'Cash drawer' : m.name}</p><p className="text-xl font-extrabold money">{money(m.currency, m.balance)}</p></div>)}
+                    <div className="bg-[#F8F8FA] rounded-[1.5rem] p-4"><p className="sd-label">With Main Office</p><p className={`text-xl font-extrabold money ${+o.owes > 0 ? 'text-[#D55C48]' : 'text-emerald-600'}`}>{+o.owes > 0 ? `owe ${money(o.currency, o.owes)}` : `sent ${money(o.currency, -o.owes)}`}</p><p className="text-[10px] text-gray-400 mt-0.5">{+o.in_transit ? `${money(o.currency, o.in_transit)} on the way` : 'costs paid for you, less cash sent'}</p></div>
+                </div>
+                {incoming.length > 0 && <><p className="sd-label mb-2">Cash from Main Office — confirm what arrived</p><div className="mb-6">{table([['Transfer'], ['Sent'], ['Amount', 'right'], ['']], incoming.map((t: any) => (
+                    <tr key={t.id}><td className="p-3 pl-4 font-extrabold font-mono" data-label="Transfer">{t.transfer_no}</td><td className="p-3" data-label="Sent">{`${day(t.transfer_date)} · ${t.sent_by_name || ''}`}</td>
+                        <td className="p-3 text-right money font-extrabold" data-label="Amount">{money(t.currency, t.amount)}</td>
+                        <td className="p-3 pr-4 text-right" data-label=""><button type="button" className="btn btn-dark btn-sm" onClick={() => receiveCash(t)}>Confirm received</button></td></tr>)), '')}</div></>}
+                <p className="sd-label mb-2">Transfers</p>
+                <div className="mb-6">{table([['Transfer'], ['Date'], ['From → to'], ['Amount', 'right'], ['Status'], ['']], d.transfers.map((t: any) => (
+                    <tr key={t.id}><td className="p-3 pl-4 font-extrabold font-mono" data-label="Transfer">{t.transfer_no}{t.reference && <span className="block text-[10px] text-gray-400 font-sans">{`Ref ${t.reference}`}</span>}</td>
+                        <td className="p-3" data-label="Date">{day(t.transfer_date)}</td>
+                        <td className="p-3" data-label="From → to">{`${t.from_branch === me ? moneyName(d, t.from_account) : 'Main Office'} → ${t.to_branch === me ? moneyName(d, t.to_account) : (d.destinations.find((x: any) => x.account_code === t.to_account) || {}).name || 'Main Office'}`}</td>
+                        <td className="p-3 text-right money font-extrabold" data-label="Amount">{money(t.currency, t.amount)}{t.received_amount != null && +t.received_amount !== +t.amount && <span className="block text-[10px] text-[#D55C48]">{`received ${fmt(t.currency, t.received_amount)}`}</span>}</td>
+                        <td className="p-3" data-label="Status"><span className={`pill-tag ${SP[t.status]}`}>{t.status === 'sent' ? 'on the way' : t.status}</span></td>
+                        <td className="p-3 pr-4 text-right" data-label="">{t.status === 'sent' && t.from_branch === me && <button type="button" className="btn btn-light btn-sm" onClick={() => cancelSend(t)}>Cancel</button>}</td></tr>)), 'No transfers yet.')}</div>
+                <p className="sd-label mb-2">Payment requests to Main Office</p>
+                {table([['Request'], ['For'], ['Amount', 'right'], ['Status'], ['']], d.requests.map((r: any) => (
+                    <tr key={r.id}><td className="p-3 pl-4 font-extrabold font-mono" data-label="Request">{r.request_no}<span className="block text-[10px] text-gray-400 font-sans">{`${day(r.requested_at)} · ${r.requested_by_name || ''}`}</span></td>
+                        <td className="p-3" data-label="For"><b>{r.accounts?.name || r.account_code}</b>{r.payee && ` · ${r.payee}`}<span className="block text-[10px] text-gray-500">{r.reason}</span>{r.reject_reason && <span className="block text-[10px] text-[#D55C48]">{r.reject_reason}</span>}</td>
+                        <td className="p-3 text-right money font-extrabold" data-label="Amount">{money(r.currency, r.amount)}</td>
+                        <td className="p-3" data-label="Status"><span className={`pill-tag ${SP[r.status]}`}>{r.status === 'requested' ? 'waiting' : r.status}</span>{r.decided_by_name && <span className="block text-[10px] text-gray-400">{r.decided_by_name}</span>}</td>
+                        <td className="p-3 pr-4 text-right" data-label="">{r.status === 'requested' && <button type="button" className="btn btn-light btn-sm" onClick={() => cancelRequest(r)}>Withdraw</button>}</td></tr>)), 'No requests yet.')}</>;
+        },
         cash: d => {
             if (d.none) return emptyBox('Choose a branch (top right) to close its cash.');
             const date = d.date;
