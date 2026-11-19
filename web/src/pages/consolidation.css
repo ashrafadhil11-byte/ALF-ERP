@@ -1,0 +1,3 @@
+/* page styles from admin/consolidation.html, scoped to this page */
+:where(body[data-page="consolidation"]) .tab[aria-selected="true"] { background: #111827; color: #fff; }
+:where(body[data-page="consolidation"]) .opt[aria-pressed="true"] { background: #111827; color: #fff; }

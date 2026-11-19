@@ -39,7 +39,7 @@
                         <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Scan AWBs • pick a milestone • update in one go</p>
                     </div>
                 </div>
-                <a href="shipments.html" class="btn btn-light self-start sm:self-auto"><span data-icon="arrowLeft"></span>Shipments</a>
+                <a href="/app/shipments" class="btn btn-light self-start sm:self-auto"><span data-icon="arrowLeft"></span>Shipments</a>
             </section>
 
             <section class="grid grid-cols-1 xl:grid-cols-5 gap-5">
@@ -114,7 +114,7 @@
             $('batchCount').textContent = `${ok.length} in batch`;
             $('batchRows').innerHTML = batch.length ? batch.map((b, i) => `
                 <tr class="${b.error ? 'bg-[#FFF5F3]' : ''}">
-                    <td class="cell-main p-3 pl-4 font-extrabold"><a class="hover:text-coral-500" href="shipments.html?awb=${encodeURIComponent(b.awb)}">${esc(b.awb)}</a></td>
+                    <td class="cell-main p-3 pl-4 font-extrabold"><a class="hover:text-coral-500" href="/app/shipments?awb=${encodeURIComponent(b.awb)}">${esc(b.awb)}</a></td>
                     <td class="p-3 truncate max-w-[180px]" data-label="Consignee">${b.error ? `<span class="text-coral-600 font-bold">${esc(b.error)}</span>` : esc(b.consignee || '—')}${!b.error && b.total > 1 ? `<button type="button" onclick="reBoxes(${i})" class="block text-[10px] font-extrabold ${b.pieces ? 'text-[#D55C48]' : 'text-gray-400'} hover:underline">${b.pieces ? `Boxes ${b.pieces.join(', ')} of ${b.total}` : `All ${b.total} boxes`} · change</button>` : ''}</td>
                     <td class="p-3" data-label="Status">${b.error ? '' : `<span class="pill-tag pill-coral">${esc(b.status || 'New')}</span>`}</td>
                     <td class="cell-menu p-3"><button type="button" onclick="removeAt(${i})" aria-label="Remove ${esc(b.awb)}" class="icon-btn !w-7 !h-7 hover:!text-coral-600">${UI.icon('x', 'w-3.5 h-3.5')}</button></td>

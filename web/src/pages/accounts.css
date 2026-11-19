@@ -1,0 +1,6 @@
+/* page styles from admin/accounts.html, scoped to this page */
+:where(body[data-page="accounts"]) .tab[aria-selected="true"] { background: #111827; color: #fff; }
+:where(body[data-page="accounts"]) .opt[aria-pressed="true"] { background: #111827; color: #fff; }
+:where(body[data-page="accounts"]) .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+:where(body[data-page="accounts"]) .rep td, :where(body[data-page="accounts"]) .rep th { padding: .55rem .75rem; }
+:where(body[data-page="accounts"]) .rep tr.total td { font-weight: 800; border-top: 2px solid #111827; }

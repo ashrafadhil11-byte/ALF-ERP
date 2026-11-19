@@ -21,6 +21,46 @@ const only = arg('page', null);
 
 // Each flow: [page name, [step name, action(page)] …]. A screenshot follows every step.
 const FLOWS = {
+    booking: [
+        ['destination', async (p) => { await p.click('#destCountry'); await p.type('#destCountry', 'india'); await p.keyboard.press('Enter'); await p.waitForTimeout(600); }],
+        ['cargo-and-sender', async (p) => { await p.click('#cargoOptions label:nth-child(2)'); await p.click('#senderPhone'); await p.type('#senderPhone', '91234567'); await p.press('#senderPhone', 'Enter'); await p.waitForTimeout(700); }],
+        ['receiver', async (p) => {
+            await p.fill('#senderName', 'Ali Hassan'); await p.fill('#rcvName', 'Rahul Nair'); await p.fill('#rcvPhone', '9876543210');
+            await p.click('#rcvState'); await p.type('#rcvState', 'kera'); await p.waitForTimeout(500); await p.keyboard.press('Enter'); await p.waitForTimeout(500);
+            await p.click('#rcvCity'); await p.type('#rcvCity', 'Kannur'); await p.keyboard.press('Enter'); await p.fill('#rcvHouse', 'Rose Villa'); await p.waitForTimeout(300);
+        }],
+        ['boxes-and-quote', async (p) => {
+            await p.fill('#boxRows [data-box]:nth-child(1) [data-k="weight"]', '12.5'); await p.fill('#boxRows [data-box]:nth-child(1) [data-k="l"]', '50'); await p.fill('#boxRows [data-box]:nth-child(1) [data-k="w"]', '40'); await p.fill('#boxRows [data-box]:nth-child(1) [data-k="h"]', '40');
+            await p.click('#addBox'); await p.fill('#boxRows [data-box]:nth-child(2) [data-k="weight"]', '8'); await p.waitForTimeout(1500);
+        }],
+        ['extras', async (p) => {
+            const pick = async (sel) => { const v = await p.$eval(sel, s => [...s.options].find(o => o.value)?.value || ''); if (v) await p.selectOption(sel, v); };
+            await pick('#addPackage'); await pick('#addCharge'); await pick('#addMaterial'); await p.click('#addOther'); await p.waitForTimeout(400);
+        }],
+        ['freight-removed', async (p) => { const f = p.locator('#chargeRows tr:has(.pill-dark) [data-cdel]'); if (await f.count()) await f.first().click(); await p.waitForTimeout(400); }],
+        ['freight-back', async (p) => { const b = p.locator('#quoteHint button'); if (await b.count()) await b.click(); await p.waitForTimeout(1500); }],
+        ['review', async (p) => { await p.fill('#declared', '120'); await p.click('#bookBtn'); await p.waitForTimeout(400); }],
+        ['booked', async (p) => { await p.click('[data-confirm] [data-v="1"]'); await p.waitForTimeout(1200); }]
+    ],
+    branches: [
+        ['search', async (p) => { await p.selectOption('#statusFilter', ''); await p.fill('#branchSearch', 'sal'); }],
+        ['add-form', async (p) => { await p.fill('#branchSearch', ''); await p.click('#addBtn'); await p.waitForTimeout(1200); }],
+        ['add-typed', async (p) => { await p.type('#b_name', 'Al-Farha Cargo Nizwa'); await p.fill('#b_digit', '1'); await p.fill('#b_street', 'Souq Rd'); await p.waitForTimeout(300); }],
+        ['state-list', async (p) => { await p.click('#b_state'); await p.waitForTimeout(500); }],
+        ['state-picked', async (p) => { await p.type('#b_state', 'dakh'); await p.keyboard.press('Enter'); await p.waitForTimeout(500); }],
+        ['city-picked', async (p) => { await p.click('#b_city'); await p.type('#b_city', 'nizwa'); await p.waitForTimeout(400); await p.keyboard.press('Enter'); await p.waitForTimeout(400); }],
+        ['postal', async (p) => { await p.fill('#b_postal', ''); await p.type('#b_postal', '611'); await p.waitForTimeout(900); }],
+        ['save-asks', async (p) => { await p.fill('#b_digit', '9'); await p.fill('#b_phone', '25412345'); await p.click('#branchSave'); }],
+        ['saved', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['edit', async (p) => { await p.click('#branchGrid article button[aria-label^="Actions"]'); await p.waitForTimeout(200); await p.click('.row-menu button:has-text("Edit branch")'); await p.waitForTimeout(1500); }],
+        ['destinations', async (p) => { await p.keyboard.press('Escape'); await p.waitForTimeout(400); await p.click('[data-tab="destinations"]'); }],
+        ['dest-edit', async (p) => { await p.click('#destRows button[aria-label^="Actions"]'); await p.waitForTimeout(200); await p.click('.row-menu button:has-text("Edit code")'); }],
+        ['dest-add', async (p) => { await p.keyboard.press('Escape'); await p.waitForTimeout(400); await p.click('#addBtn'); await p.click('#d_country'); await p.type('#d_country', 'kenya'); await p.keyboard.press('Enter'); }],
+        ['dest-saved', async (p) => { await p.click('#destForm button.btn-dark'); }],
+        ['cargo', async (p) => { await p.click('[data-tab="cargo"]'); }],
+        ['cargo-edit', async (p) => { await p.click('#cargoGrid button[aria-label^="Edit"]'); await p.waitForTimeout(300); await p.fill('#c_desc', 'Door to door'); }],
+        ['cargo-saved', async (p) => { await p.click('#cargoForm button.btn-dark'); await p.waitForTimeout(300); await p.click('[data-tab="branches"]'); }]
+    ],
     delivery: [
         ['select-two', async (p) => { const boxes = p.locator('#readyRows [data-sel]'); await boxes.nth(0).check(); if (await boxes.count() > 1) await boxes.nth(1).check(); }],
         ['search', async (p) => { await p.type('#pickInput', 'sal'); }],
@@ -53,6 +93,150 @@ const FLOWS = {
         ['create-confirm', async (p) => { await p.click('#createBtn'); }],
         ['create-done', async (p) => { await p.click('[data-confirm] [data-v="1"]'); await p.waitForTimeout(1200); }],
         ['deactivate-asks', async (p) => { await p.click('#rows tr:nth-child(2) button[aria-label^="Actions"]'); await p.waitForTimeout(200); await p.click('.row-menu button.danger'); }]
+    ],
+    shipments: [
+        ['card', async (p) => { await p.click('#rows tr:nth-child(1) td:nth-child(3)'); }],
+        ['card-track', async (p) => { await p.click('#drawer .sx-tab[data-tab="track"]'); }],
+        ['card-pod', async (p) => { await p.click('#drawer .sx-tab[data-tab="pod"]'); }],
+        ['card-copy', async (p) => { await p.click('#drawer [data-tab="info"]'); await p.click('#drawer .sx-copy'); }],
+        ['card-close', async (p) => { await p.click('#drawer .sx-close'); }],
+        ['row-edit', async (p) => { await p.click('#rows tr:nth-child(1) .icon-btn'); await p.waitForTimeout(300); await p.click('.row-menu button >> nth=1'); }],
+        ['edit-change', async (p) => { await p.fill('#f_weight', '14'); await p.click('#f_intake [data-v="pickup"]'); }],
+        ['edit-ask', async (p) => { await p.click('#saveBtn'); }],
+        ['edit-go', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['branch-pick', async (p) => { await p.selectOption('#workBranch', { index: 1 }); }],
+        ['scan-pickup', async (p) => { await p.click('[data-intake="pickup"]'); await p.fill('#scanInput', 'alf00999'); await p.press('#scanInput', 'Enter'); }],
+        ['review-edit', async (p) => { await p.fill('#f_consignee_address', 'Ward 4, Bhaktapur'); await p.selectOption('#f_package_type', 'Parcel'); }],
+        ['review-ask', async (p) => { await p.click('#saveBtn'); }],
+        ['review-back', async (p) => { await p.click('[data-confirm] [data-v="0"]'); }],
+        ['review-ask2', async (p) => { await p.click('#saveBtn'); }],
+        ['review-add', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['bulk', async (p) => { await p.click('details summary'); await p.fill('#bulkInput', 'ALF1, ALF2\nBAD9'); await p.click('#bulkBtn'); }],
+        ['bulk-go', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['filter', async (p) => { await p.fill('#search', 'fathima'); await p.selectOption('#statusFilter', { index: 2 }); }],
+        ['menu', async (p) => { await p.locator('#rows tr:nth-child(2)').scrollIntoViewIfNeeded(); await p.waitForTimeout(500); await p.click('#rows tr:nth-child(2) .icon-btn'); }],
+        ['menu-cancel', async (p) => { await p.click('.row-menu button.danger >> nth=0'); await p.waitForTimeout(300); await p.fill('#cancelReason', 'Customer cancelled'); }],
+        ['cancel-go', async (p) => { await p.click('#cancelForm button.btn-coral'); }],
+        ['menu2', async (p) => { await p.locator('#rows tr:nth-child(3)').scrollIntoViewIfNeeded(); await p.waitForTimeout(500); await p.click('#rows tr:nth-child(3) .icon-btn'); }],
+        ['delete-ask', async (p) => { await p.click('.row-menu button.danger >> nth=-1'); }],
+        ['delete-go', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['csv', async (p) => { await p.click('button:has-text("Upload CSV")'); await p.waitForTimeout(300);
+            await p.setInputFiles('#csvFile', { name: 's.csv', mimeType: 'text/csv', buffer: Buffer.from('BookingID,Shipper,Consignee,Weight,DestCountry\n"A1","Ali","Sara, K.",3,India\nA1,X,Y,1,Nepal\nA2,,Z,2,India\n') }); }],
+        ['csv-ask', async (p) => { await p.click('#csvSave'); }],
+        ['csv-go', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['sync', async (p) => { await p.click('#syncBtn'); }]
+    ],
+    accounts: [
+        ['new-invoice', async (p) => { await p.click('button:has-text("New invoice")'); await p.waitForTimeout(300); await p.fill('#iName', 'Ali'); await p.click('#formBody button:has-text("Add line")'); await p.fill('#iLines [data-line]:nth-child(2) [data-k=description]', 'Packing'); await p.fill('#iLines [data-line]:nth-child(2) [data-k=rate]', '2'); }],
+        ['invoice-create', async (p) => { await p.click('#formOk'); }],
+        ['invoice-open', async (p) => { await p.waitForTimeout(800); }],
+        ['invoice-pay', async (p) => { await p.fill('#pAmt', '1'); await p.click('#formBody button:has-text("Receive")'); }],
+        ['invoice-close', async (p) => { await p.click('#formModal .btn-light:has-text("Close")'); }],
+        ['range-year', async (p) => { await p.click('[data-range="year"]'); }],
+        ['branch', async (p) => { await p.selectOption('#fBranch', 'ALFSLL'); }],
+        ['invoices', async (p) => { await p.click('[data-tab="invoices"]'); }],
+        ['invoices-all', async (p) => { await p.click('[data-inv-status="all"]'); }],
+        ['invoices-search', async (p) => { await p.fill('#invQ', 'fath'); await p.waitForTimeout(700); }],
+        ['invoice-row', async (p) => { await p.click('[data-inv] >> nth=0'); }],
+        ['invoice-void', async (p) => { const b = p.locator('#formExtra .btn-danger'); if (await b.count()) await b.click(); else await p.click('#formModal .btn-light:has-text("Close")'); }],
+        ['void-close', async (p) => { await p.keyboard.press('Escape'); }],
+        ['payments', async (p) => { await p.click('[data-tab="payments"]'); }],
+        ['payment-void', async (p) => { await p.click('#panel button:has-text("Void") >> nth=0'); await p.fill('#vReason', 'twice'); }],
+        ['payment-void-go', async (p) => { await p.click('#formOk'); }],
+        ['expenses', async (p) => { await p.click('[data-tab="expenses"]'); }],
+        ['expense-form', async (p) => { await p.click('button:has-text("Add expense")'); await p.waitForTimeout(300); await p.fill('#eAmt', '4.5'); await p.fill('#eTo', 'Shell'); }],
+        ['expense-save', async (p) => { await p.click('#formOk'); }],
+        ['cash', async (p) => { await p.click('[data-tab="cash"]'); }],
+        ['cash-close', async (p) => { await p.fill('[data-close] [name=counted]', '41.25'); await p.click('[data-close] button.btn-dark'); }],
+        ['cash-go', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['balances', async (p) => { await p.click('[data-tab="balances"]'); }],
+        ['pricing', async (p) => { await p.click('[data-tab="pricing"]'); }],
+        ['rate-edit', async (p) => { await p.click('[data-rate] >> nth=3'); }],
+        ['rate-band', async (p) => { await p.click('[data-method="vol_band"]'); await p.click('#formBody button:has-text("Add band")'); await p.fill('#rBands [data-band]:nth-child(2) [data-k=upto]', '50'); }],
+        ['rate-doc', async (p) => { await p.click('[data-method="doc_slab"]'); }],
+        ['rate-save', async (p) => { await p.click('#formOk'); }],
+        ['packages', async (p) => { await p.click('[data-psub="packages"]'); }],
+        ['package-edit', async (p) => { await p.click('[data-pkg] >> nth=0'); }],
+        ['package-save', async (p) => { await p.click('#formOk'); }],
+        ['charges', async (p) => { await p.click('[data-psub="charges"]'); }],
+        ['charge-new', async (p) => { await p.click('button:has-text("New charge")'); await p.waitForTimeout(300); await p.fill('#chName', 'Packing'); await p.fill('#chPrice', '1'); await p.check('#chAuto'); }],
+        ['charge-save', async (p) => { await p.click('#formOk'); }],
+        ['commodities', async (p) => { await p.click('[data-psub="commodities"]'); }],
+        ['costs', async (p) => { await p.click('[data-tab="costs"]'); }],
+        ['cost-new', async (p) => { await p.click('button:has-text("Add cost")'); await p.waitForTimeout(300); await p.selectOption('#cFor', '7'); await p.fill('#cAmt', '30'); }],
+        ['cost-save', async (p) => { await p.click('#formOk'); }],
+        ['cost-pay', async (p) => { await p.click('#panel button:has-text("Pay") >> nth=0'); }],
+        ['cost-pay-go', async (p) => { await p.click('#formOk'); }],
+        ['profit', async (p) => { await p.click('[data-csub="profit"]'); }],
+        ['parties', async (p) => { await p.click('[data-tab="parties"]'); }],
+        ['parties-agents', async (p) => { await p.click('[data-pkind="agent"]'); }],
+        ['party-edit', async (p) => { await p.click('[data-party] >> nth=0'); }],
+        ['party-save', async (p) => { await p.fill('#suNotes', 'Main sea agent'); await p.click('#formOk'); }],
+        ['materials', async (p) => { await p.click('[data-tab="materials"]'); }],
+        ['sale', async (p) => { await p.click('#panel button:has-text("Counter sale")'); await p.waitForTimeout(500); await p.click('#formBody button:has-text("Add item")'); await p.selectOption('#saLines [data-sl]:nth-child(2) [data-k=product_id]', '3'); await p.fill('#saLines [data-sl]:nth-child(2) [data-k=qty]', '2'); }],
+        ['sale-go', async (p) => { await p.click('#formOk'); await p.waitForTimeout(600); }],
+        ['sale-close', async (p) => { await p.click('#formModal .btn-light:has-text("Close")'); }],
+        ['purchase', async (p) => { await p.click('#panel button:has-text("Purchase")'); await p.waitForTimeout(500); await p.selectOption('#puLines [data-pl] [data-k=product_id]', '1'); await p.fill('#puLines [data-k=qty]', '10'); await p.fill('#puLines [data-k=unit_cost]', '0.5'); }],
+        ['purchase-save', async (p) => { await p.click('#formOk'); }],
+        ['product-new', async (p) => { await p.click('#panel button:has-text("New item")'); await p.waitForTimeout(300); await p.fill('#prSku', 'TAPE-B'); await p.fill('#prName', 'Brown tape'); await p.click('[data-track="0"]'); }],
+        ['product-save', async (p) => { await p.click('#formOk'); }],
+        ['count', async (p) => { await p.click('#panel button.btn-sm:text-is("Count") >> nth=0'); await p.fill('#scQty', '180'); }],
+        ['count-save', async (p) => { await p.click('#formOk'); }],
+        ['inventory', async (p) => { await p.click('[data-tab="inventory"]'); }],
+        ['moves', async (p) => { await p.click('[data-isub="moves"]'); }],
+        ['requests', async (p) => { await p.click('[data-isub="requests"]'); }],
+        ['request-new', async (p) => { await p.click('#panel button:has-text("Request stock")'); await p.waitForTimeout(300); await p.fill('#rqLines input', '25'); }],
+        ['request-send', async (p) => { await p.click('#formOk'); }],
+        ['internal', async (p) => { await p.click('[data-isub="internal"]'); }],
+        ['settle', async (p) => { await p.click('#panel button:has-text("Settle")'); }],
+        ['settle-go', async (p) => { await p.click('#formOk'); }],
+        ['purchases', async (p) => { await p.click('[data-tab="purchases"]'); }],
+        ['pay-supplier', async (p) => { await p.click('#panel button:has-text("Pay") >> nth=0'); }],
+        ['pay-supplier-go', async (p) => { await p.click('#formOk'); }],
+        ['reports', async (p) => { await p.click('[data-tab="reports"]'); }],
+        ['bs', async (p) => { await p.click('[data-report="bs"]'); }],
+        ['tb', async (p) => { await p.click('[data-report="tb"]'); }],
+        ['journal', async (p) => { await p.click('[data-tab="journal"]'); }],
+        ['journal-new', async (p) => { await p.click('button:has-text("Manual journal")'); await p.waitForTimeout(300); await p.fill('#jMemo', 'Opening cash'); await p.fill('#jLines [data-jl]:nth-child(1) [data-k=debit]', '100'); }],
+        ['journal-diff', async (p) => { await p.selectOption('#jLines [data-jl]:nth-child(2) [data-k=account]', '3000'); await p.fill('#jLines [data-jl]:nth-child(2) [data-k=credit]', '100'); }],
+        ['journal-post', async (p) => { await p.click('#formOk'); }],
+        ['journal-filter', async (p) => { await p.selectOption('#jAcct', '1100'); }],
+        ['chart', async (p) => { await p.click('[data-tab="chart"]'); }],
+        ['account-edit', async (p) => { await p.click('[data-acct="5300"]'); }],
+        ['account-save', async (p) => { await p.click('#formOk'); }]
+    ],
+    consolidation: [
+        ['scan-held-boxes', async (p) => { await p.fill('#obInput', 'afc-849223'); await p.press('#obInput', 'Enter'); }],
+        ['boxes-untick', async (p) => { await p.locator('.ui-modal.open input[type=checkbox]').nth(1).uncheck(); }],
+        ['boxes-ok', async (p) => { await p.locator('.ui-modal.open .btn.btn-dark').last().click(); }],
+        ['tick-row', async (p) => { await p.check('[data-ob="AFC-849221"]'); }],
+        ['filter', async (p) => { await p.fill('#obFilter', 'kochi'); }],
+        ['filter-clear', async (p) => { await p.fill('#obFilter', ''); await p.selectOption('#obTo', 'ALFKOC'); await p.fill('#obVehicle', 'Van 3'); await p.fill('#obSeal', 'S-1'); }],
+        ['send-ask', async (p) => { await p.click('#obSend'); }],
+        ['send-go', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['inbound', async (p) => { await p.click('[data-tab="inbound"]'); }],
+        ['receive-scan', async (p) => { await p.fill('#ibNote', 'one box wet'); await p.fill('#ibInput', 'AFC-849302'); await p.press('#ibInput', 'Enter'); }],
+        ['receive-ok', async (p) => { await p.locator('.ui-modal.open .btn.btn-dark').last().click(); }],
+        ['receive-other', async (p) => { await p.fill('#ibInput', 'AFC-111111'); await p.press('#ibInput', 'Enter'); }],
+        ['receive-all-ask', async (p) => { await p.click('[data-recv-all]'); }],
+        ['receive-all', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['mawb', async (p) => { await p.click('[data-tab="mawb"]'); }],
+        ['closed', async (p) => { await p.click('[data-cfilter="closed"]'); }],
+        ['all', async (p) => { await p.click('[data-cfilter="all"]'); }],
+        ['new-container', async (p) => { await p.click('#newCons'); await p.waitForTimeout(300); await p.click('[data-kind="container"]'); await p.fill('#cNo', 'msku7654321'); await p.fill('#cCarrier', 'Maersk'); await p.fill('#cVoy', '12W'); }],
+        ['create', async (p) => { await p.click('#consForm button.btn-dark'); }],
+        ['add-awb', async (p) => { await p.fill('#dInput', 'AFC-849241'); await p.press('#dInput', 'Enter'); }],
+        ['bulk-open', async (p) => { await p.click('#bulkBox summary'); }],
+        ['bulk-agent', async (p) => { await p.selectOption('#bStatus', 'ASSIGNED_TO_AGENT'); await p.fill('#bAgent', 'SMSA'); await p.fill('#bDocket', 'D-77'); }],
+        ['bulk-one', async (p) => { await p.selectOption('#bTarget', 'AFC-849232'); }],
+        ['bulk-ask', async (p) => { await p.click('#bApply'); }],
+        ['bulk-go', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['cost-form', async (p) => { await p.click('#costAdd'); await p.fill('#kAmt', '45'); await p.fill('#kRef', 'EK-1'); }],
+        ['cost-save', async (p) => { await p.click('#costForm button.btn-dark'); }],
+        ['remove-ask', async (p) => { await p.click('[data-remove="AFC-849231"]'); }],
+        ['remove-go', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }],
+        ['close-ask', async (p) => { await p.click('#dClose'); }],
+        ['close-go', async (p) => { await p.click('[data-confirm] [data-v="1"]'); }]
     ],
     warehouse: [
         ['pin-mismatch', async (p) => { await p.fill('#gPin', '1234'); await p.fill('#gPin2', '1235'); await p.click('#gBtn'); }],
@@ -141,6 +325,9 @@ await ctx.addInitScript(() => {
     localStorage.setItem('cargo_auth_token', 'h.eyJzdWIiOiJ1MSJ9.s');
     localStorage.setItem('cargo_user_role', 'super_admin');
     localStorage.setItem('cargo_user_name', 'Test User');
+    // print windows: keep them, but skip the print dialog (it stalls headless screenshots)
+    const open = window.open.bind(window);
+    window.open = (...a) => { const w = open(...a); if (w) try { w.print = () => {}; } catch { } return w; };
 });
 let fails = 0;
 for (const [name, steps] of Object.entries(FLOWS)) {
@@ -160,6 +347,9 @@ for (const [name, steps] of Object.entries(FLOWS)) {
         try {
             await act(page);
             await page.waitForTimeout(900);
+            // a print window opened by the step takes focus and the page stops painting: close it, come back
+            for (const other of ctx.pages()) if (other !== page) await other.close().catch(() => {});
+            await page.bringToFront();
             await page.screenshot({ path: path.join(outDir, `${name}.${step}.png`), animations: 'disabled', caret: 'hide' });
             console.log(`${name} · ${step}: ok`);
         } catch (e) { fails++; console.log(`${name} · ${step}: FAILED ${e.message.split('\n')[0]}`); }

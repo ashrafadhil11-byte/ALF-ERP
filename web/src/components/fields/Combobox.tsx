@@ -12,6 +12,8 @@ export type ComboboxHandle = {
     preload(): Promise<void>;
     setValue(value: string | null | undefined): Promise<void>;
     clear(): void;
+    /** put text in the box without choosing an item (no flag), like setting input.value directly */
+    setText(t: string): void;
     readonly value: Item | null;
     readonly text: string;
 };
@@ -80,6 +82,7 @@ export const Combobox = forwardRef<ComboboxHandle, Props>(function Combobox({ lo
             rerender();
         },
         clear() { s.selected = null; s.text = ''; rerender(); },
+        setText(t) { s.selected = null; s.text = t; rerender(); },
         get value() { return s.selected; },
         get text() { return s.text; }
     }));

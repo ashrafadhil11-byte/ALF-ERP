@@ -50,7 +50,7 @@
                         <p class="text-[10px] font-medium text-gray-400 leading-tight mt-0.5">Counter booking with automatic reference</p>
                     </div>
                 </div>
-                <a href="shipments.html" class="btn btn-light self-start sm:self-auto"><span data-icon="arrowLeft"></span>Shipments</a>
+                <a href="/app/shipments" class="btn btn-light self-start sm:self-auto"><span data-icon="arrowLeft"></span>Shipments</a>
             </section>
 
             <form id="bookingForm" data-guard class="grid grid-cols-1 xl:grid-cols-3 gap-5" novalidate autocomplete="off">
@@ -211,9 +211,9 @@
                 <button type="button" class="btn btn-dark" onclick="printDone('label')"><span data-icon="hash"></span>Print label</button>
                 <button type="button" class="btn btn-light" onclick="printDone('receipt')"><span data-icon="clipboard"></span>Receipt</button>
                 <button type="button" class="btn btn-light" onclick="whatsappDone()"><span data-icon="message"></span>WhatsApp</button>
-                <a id="doneView" class="btn btn-light" href="shipments.html"><span data-icon="eye"></span>View</a>
+                <a id="doneView" class="btn btn-light" href="/app/shipments"><span data-icon="eye"></span>View</a>
             </div>
-            <button type="button" class="btn btn-coral w-full mt-3" onclick="location.href='booking.html'"><span data-icon="plus"></span>New booking</button>
+            <button type="button" class="btn btn-coral w-full mt-3" onclick="location.href='/app/booking'"><span data-icon="plus"></span>New booking</button>
         </div>
     </div>
 
@@ -559,7 +559,7 @@
                 $('doneSub').textContent = `${fields.consignee} · ${fields.dest_city}, ${c.n}`
                     + (out.invoice ? ` · ${out.invoice.invoice_no}${out.invoice.payment ? ' (paid, ' + out.invoice.payment.receipt_no + ')' : ' (balance due)'}` : '');
                 if (out.invoice_error) toast(false, `Booked, but the invoice was not created: ${out.invoice_error}`);
-                $('doneView').href = `shipments.html?awb=${encodeURIComponent(out.awb)}`;
+                $('doneView').href = `/app/shipments?awb=${encodeURIComponent(out.awb)}`;
                 UI.beep(true);
                 openModal('doneModal');
             } catch (err) { toast(false, err.message); UI.beep(false); }

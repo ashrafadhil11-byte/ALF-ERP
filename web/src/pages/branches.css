@@ -1,0 +1,4 @@
+/* from admin/branches.html <style> — only on this page. :where() keeps the same specificity as the original rules. */
+:where(body[data-page="branches"]) .tab-btn[aria-selected="true"] { background: #111827; color: #fff; }
+:where(body[data-page="branches"]) .ref-token { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800; border-radius: .6rem; padding: .3rem .55rem; }
+:where(body[data-page="branches"]) .flag { width: 22px; height: 16px; object-fit: cover; border-radius: 3px; border: 1px solid #E5E7EB; flex-shrink: 0; }

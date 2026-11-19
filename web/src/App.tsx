@@ -49,6 +49,11 @@ export const router = createBrowserRouter([
             { path: '/attendance', lazy: () => import('./pages/Attendance').then(m => ({ Component: m.Attendance })) },
             { path: '/warehouse', lazy: () => import('./pages/Warehouse').then(m => ({ Component: m.Warehouse })) },
             { path: '/create-user', lazy: () => import('./pages/Users').then(m => ({ Component: m.Users })) },
+            { path: '/branches', lazy: () => import('./pages/Branches').then(m => ({ Component: m.Branches })) },
+            { path: '/booking', lazy: () => import('./pages/Booking').then(m => ({ Component: m.Booking })) },
+            { path: '/consolidation', lazy: () => import('./pages/Consolidation').then(m => ({ Component: m.Consolidation })) },
+            { path: '/shipments', lazy: () => import('./pages/Shipments').then(m => ({ Component: m.Shipments })) },
+            { path: '/accounts', lazy: () => import('./pages/Accounts').then(m => ({ Component: m.Accounts })) },
             { path: '/delivery', lazy: () => import('./pages/Delivery').then(m => ({ Component: m.Delivery })) },
             { path: '*', element: <Navigate to="/" replace /> }
         ]

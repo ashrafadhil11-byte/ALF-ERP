@@ -142,7 +142,27 @@ A page only switches over when all of these pass:
 
 **Phase 2 — live in production since 18 Nov 2026 (commit 032eb72).**
 
-**Phase 3 — done locally, not pushed (18 Nov 2026)**
+**Phase 4 — done locally, not pushed (19 Nov 2026)**
+
+- **Converted pages:** New Booking, Branch Network, Consolidation & Bulk, Shipments & AWB and Accounts, at `/app/booking`, `/app/branches`, `/app/consolidation`, `/app/shipments` and `/app/accounts`. All 15 signed-in pages are now React.
+- **New shared pieces:** the postcode / PIN / Saudi short-address lookup (`PostalLookup`), label and receipt printing (`lib/print.ts`, which reuses the old print code), and manifest printing (`lib/manifest.ts`).
+- **Links switched to the new pages:** the menus, the "New booking" button in the top bar, the Shipments / View / New booking buttons, the AWB links on Customers, Scan & Update and the profit report, and the notification links (for example "4 shipments coming from …" now opens `/app/consolidation?tab=inbound`). The old `.html` pages still work as a fallback.
+- **Checks:**
+  - Page and popup screenshots: all 26 identical at 0% for the five pages, at desktop and phone size. Re-run across all 15 pages after the link switch: 78 of 78 identical.
+  - Frame: 36 of 36 identical.
+  - Step-by-step: Consolidation 31 of 31, Shipments 29 of 29, Accounts 76 of 77, Branch Network 16 of 17, New Booking identical apart from a sticky side panel drawn a fraction differently (positions measured identical).
+    - The Accounts step that differs: right after **Year**, the old page was still showing "Loading…" when the picture was taken. One step later both are identical.
+    - The Branch Network step that differs: the browser's spell-check underline.
+  - Server requests: identical on all five pages, byte for byte.
+- **Changed on purpose:** on Accounts, closing the cash with a difference used to show the error "c is not defined" instead of "Closed with a difference of …". It now shows the right message. Closing with no difference was already correct.
+- **Kept as before (worth fixing later):**
+  - On Shipments, **Edit** from the shipment card opens the form behind the card.
+  - On Accounts, after a **Void** form the Save button of the next form stays coral.
+- **Test helpers:** the step runner closes print windows and keeps the page in front, so printing no longer stalls it.
+
+**Phase 3 — live in production (commit 00cf51f).**
+
+**Phase 3 — details (18 Nov 2026)**
 
 - **Converted pages:** Dashboard (10 widgets and Customize mode), Attendance, Warehouse, Staff & Users and Delivery & POD, at `/app/super-dashboard`, `/app/attendance`, `/app/warehouse`, `/app/create-user` and `/app/delivery`.
 - **Links switched to the new pages:** the menus, the logo, the phone bottom bar, the check-in "Done" button, the "Open warehouse" link on Accounts and the admin-only redirects. Sign-in and the installed app's start page now open `/app/super-dashboard`. The old `.html` pages still work as a fallback.

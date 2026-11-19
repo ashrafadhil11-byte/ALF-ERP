@@ -347,7 +347,7 @@
                     const d = await api(`/api/accounts?view=profit&${qs()}`);
                     const tot = {};
                     d.rows.forEach(r => { const t = (tot[r.currency] ||= { revenue: 0, cost: 0, profit: 0 }); t.revenue += +r.revenue; t.cost += +r.direct_cost + +r.allocated_cost; t.profit += +r.profit; });
-                    const rows = d.rows.map(r => `<tr><td class="p-3 pl-4 font-extrabold font-mono" data-label="AWB"><a href="shipments.html?awb=${encodeURIComponent(r.awb)}" class="hover:text-coral-600">${esc(r.awb)}</a><span class="block text-[10px] text-gray-400 font-sans">${day(r.booked_at)} · ${esc(r.branch_code)}</span></td>
+                    const rows = d.rows.map(r => `<tr><td class="p-3 pl-4 font-extrabold font-mono" data-label="AWB"><a href="/app/shipments?awb=${encodeURIComponent(r.awb)}" class="hover:text-coral-600">${esc(r.awb)}</a><span class="block text-[10px] text-gray-400 font-sans">${day(r.booked_at)} · ${esc(r.branch_code)}</span></td>
                         <td class="p-3" data-label="Consignee">${esc(r.consignee || '—')}<span class="block text-[10px] text-gray-400">${esc(r.dest_country || '')}</span></td>
                         <td class="p-3 text-right money" data-label="Revenue">${fmt(r.currency, r.revenue)}</td>
                         <td class="p-3 text-right money" data-label="Direct cost">${+r.direct_cost ? fmt(r.currency, r.direct_cost) : '—'}</td>

@@ -14,7 +14,7 @@ export const PAGES: Page[] = ([
 
 /** Converted pages (flip `react` to true here when a page is approved). */
 // Keep in step with REACT_PAGES in admin/components/sidebar.js (the old pages' menu).
-export const CONVERTED = new Set<PageFile>(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html']);
+export const CONVERTED = new Set<PageFile>(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html']);
 PAGES.forEach(p => { p.react = CONVERTED.has(p.file); });
 
 export const pageByFile = (file: string) => PAGES.find(p => p.file === file);

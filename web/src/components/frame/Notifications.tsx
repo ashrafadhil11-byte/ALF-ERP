@@ -3,12 +3,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
+import { hrefFor, pageByFile, type PageFile } from '../../lib/pages';
 import { toast } from '../../lib/toast';
 import type { IconName } from '../../lib/icons';
 import { Icon } from '../Icon';
 
 type Note = { kind: string; title: string; body?: string; href: string; at: string; unread?: boolean };
 type Resp = { items?: Note[]; unread?: number };
+/** "consolidation.html?tab=inbound" (relative to the old /admin/ pages) → where that page lives now */
+const noteHref = (href: string) => {
+    const m = /^([a-z-]+\.html)(.*)$/.exec(href || '');
+    if (!m || !pageByFile(m[1])) return href;
+    const t = hrefFor(m[1] as PageFile);
+    return ('to' in t ? '/app' + t.to : t.href) + m[2];
+};
 
 const KIND: Record<string, { icon: IconName; tone: string }> = {
     inbound: { icon: 'truck', tone: 'bg-[#111827] text-white' },
@@ -84,7 +92,7 @@ export function Notifications() {
                         : items.length ? items.map((n, i) => {
                             const k = KIND[n.kind] || KIND.carrier;
                             return (
-                                <a key={i} href={n.href} className={`flex gap-3 p-3 rounded-2xl hover:bg-[#F8F8FA] transition-colors ${n.unread ? 'bg-[#FFF5F3]/60' : ''}`}>
+                                <a key={i} href={noteHref(n.href)} className={`flex gap-3 p-3 rounded-2xl hover:bg-[#F8F8FA] transition-colors ${n.unread ? 'bg-[#FFF5F3]/60' : ''}`}>
                                     <span className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${k.tone}`}><Icon name={k.icon} cls="w-4 h-4" /></span>
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-start justify-between gap-2"><span className="text-xs font-extrabold leading-snug">{n.title}</span>
