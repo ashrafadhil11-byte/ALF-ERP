@@ -142,6 +142,19 @@ A page only switches over when all of these pass:
 
 **Phase 2 — live in production since 18 Nov 2026 (commit 032eb72).**
 
+**After the cutover — fixes and Reports (19 Nov 2026, not pushed yet)**
+
+- **Reports** moved out of Accounts into its own page, `/app/reports`, under **Money & Stock** (Super Admin and Head Office, as before). Old `/app/accounts?tab=reports` links forward there.
+  - **Print report** opens only the report as an A4 accounting document: company header, period, branch, currency, account codes, section subtotals, double-underlined totals, negatives in brackets, a balance check, "Prepared by / Approved by" lines and page numbers. Each currency prints on its own page.
+  - **Export (Excel)** downloads the same report as a CSV spreadsheet.
+  - The screen, the print and the export use one calculation (`web/src/lib/reports.ts`, with tests). Rows of the same account are now added together into one line.
+- **Hidden buttons showing:** `ui.css` loads after Tailwind, so `.btn` (and the other shared classes that set a display) beat `hidden`. Buttons that should be hidden showed, for example "Show more" on the Activity Log and "Sync carriers" for staff. Fixed in `ui.css` for old and new pages.
+- **Shipment card:** the edit and cancel forms, confirmations and messages opened from the card now show above it, not behind it.
+- **Accounts:** after a Void form, the next form's Save button no longer stays coral.
+- **Sidebar groups:** fold and open again (pushed earlier, commit a554471).
+- **Activity log:** entries are recorded (checked in the database: every change since logging started on 17 Nov 2026 is there). A save to the log that the database refuses is now written to the server logs instead of being lost silently.
+- **Local test setup:** the dev server now serves `/pwa.js` like production. `ALF_BROWSER=chrome` makes the test scripts use Chrome when Edge won't start.
+
 **Phase 5 — done locally, not pushed (19 Nov 2026)**
 
 - **Converted pages:** Sign-in at `/app/login` and customer tracking (with the delivery review) at `/app/track`. Both are public: they need no sign-in and show no menus.

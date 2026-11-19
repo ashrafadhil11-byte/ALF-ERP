@@ -34,7 +34,8 @@ const STEPS = [
     ['track-send', null, async (p) => { await p.click('#sendReview'); }]
 ];
 
-const exe = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+// ALF_BROWSER=chrome uses Chrome when Edge will not start headless (e.g. an Edge update waiting for a restart)
+const exe = [...(process.env.ALF_BROWSER === 'chrome' ? [] : ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe']), 'C:/Program Files/Google/Chrome/Application/chrome.exe',
     '/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(p => fs.existsSync(p));
 fs.mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch({ executablePath: exe, headless: true });

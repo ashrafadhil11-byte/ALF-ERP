@@ -4,6 +4,7 @@
 // One shared form popup (#formModal) is filled by each action, like the old form(title, sub, body, save).
 // Data: /api/accounts?view=… and POST /api/accounts { action }
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
 import { AppFrame } from '../components/frame/AppFrame';
 import { Modal, useDismiss } from '../components/Modal';
 import { Icon } from '../components/Icon';
@@ -27,7 +28,7 @@ const STATUS_PILL: Record<string, string> = { paid: 'pill-green', partial: 'pill
 const TABS: [string, string, boolean?][] = [
     ['overview', 'Overview'], ['invoices', 'Invoices'], ['payments', 'Receipts'], ['expenses', 'Expenses'],
     ['cash', 'Cash closing'], ['balances', 'Customer balances'], ['pricing', 'Pricing'], ['costs', 'Cost center'], ['parties', 'Suppliers & agents'], ['materials', 'Packing materials'], ['inventory', 'Inventory'], ['purchases', 'Purchases'],
-    ['reports', 'Reports', true], ['journal', 'Journal', true], ['chart', 'Chart of accounts', true]
+    ['journal', 'Journal', true], ['chart', 'Chart of accounts', true]
 ];
 const SERVICES = [['air', 'Air'], ['sea', 'Sea'], ['customs', 'Customs'], ['delivery', 'Delivery'], ['trucking', 'Trucking'], ['packing', 'Packing'], ['materials', 'Materials']];
 const $ = (id: string) => document.getElementById(id) as HTMLInputElement;
@@ -220,7 +221,14 @@ function FormClose({ text }: { text?: string }) {
 
 type FormSpec = { title: string; sub: string; body: ReactNode; okText: string; extra: ReactNode; hasSave: boolean; n: number };
 
+/** Reports moved to its own page under Money & Stock: old links to ?tab=reports go there. */
 export function Accounts() {
+    const params = new URLSearchParams(location.search);
+    if (params.get('tab') === 'reports') return <Navigate to={`/reports${params.get('report') ? '?report=' + params.get('report') : ''}`} replace />;
+    return <AccountsPage />;
+}
+
+function AccountsPage() {
     const [ctx, setCtx] = useState<any>({ full: false, branches: [], my_branch: null, loaded: false });
     const ctxRef = useRef(ctx); ctxRef.current = ctx;
     const [tab, setTabS] = useState(() => new URLSearchParams(location.search).get('tab') || 'overview');
@@ -270,7 +278,6 @@ export function Accounts() {
             if (sub === 'requests') { const d = await api('/api/accounts?view=requests'); cache.current.requests = d; return d; }
             const d = await api('/api/accounts?view=internal'); cache.current.internal = d; return d;
         },
-        reports: () => api(`/api/accounts?view=ledger&${qs()}`),
         journal: async () => { const d = await api(`/api/accounts?view=journal&${qs(cache.current.jAcct ? { account: cache.current.jAcct } : {})}`); cache.current.accounts = d.accounts; return d; },
         chart: async () => { const d = await api(`/api/accounts?view=journal&${qs({ from: '1900-01-01' })}`).catch(() => ({ accounts: [] })); cache.current.accounts = d.accounts; return d; }
     };
@@ -302,11 +309,12 @@ export function Accounts() {
     // ---------- the shared form popup ----------
     const [formOpen, setFormOpen] = useState(false);
     const [spec, setSpec] = useState<FormSpec>({ title: '', sub: '', body: null, okText: 'Save', extra: null, hasSave: true, n: 0 });
-    const [okClass, setOkClass] = useState('btn btn-dark');   // like the old page, a Void form leaves the button coral
+    const [okClass, setOkClass] = useState('btn btn-dark');   // coral only on a Void form
     const [saving, setSaving] = useState(false);
     const onSave = useRef<null | (() => Promise<unknown>)>(null);
     function form(title: string, sub: string, body: ReactNode, save: null | (() => Promise<unknown>), okText = 'Save', extra: ReactNode = null) {
         onSave.current = save;
+        setOkClass('btn btn-dark');
         setSpec(s => ({ title, sub: sub || '', body, okText, extra, hasSave: !!save, n: s.n + 1 }));
         markClean(document.getElementById('formModal'));
         setFormOpen(true);
@@ -872,39 +880,6 @@ export function Accounts() {
                 <p className="sd-label mt-6 mb-2">Settlements</p>
                 {table([['Date'], ['Branch → warehouse'], ['Method'], ['Amount', 'right']], d.settlements.map((x: any, i: number) => (
                     <tr key={i}><td className="p-3 pl-4" data-label="Date">{day(x.settled_at)}</td><td className="p-3" data-label="Branch → warehouse">{`${x.branch_code} → ${x.warehouse}`}</td><td className="p-3" data-label="Method">{`${METHOD_LABEL[x.method]}${x.reference ? ' · ' + x.reference : ''}`}</td><td className="p-3 pr-4 text-right money font-extrabold" data-label="Amount">{money(x.currency, x.amount)}</td></tr>)), 'No settlements yet.')}</>;
-        },
-        reports: d => {
-            const kind = cache.current.report || 'pl';
-            const byCur = (rows: any[]) => rows.reduce((m: Record<string, any[]>, r) => ((m[r.currency] ||= []).push(r), m), {});
-            const amt = (r: any, natural: string) => natural === 'debit' ? r.debit - r.credit : r.credit - r.debit;
-            const section = (title: string, rows: any[], natural: string, cur: string) => {
-                const t = rows.reduce((s, r) => s + amt(r, natural), 0);
-                return { rows: <><tr><td colSpan={2} className="pt-4 sd-label">{title}</td></tr>{rows.map((r, i) => <tr key={i}><td>{`${r.account_code} · ${r.name}`}</td><td className="text-right money">{fmt(cur, amt(r, natural))}</td></tr>)}
-                    <tr className="font-bold"><td>{`Total ${title.toLowerCase()}`}</td><td className="text-right money">{fmt(cur, t)}</td></tr></>, total: t };
-            };
-            const cards: ReactNode[] = [];
-            if (kind === 'tb') Object.entries(byCur(d.to_date)).forEach(([cur, rows]) => {
-                const dr = rows.reduce((s, r) => s + Math.max(0, r.debit - r.credit), 0), cr = rows.reduce((s, r) => s + Math.max(0, r.credit - r.debit), 0);
-                cards.push(<div key={cur} className="bg-white rounded-[1.5rem] border border-gray-100 p-5"><p className="font-extrabold mb-2">{`Trial balance · ${cur} · to ${day(d.to)}`}</p><table className="rep w-full text-xs"><thead><tr className="sd-label text-left"><th>Account</th><th className="text-right">Debit</th><th className="text-right">Credit</th></tr></thead><tbody>
-                    {rows.map((r, i) => { const n = r.debit - r.credit; return <tr key={i}><td>{`${r.account_code} · ${r.name}`}</td><td className="text-right money">{n > 0 ? fmt(cur, n) : ''}</td><td className="text-right money">{n < 0 ? fmt(cur, -n) : ''}</td></tr>; })}
-                    <tr className="total"><td>{`Total ${Math.abs(dr - cr) < 0.0005 ? '✓ balanced' : '⚠ out of balance'}`}</td><td className="text-right money">{fmt(cur, dr)}</td><td className="text-right money">{fmt(cur, cr)}</td></tr></tbody></table></div>);
-            });
-            else if (kind === 'pl') Object.entries(byCur(d.period)).forEach(([cur, rows]) => {
-                const inc = section('Income', rows.filter(r => r.type === 'income'), 'credit', cur), exp = section('Expenses', rows.filter(r => r.type === 'expense'), 'debit', cur);
-                cards.push(<div key={cur} className="bg-white rounded-[1.5rem] border border-gray-100 p-5"><p className="font-extrabold mb-2">{`Profit & loss · ${cur} · ${day(d.from)} – ${day(d.to)}`}</p><table className="rep w-full text-xs"><tbody>{inc.rows}{exp.rows}
-                    <tr className="total"><td>{`Net ${inc.total - exp.total >= 0 ? 'profit' : 'loss'}`}</td><td className={`text-right money ${inc.total - exp.total < 0 ? 'text-[#D55C48]' : 'text-emerald-600'}`}>{money(cur, inc.total - exp.total)}</td></tr></tbody></table></div>);
-            });
-            else Object.entries(byCur(d.to_date)).forEach(([cur, rows]) => {
-                const a = section('Assets', rows.filter(r => r.type === 'asset'), 'debit', cur), l = section('Liabilities', rows.filter(r => r.type === 'liability'), 'credit', cur);
-                const eqRows = rows.filter(r => r.type === 'equity'), earnings = rows.filter(r => ['income', 'expense'].includes(r.type)).reduce((s, r) => s + r.credit - r.debit, 0);
-                const e = section('Equity', [...eqRows, { account_code: '—', name: 'Retained earnings (profit to date)', debit: 0, credit: earnings }], 'credit', cur);
-                cards.push(<div key={cur} className="bg-white rounded-[1.5rem] border border-gray-100 p-5"><p className="font-extrabold mb-2">{`Balance sheet · ${cur} · at ${day(d.to)}`}</p><table className="rep w-full text-xs"><tbody>{a.rows}{l.rows}{e.rows}
-                    <tr className="total"><td>{`Liabilities + equity ${Math.abs(a.total - l.total - e.total) < 0.0005 ? '✓' : '⚠'}`}</td><td className="text-right money">{money(cur, l.total + e.total)}</td></tr></tbody></table></div>);
-            });
-            return <>{toolbar(opts([['pl', 'Profit & loss'], ['bs', 'Balance sheet'], ['tb', 'Trial balance']], 'data-report', kind, k => setCache('report', k)),
-                <button type="button" className="btn btn-light" onClick={() => window.print()}><Icon name="clipboard" />Print</button>)}
-                <p className="text-[11px] text-gray-400 mb-3">{`${d.branch ? 'Branch ' + d.branch : 'All branches'} · each currency is reported on its own.`}</p>
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">{cards.length ? cards : emptyBox('No postings yet.', 'col-span-full p-10')}</div></>;
         },
         journal: d => {
             const name = (c: string) => d.accounts.find((a: any) => a.code === c)?.name || c;

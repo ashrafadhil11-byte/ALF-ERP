@@ -10,7 +10,11 @@ export default defineConfig({
     server: {
         port: 5173,
         strictPort: true,
-        proxy: Object.fromEntries(['/api', '/admin', '/assets', '/icons', '/login.html', '/track.html', '/manifest.webmanifest', '/pwa.js', '/sw.js'].map(p => [p, MOCK]))
+        proxy: {
+            ...Object.fromEntries(['/api', '/admin', '/assets', '/icons', '/login.html', '/track.html', '/manifest.webmanifest', '/pwa.js', '/sw.js'].map(p => [p, MOCK])),
+            // index.html's <script src="/pwa.js">: the dev server serves it under /app/ (the build keeps /pwa.js)
+            '/app/pwa.js': { target: MOCK, rewrite: () => '/pwa.js' }
+        }
     },
     // Built into /app at the repo root, which Vercel serves next to the old pages (vercel.json buildCommand).
     build: { outDir: '../app', emptyOutDir: true, sourcemap: true },

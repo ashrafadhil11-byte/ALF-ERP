@@ -28,7 +28,8 @@ const audit = fs.readFileSync(path.join(here, 'layout-audit.js'), 'utf8').replac
 const FIXED_TIME = new Date('2026-11-17T07:30:00Z');   // 11:30 in Muscat
 const TOKEN = 'h.eyJzdWIiOiJ1MSJ9.s';                   // mock-server sample session (not a real credential)
 
-const exe = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+// ALF_BROWSER=chrome uses Chrome when Edge will not start headless (e.g. an Edge update waiting for a restart)
+const exe = [...(process.env.ALF_BROWSER === 'chrome' ? [] : ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe']), 'C:/Program Files/Google/Chrome/Application/chrome.exe',
     '/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(p => fs.existsSync(p));
 if (!exe) { console.error('No Edge or Chrome found.'); process.exit(1); }
 

@@ -413,3 +413,14 @@ a.sx-chip:hover { background: #E86D58; border-color: #E86D58; color: #fff; }
     .sx-body { padding: 0 14px 12px; margin-top: -56px; } .sx-panes { padding: 12px 14px 18px; }
     .sx-hero { height: 104px; padding: 16px; }
 }
+
+/* "hidden" must win over the display set by the classes above (this file loads after Tailwind, so .btn etc. used to
+   beat .hidden: hidden buttons such as "Show more" or "Sync carriers" for staff stayed visible) */
+.btn.hidden, .icon-btn.hidden, .pill-tag.hidden, .sd-step.hidden, .seg.hidden, .ui-label.hidden,
+.sx-avatar.hidden, .sx-badge.hidden, .sx-body.hidden, .sx-chip.hidden, .sx-close.hidden, .sx-copy.hidden, .sx-count.hidden,
+.sx-country.hidden, .sx-dot.hidden, .sx-ev-dot.hidden, .sx-foot.hidden, .sx-hero.hidden, .sx-ic.hidden, .sx-id.hidden,
+.sx-route.hidden, .sx-step.hidden, .sx-tabs.hidden, .sx-track.hidden { display: none; }
+
+/* popups and messages opened from the shipment card (edit, cancel, delete, confirmations) show above it, not behind */
+body:has(.sx-modal.open) .ui-modal.open { z-index: 66; }
+body:has(.sx-modal.open) #ui-toast { z-index: 67; }

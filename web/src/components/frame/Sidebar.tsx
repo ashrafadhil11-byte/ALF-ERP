@@ -29,6 +29,7 @@ function groups(): Group[] {
         ] },
         { id: 'biz', label: 'Money & stock', items: [
             ['Accounts', 'accounts.html', 'cash', role !== 'staff'],
+            ['Reports', 'reports.html', 'chart', isAdmin],
             ['Warehouse', 'warehouse.html', 'warehouse', isWarehouse || isAdmin]
         ] },
         { id: 'team', label: 'Team', items: [

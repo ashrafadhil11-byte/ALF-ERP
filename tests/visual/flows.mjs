@@ -193,9 +193,6 @@ const FLOWS = {
         ['purchases', async (p) => { await p.click('[data-tab="purchases"]'); }],
         ['pay-supplier', async (p) => { await p.click('#panel button:has-text("Pay") >> nth=0'); }],
         ['pay-supplier-go', async (p) => { await p.click('#formOk'); }],
-        ['reports', async (p) => { await p.click('[data-tab="reports"]'); }],
-        ['bs', async (p) => { await p.click('[data-report="bs"]'); }],
-        ['tb', async (p) => { await p.click('[data-report="tb"]'); }],
         ['journal', async (p) => { await p.click('[data-tab="journal"]'); }],
         ['journal-new', async (p) => { await p.click('button:has-text("Manual journal")'); await p.waitForTimeout(300); await p.fill('#jMemo', 'Opening cash'); await p.fill('#jLines [data-jl]:nth-child(1) [data-k=debit]', '100'); }],
         ['journal-diff', async (p) => { await p.selectOption('#jLines [data-jl]:nth-child(2) [data-k=account]', '3000'); await p.fill('#jLines [data-jl]:nth-child(2) [data-k=credit]', '100'); }],
@@ -316,7 +313,8 @@ const FLOWS = {
     ]
 };
 
-const exe = ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe',
+// ALF_BROWSER=chrome uses Chrome when Edge will not start headless (e.g. an Edge update waiting for a restart)
+const exe = [...(process.env.ALF_BROWSER === 'chrome' ? [] : ['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe']), 'C:/Program Files/Google/Chrome/Application/chrome.exe',
     '/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find(p => fs.existsSync(p));
 fs.mkdirSync(outDir, { recursive: true });
 const browser = await chromium.launch({ executablePath: exe, headless: true });

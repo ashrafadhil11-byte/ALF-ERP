@@ -63,7 +63,7 @@ export async function withAudit(routeName, handler, req, res) {
     const json = res.json.bind(res);
     res.json = (payload) => {
         pending = (async () => {
-            try { await save(routeName, method, action, req, res.statusCode || 200, payload, body); } catch (e) { /* never block the reply */ }
+            try { await save(routeName, method, action, req, res.statusCode || 200, payload, body); } catch (e) { console.error(`[audit] could not save ${method} ${routeName}: ${e.message}`); /* never block the reply */ }
             json(payload);
         })();
         return res;
@@ -92,5 +92,7 @@ async function save(routeName, method, action, req, status, payload, body) {
         ip: String(req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim().slice(0, 60) || null,
         user_agent: String(req.headers?.['user-agent'] || '').slice(0, 200) || null
     };
-    await fetch(`${process.env.SUPABASE_URL}/rest/v1/audit_log`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+    const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/audit_log`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+    // a refused insert used to vanish without a trace; now it shows in the server logs
+    if (!r.ok) console.error(`[audit] could not save ${method} ${routeName}${action ? ':' + action : ''} — HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 300)}`);
 }
