@@ -22,7 +22,11 @@ const KIND: Record<string, { icon: IconName; tone: string }> = {
     inbound: { icon: 'truck', tone: 'bg-[#111827] text-white' },
     exception: { icon: 'alert', tone: 'bg-[#FFF5F3] text-[#D55C48]' },
     review: { icon: 'star', tone: 'bg-amber-50 text-amber-500' },
-    carrier: { icon: 'globe', tone: 'bg-gray-100 text-gray-600' }
+    carrier: { icon: 'globe', tone: 'bg-gray-100 text-gray-600' },
+    cash: { icon: 'wallet', tone: 'bg-emerald-50 text-emerald-600' },
+    request: { icon: 'clock', tone: 'bg-[#FFF5F3] text-[#E86D58]' },
+    done: { icon: 'check', tone: 'bg-emerald-50 text-emerald-600' },
+    warn: { icon: 'alert', tone: 'bg-amber-50 text-amber-600' }
 };
 
 export const ago = (iso: string) => {

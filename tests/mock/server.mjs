@@ -31,6 +31,67 @@ http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname === '/__role') { role = u.searchParams.get('r'); return res.end('ok'); }
   const send = (o) => { res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(o)); };
+  // ---------- Messages (sample chat, kept in memory; the other side answers a moment after you write) ----------
+  if (u.pathname === '/api/chat') {
+    const C = globalThis.__chat ||= (() => {
+      const P = [{ id: 'u2', name: 'Muhammed Salim', role: 'branch_manager', branch: 'ALFSNY', branch_name: 'Al-Farha Cargo Sannayya' },
+                 { id: 'u3', name: 'Fathima Rahman', role: 'staff', branch: 'ALFSLL', branch_name: 'Al-Farha Cargo Salalah' },
+                 { id: 'u4', name: 'Rafi Kannur', role: 'staff', branch: 'AFWRSL', branch_name: 'Central Warehouse' },
+                 { id: 'u5', name: 'Anitha Joseph', role: 'head_office', branch: null, branch_name: '' }];
+      const ago = (m) => new Date(Date.now() - m * 60e3).toISOString();
+      let id = 100;
+      const msg = (t, from, name, body, m, extra = {}) => ({ id: ++id, thread_id: t, sender_id: from, sender_name: name, body, reply_to: null, system: false, created_at: ago(m), deleted_at: null, ...extra });
+      const T = [
+        { id: 1, kind: 'direct', title: null, members: ['u1', 'u2'], read: { u1: ago(30), u2: ago(1) } },
+        { id: 2, kind: 'group', title: 'Salalah team', members: ['u1', 'u3', 'u4', 'u5'], read: { u1: ago(2000), u3: ago(5), u4: ago(400), u5: ago(5) } },
+        { id: 3, kind: 'direct', title: null, members: ['u1', 'u5'], read: { u1: ago(1), u5: ago(1) } }];
+      const M = [
+        msg(2, 'u1', 'Test User', 'Test User created the group “Salalah team”', 3000, { system: true }),
+        msg(2, 'u3', 'Fathima Rahman', 'Container MSKU1234567 closes tomorrow 10:00. Please send the last shipments today.', 2900),
+        msg(2, 'u4', 'Rafi Kannur', 'Received 3 boxes of 311000001 at the warehouse ✅', 2890),
+        msg(2, 'u5', 'Anitha Joseph', 'Thanks both. Agent bill will be split by weight 👍', 60),
+        msg(3, 'u5', 'Anitha Joseph', 'Can you check the Sannayya cash transfer?', 1500),
+        msg(3, 'u1', 'Test User', 'Yes, received OMR 85 — short 0.500, noted.', 1490),
+        msg(1, 'u2', 'Muhammed Salim', 'Good morning! Sending week 46 cash today.', 300),
+        msg(1, 'u1', 'Test User', 'Great, I will confirm when it arrives.', 290),
+        msg(1, 'u2', 'Muhammed Salim', 'Bag 22, OMR 85. Also 311000002 has 1 box left here.', 25),
+        msg(1, 'u2', 'Muhammed Salim', 'https://example.com/manifest.pdf', 24)];
+      return { P, T, M, next: () => ++id };
+    })();
+    const me = 'u1', who = (x) => x === me ? { id: me, name: 'Test User', role: 'super_admin', branch: null } : C.P.find(p => p.id === x);
+    const view = (t) => {
+      const ms = C.M.filter(m => m.thread_id === t.id), last = ms[ms.length - 1];
+      return { id: t.id, kind: t.kind, title: t.title, last_message_at: last ? last.created_at : new Date().toISOString(), last_message: last?.deleted_at ? '(deleted)' : last?.body, last_sender: last?.sender_name,
+        unread: ms.filter(m => m.sender_id !== me && m.created_at > t.read[me] && !m.deleted_at).length, members: t.members.filter(x => x !== me).map(who) };
+    };
+    const unread = () => C.T.filter(t => t.members.includes(me)).reduce((n, t) => n + view(t).unread, 0);
+    if (req.method === 'POST') { let b = ''; req.on('data', c => b += c); req.on('end', () => { const j = JSON.parse(b || '{}'); const t = C.T.find(x => x.id === +j.thread);
+      if (j.action === 'read' && t) { t.read[me] = new Date().toISOString(); return send({ success: true }); }
+      if (j.action === 'send' && t) {
+        const m = { id: C.next(), thread_id: t.id, sender_id: me, sender_name: 'Test User', body: String(j.body), reply_to: j.reply_to || null, system: false, created_at: new Date().toISOString(), deleted_at: null };
+        C.M.push(m); t.read[me] = m.created_at;
+        const other = t.members.find(x => x !== me);
+        setTimeout(() => { t.read[other] = new Date().toISOString(); }, 1500);
+        setTimeout(() => C.M.push({ id: C.next(), thread_id: t.id, sender_id: other, sender_name: who(other).name, body: ['Noted 👍', 'OK, thanks!', 'Will do.', 'Got it ✅'][C.M.length % 4], reply_to: null, system: false, created_at: new Date().toISOString(), deleted_at: null }), 3000);
+        return send({ success: true, message: m });
+      }
+      if (j.action === 'delete') { const m = C.M.find(x => x.id === +j.id && x.sender_id === me); if (m) m.deleted_at = new Date().toISOString(); return send({ success: true }); }
+      if (j.action === 'direct') { let t2 = C.T.find(x => x.kind === 'direct' && x.members.includes(j.user_id)); if (!t2) { t2 = { id: C.next(), kind: 'direct', title: null, members: [me, j.user_id], read: { [me]: new Date().toISOString(), [j.user_id]: new Date().toISOString() } }; C.T.push(t2); } return send({ success: true, thread: t2.id }); }
+      if (j.action === 'group') { const t2 = { id: C.next(), kind: 'group', title: j.title, members: [me, ...j.members], read: Object.fromEntries([me, ...j.members].map(x => [x, new Date().toISOString()])) }; C.T.push(t2);
+        C.M.push({ id: C.next(), thread_id: t2.id, sender_id: me, sender_name: 'Test User', body: `Test User created the group “${j.title}”`, system: true, created_at: new Date().toISOString() }); return send({ success: true, thread: t2.id }); }
+      if (j.action === 'rename' && t) { t.title = j.title; return send({ success: true }); }
+      if (j.action === 'add' && t) { t.members.push(...j.members); return send({ success: true }); }
+      if (j.action === 'leave' && t) { t.members = t.members.filter(x => x !== me); return send({ success: true }); }
+      res.statusCode = 400; send({ error: 'Unknown action.' }); }); return; }
+    if (u.searchParams.get('view') === 'unread') return send({ unread: unread() });
+    if (u.searchParams.get('view') === 'people') return send({ people: C.P });
+    const tid = +u.searchParams.get('thread');
+    if (tid) { const t = C.T.find(x => x.id === tid && x.members.includes(me)); if (!t) { res.statusCode = 404; return send({ error: 'Chat not found.' }); }
+      const after = +u.searchParams.get('after') || 0;
+      const ms = C.M.filter(m => m.thread_id === t.id && m.id > after).map(m => m.deleted_at ? { ...m, body: '' } : m);
+      return send({ thread: { id: t.id, kind: t.kind, title: t.title }, more: false, quoted: [], members: t.members.map(x => ({ ...who(x), last_read_at: t.read[x] || new Date(0).toISOString() })), messages: ms }); }
+    return send({ threads: C.T.filter(t => t.members.includes(me) && (t.kind === 'group' || C.M.some(m => m.thread_id === t.id))).map(view).sort((a, b) => b.last_message_at.localeCompare(a.last_message_at)), unread: unread() });
+  }
   // ---------- Main Office (sample data) ----------
   if (u.pathname === '/api/main-office') {
     const tokOk = Boolean(req.headers['x-office-token']);
@@ -188,7 +249,11 @@ http.createServer((req, res) => {
   if (u.pathname === '/api/notifications') {
     if (req.method === 'POST') return send({ success: true });
     const t = (m) => new Date(Date.now() - m * 6e4).toISOString();
-    return send({ unread: 3, items: [
+    return send({ unread: 6, items: [
+      { id:'cs-1', kind:'cash', title:'Cash on the way · OMR 85.000 from ALFSNY', body:'TRF-ALFSNY-000014 · Bag 22 · sent by Muhammed Salim · confirm when you count it', at:t(2), href:'main-office.html?tab=approvals', unread:true },
+      { id:'pq-1', kind:'request', title:'Payment request · ALFTMT · OMR 180.000', body:'PRQ-ALFTMT-000003 · Landlord · December rent', at:t(3), href:'main-office.html?tab=approvals', unread:true },
+      { id:'cr-9', kind:'warn', title:'Main Office confirmed your cash · OMR 84.500', body:'TRF-ALFSNY-000013 · short OMR 0.500 · Adhil', at:t(8), href:'accounts.html?tab=money', unread:true },
+      { id:'md-1', kind:'done', title:'ALFSNY received TR-ALFSLL-00011', body:'Ali', at:t(20), href:'consolidation.html?tab=outbound', unread:false },
       { id:'tr-1', kind:'inbound', title:'4 shipments coming from ALFSLL', body:'TR-ALFSLL-00012 · sent by Ali', at:t(4), href:'consolidation.html?tab=inbound', unread:true },
       { id:'ev-1', kind:'exception', title:'Delivery Attempt Failed · AFC-849208', body:'Attempt 1: Customer not reachable · Rashid', at:t(35), href:'shipments.html?awb=AFC-849208', unread:true },
       { id:'ev-2', kind:'review', title:'New review · AFC-849190', body:'5★ • Fast delivery, thank you', at:t(90), href:'shipments.html?awb=AFC-849190', unread:true },

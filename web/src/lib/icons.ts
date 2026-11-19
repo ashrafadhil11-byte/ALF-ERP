@@ -2,6 +2,12 @@
 // Keep in sync until the old pages are removed.
 export const ICONS = {
     flag: "<path d=\"M4 22V4M4 4h12l-2 4 2 4H4\"/>",
+    users: "<path d=\"M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2\"/><circle cx=\"9\" cy=\"7\" r=\"4\"/><path d=\"M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75\"/>",
+    wallet: "<path d=\"M3 7a2 2 0 012-2h13v4\"/><path d=\"M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z\"/><circle cx=\"16\" cy=\"14.5\" r=\"1.2\"/>",
+    send: "<path d=\"M22 2L11 13\"/><path d=\"M22 2l-7 20-4-9-9-4 20-7z\"/>",
+    search: "<circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"M21 21l-4.3-4.3\"/>",
+    reply: "<path d=\"M9 14L4 9l5-5\"/><path d=\"M4 9h11a5 5 0 015 5v6\"/>",
+    smile: "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 14s1.5 2 4 2 4-2 4-2\"/><path d=\"M9 9h.01M15 9h.01\"/>",
     lock: "<rect x=\"4\" y=\"11\" width=\"16\" height=\"10\" rx=\"2\"/><path d=\"M8 11V7a4 4 0 018 0v4\"/>",
     fingerprint: "<path d=\"M12 11v3a8 8 0 01-1 4M8 12a4 4 0 018 0v1M5 13v-1a7 7 0 0114 0v2M16 17v1M12 3a9 9 0 019 9\"/>",
     eye: "<path d=\"M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>",

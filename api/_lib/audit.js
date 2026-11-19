@@ -5,6 +5,7 @@
 import { serviceHeaders } from './auth.js';
 
 const SKIP = new Set(['notifications:seen']);           // noise
+const PRIVATE = new Set(['chat']);                        // private messages are never copied into the activity log
 const SECRET = /pass|pin|secret|token|api_?key|apikey|signature|photo|authorization|cookie/i;
 const MAX_JSON = 6000;
 const names = new Map();                                 // user id → { name, role, branch, at } (warm-function cache)
@@ -57,7 +58,7 @@ export async function withAudit(routeName, handler, req, res) {
     if (method === 'GET' || method === 'OPTIONS' || method === 'HEAD') return handler(req, res);
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const action = body.action || null;
-    if (SKIP.has(`${routeName}:${action}`)) return handler(req, res);
+    if (PRIVATE.has(routeName) || SKIP.has(`${routeName}:${action}`)) return handler(req, res);
 
     let pending = null;
     const json = res.json.bind(res);

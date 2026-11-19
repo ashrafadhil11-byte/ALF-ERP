@@ -99,7 +99,8 @@ test('notifications: branch-scoped, own actions excluded, unread after last seen
             { id: 1, status_code: 'DELIVERY_FAILED', status: 'Delivery Attempt Failed', remark: 'Not reachable', event_at: '2026-11-16T11:00:00Z', created_by_name: 'Rashid', bookings: { awb: 'A1' } },
             { id: 2, status_code: 'REVIEWED', status: 'Customer Reviewed', remark: '5★', event_at: '2026-11-16T09:00:00Z', bookings: { awb: 'A2' } }
         ],
-        '/rest/v1/transfer_manifests': () => [{ id: 9, manifest_no: 'TR-ALFSLL-00009', from_branch: 'ALFSLL', status: 'in_transit', created_at: '2026-11-16T10:30:00Z', transfers: [{ status: 'pending' }, { status: 'pending' }] }]
+        // incoming manifests only (the 'received' query for the sender's confirmations returns nothing here)
+        '/rest/v1/transfer_manifests': (u) => u.includes('status=in.(received,partial)') ? [] : [{ id: 9, manifest_no: 'TR-ALFSLL-00009', from_branch: 'ALFSLL', status: 'in_transit', created_at: '2026-11-16T10:30:00Z', transfers: [{ status: 'pending' }, { status: 'pending' }] }]
     });
     const r = res();
     await notifications(req('GET'), r);
@@ -108,7 +109,7 @@ test('notifications: branch-scoped, own actions excluded, unread after last seen
     assert.match(r.body.items[1].title, /2 shipments coming from ALFSLL/);
     const ev = calls.find(c => c.url.includes('/tracking_events')).url;
     assert.ok(ev.includes('bookings.branch_code=eq.ALFSNY') && ev.includes('created_by.neq.u1') && !ev.includes('CANCELLED'));
-    assert.ok(calls.find(c => c.url.includes('/transfer_manifests')).url.includes('to_branch=eq.ALFSNY'));
+    assert.ok(calls.find(c => c.url.includes('/transfer_manifests?status=in.(in_transit,partial)')).url.includes('to_branch=eq.ALFSNY'));
 });
 
 test('notifications: "seen" stamps the employee row', async () => {

@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isWarehouse = localStorage.getItem('cargo_is_warehouse') === '1';
 
     // Pages already moved to the React app (web/) open there. Keep in step with CONVERTED in web/src/lib/pages.ts.
-    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html', 'main-office.html']);
+    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html', 'main-office.html', 'messages.html']);
     const link = (page) => REACT_PAGES.has(page) ? '/app/' + page.replace(/\.html$/, '') : page;
 
     const svg = (d, extra = '') => `<svg class="w-[18px] h-[18px] flex-shrink-0 ${extra}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">${d}</svg>`;
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // [label, page, icon, show?]
     const GROUPS = [
-        { id: 'top', items: [[isAdmin ? 'Global Overview' : 'Dashboard', 'super-dashboard.html', 'home', true]] },
+        { id: 'top', items: [[isAdmin ? 'Global Overview' : 'Dashboard', 'super-dashboard.html', 'home', true], ['Messages', 'messages.html', 'chat', true]] },
         { id: 'ops', label: 'Operations', items: [
             ['Shipments & AWB', 'shipments.html', 'ship', true],
             ['New Booking', 'booking.html', 'plus', true],
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
     if (!document.getElementById('sidebar-container') || document.getElementById('bottom-nav')) return;
     const page = window.location.pathname.split('/').pop() || 'super-dashboard.html';
-    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html', 'main-office.html']);   // see above
+    const REACT_PAGES = new Set(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html', 'main-office.html', 'messages.html']);   // see above
     const link = (p) => REACT_PAGES.has(p) ? '/app/' + p.replace(/\.html$/, '') : p;
     const ic = (d) => `<svg class="w-[22px] h-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
     const items = [

@@ -1,0 +1,44 @@
+/* Messages page — chat bubbles and layout. Scoped to this page. */
+:where(body[data-page="messages"]) .chat-app { height: calc(100dvh - 230px); min-height: 460px; }
+@media (max-width: 1023px) { :where(body[data-page="messages"]) .chat-app { height: calc(100dvh - 290px); min-height: 400px; } }
+
+:where(body[data-page="messages"]) .chat-scroll {
+    background:
+        radial-gradient(circle at 20% 10%, rgba(232, 109, 88, .045), transparent 40%),
+        radial-gradient(circle at 85% 80%, rgba(17, 24, 39, .035), transparent 45%);
+}
+
+:where(body[data-page="messages"]) .bubble {
+    position: relative; padding: .55rem .85rem .45rem; border-radius: 1.25rem; font-size: .8125rem; line-height: 1.35rem;
+    box-shadow: 0 1px 1px rgba(17, 24, 39, .04);
+}
+:where(body[data-page="messages"]) .bubble-me { background: #111827; color: #fff; border-bottom-right-radius: .4rem; }
+:where(body[data-page="messages"]) .bubble-them { background: #F3F4F6; color: #111827; border-bottom-left-radius: .4rem; }
+/* consecutive messages from one sender read as one block */
+:where(body[data-page="messages"]) .bubble-me.join-next-me { border-bottom-right-radius: .4rem; }
+:where(body[data-page="messages"]) .bubble-me.join-prev-me { border-top-right-radius: .4rem; }
+:where(body[data-page="messages"]) .bubble-them.join-next-them { border-bottom-left-radius: .4rem; }
+:where(body[data-page="messages"]) .bubble-them.join-prev-them { border-top-left-radius: .4rem; }
+:where(body[data-page="messages"]) .bubble-time { float: right; margin: .35rem 0 -.15rem .6rem; font-size: .625rem; font-weight: 700; line-height: 1rem; }
+
+:where(body[data-page="messages"]) .chat-msg { animation: chat-in .18s ease-out; }
+@keyframes chat-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+:where(body[data-page="messages"]) .msg-tools { opacity: 0; transition: opacity .12s; }
+:where(body[data-page="messages"]) .chat-msg:hover .msg-tools,
+:where(body[data-page="messages"]) .chat-msg:focus-within .msg-tools { opacity: 1; }
+/* phones: the tools take no room; tap a message to show them */
+@media (hover: none) {
+    :where(body[data-page="messages"]) .msg-tools { display: none; }
+    :where(body[data-page="messages"]) .chat-msg:focus-within .msg-tools { display: flex; opacity: 1; }
+}
+:where(body[data-page="messages"]) .msg-tools .tool {
+    width: 1.75rem; height: 1.75rem; border-radius: 9999px; display: flex; align-items: center; justify-content: center; color: #9CA3AF;
+}
+:where(body[data-page="messages"]) .msg-tools .tool:hover { background: #F8F8FA; color: #111827; }
+
+:where(body[data-page="messages"]) .emoji-pop { animation: chat-in .15s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+    :where(body[data-page="messages"]) .chat-msg, :where(body[data-page="messages"]) .emoji-pop { animation: none; }
+}

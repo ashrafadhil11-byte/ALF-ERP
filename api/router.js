@@ -6,6 +6,7 @@ import accounts from './_routes/accounts.js';
 import activity from './_routes/activity.js';
 import attendance from './_routes/attendance.js';
 import bookings from './_routes/bookings.js';
+import chat from './_routes/chat.js';
 import branches from './_routes/branches.js';
 import codes from './_routes/codes.js';
 import consolidation from './_routes/consolidation.js';
@@ -33,6 +34,7 @@ const ROUTES = {
     activity,
     attendance,
     bookings,
+    chat,
     branches,
     codes,
     consolidation,
