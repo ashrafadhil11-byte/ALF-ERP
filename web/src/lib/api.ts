@@ -29,7 +29,7 @@ async function request<T>(path: string, { method = 'GET', body, headers = {} }: 
     });
     if (res.status === 401) {
         localStorage.removeItem('cargo_auth_token');
-        location.replace('/login.html');
+        location.replace('/app/login');
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new ApiError(data.error || `Request failed (${res.status})`, res.status);

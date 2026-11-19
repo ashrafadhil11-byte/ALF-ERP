@@ -4,6 +4,23 @@
   ],
   "buildCommand": "npm --prefix web ci --no-audit --no-fund && npm --prefix web run build && rm -rf web/node_modules",
   "outputDirectory": ".",
+  "redirects": [
+    {
+      "source": "/login.html",
+      "destination": "/app/login",
+      "permanent": false
+    },
+    {
+      "source": "/track.html",
+      "destination": "/app/track",
+      "permanent": false
+    },
+    {
+      "source": "/admin/:page(super-dashboard|shipments|booking|status-update|delivery|consolidation|customers|crm|accounts|warehouse|attendance|create-user|branches|integrations|activity).html",
+      "destination": "/app/:page",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:route",

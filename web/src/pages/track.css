@@ -1,0 +1,10 @@
+/* page styles from track.html, scoped to this page */
+:where(body[data-page="track"]) .star { color: #E5E7EB; transition: transform .1s, color .1s; }
+:where(body[data-page="track"]) .star.on { color: #F59E0B; }
+:where(body[data-page="track"]) .star:hover { transform: scale(1.12); }
+:where(body[data-page="track"]) .field { width: 100%; background: #fff; border: 1px solid #E5E7EB; border-radius: 1rem; padding: .85rem 1rem; font-size: .875rem; font-weight: 600; }
+:where(body[data-page="track"]) .field:focus { outline: none; border-color: transparent; box-shadow: 0 0 0 2px #E86D58; }
+/* the old page did not load ui.css: undo the two things it adds to .field there */
+body[data-page="track"] .field::placeholder { font-weight: inherit; }
+body[data-page="track"] .field:hover:not(:focus) { border-color: #E5E7EB; }
+body[data-page="track"] .field.font-mono { font-family: theme('fontFamily.mono'); }

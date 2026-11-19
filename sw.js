@@ -1,18 +1,13 @@
 // File: sw.js — makes the ERP installable and keeps the app shell available offline.
 // API calls (/api/*) are never cached: data is always live.
-const VERSION = 'alf-erp-v6';
+const VERSION = 'alf-erp-v7';
+// The React app (/app/…) is cached as it is used: its files have content hashes, so a new release never mixes with an old one.
 const SHELL = [
     '/offline.html',
-    '/assets/app.css',
-    '/admin/components/ui.css',
-    '/admin/components/ui.js',
-    '/admin/components/sidebar.js',
-    '/admin/components/topbar.js',
     '/pwa.js',
-    '/admin/components/countries.js',
-    '/admin/components/oman-places.js',
     '/icons/icon-192.png',
-    '/assets/LOGO%20BG%20W.svg'
+    '/assets/LOGO%20BG%20W.svg',
+    '/assets/LOGO%20BG%20B.svg'
 ];
 
 self.addEventListener('install', (event) => {

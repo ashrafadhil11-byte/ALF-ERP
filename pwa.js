@@ -1,5 +1,6 @@
 // File: pwa.js — registers the service worker and offers "Install app".
 (function () {
+    if (/^\/(app\/track|track\.html)/.test(location.pathname)) return;   // customer tracking page: not part of the installable app
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
     }

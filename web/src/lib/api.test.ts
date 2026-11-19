@@ -33,6 +33,6 @@ describe('api (same behaviour as UI.api)', () => {
         vi.stubGlobal('fetch', vi.fn(async () => json({}, 401)));
         await expect(api('/api/z')).rejects.toThrow();
         expect(localStorage.getItem('cargo_auth_token')).toBeNull();
-        expect(replace).toHaveBeenCalledWith('/login.html');
+        expect(replace).toHaveBeenCalledWith('/app/login');
     });
 });

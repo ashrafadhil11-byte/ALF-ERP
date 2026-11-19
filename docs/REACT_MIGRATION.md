@@ -142,7 +142,30 @@ A page only switches over when all of these pass:
 
 **Phase 2 — live in production since 18 Nov 2026 (commit 032eb72).**
 
-**Phase 4 — done locally, not pushed (19 Nov 2026)**
+**Phase 5 — done locally, not pushed (19 Nov 2026)**
+
+- **Converted pages:** Sign-in at `/app/login` and customer tracking (with the delivery review) at `/app/track`. Both are public: they need no sign-in and show no menus.
+- **Cutover — old addresses open the new pages** (Vercel redirects in `vercel.json`; the query string is kept):
+  - `/login.html` goes to `/app/login`.
+  - `/track.html?awb=…&r=…` goes to `/app/track?awb=…&r=…`, so tracking and review links already sent to customers keep working.
+  - `/admin/<page>.html` goes to `/app/<page>` for all 15 pages, so bookmarks and saved links keep working.
+  - The home page `/` sends visitors to `/app/login`.
+- **Signing out or an expired session** now goes straight to `/app/login`.
+- **Installed app (PWA):**
+  - The service worker is now version 7, so installed apps drop the old cached pages.
+  - The React pages now load `pwa.js`, so the "Install app" prompt and the installed-app look work on them. The tracking page skips it, as before.
+- **Offline page:** kept as a plain `offline.html` on purpose. The service worker must be able to show it with no network, when the app's own code may not be available.
+- **Tab titles:** every page shows its own title again (for example "Shipments - Al-Farha Cargo"). Phases 1 to 4 had left them all as "Al-Farha Cargo".
+- **Rolling back:** the old `.html` files are still in the repository for one release. Removing the `redirects` block from `vercel.json` brings them back. After that release they can be deleted.
+- **Checks:**
+  - Public pages: 14 of 14 screenshots identical at 0% (desktop and phone, wrong password, show/hide password, tracking, review). Login and review requests are identical, and so is what sign-in saves.
+  - All 15 signed-in pages after the cutover: 78 of 78 page and popup screenshots identical, frame 36 of 36.
+  - The redirects only exist on Vercel, so they can't be tested locally. They need checking on the live site right after the push.
+- **Sample server:** `tests/mock/server.mjs` now has a sample `/api/login`. `tests/visual/public.mjs` checks the public pages.
+
+**Phase 4 — live in production (commit 3ddea72).**
+
+**Phase 4 — details (19 Nov 2026)**
 
 - **Converted pages:** New Booking, Branch Network, Consolidation & Bulk, Shipments & AWB and Accounts, at `/app/booking`, `/app/branches`, `/app/consolidation`, `/app/shipments` and `/app/accounts`. All 15 signed-in pages are now React.
 - **New shared pieces:** the postcode / PIN / Saudi short-address lookup (`PostalLookup`), label and receipt printing (`lib/print.ts`, which reuses the old print code), and manifest printing (`lib/manifest.ts`).

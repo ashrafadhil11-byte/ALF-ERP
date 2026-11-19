@@ -1,0 +1,11 @@
+/* page styles from login.html, scoped to this page */
+:where(body[data-page="login"]) input:-webkit-autofill,
+:where(body[data-page="login"]) input:-webkit-autofill:hover,
+:where(body[data-page="login"]) input:-webkit-autofill:focus,
+:where(body[data-page="login"]) input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #F9FAFB inset !important;
+    -webkit-text-fill-color: #1F2937 !important;
+    border-radius: 0.75rem;
+}
+:where(body[data-page="login"]) .shape-1 { top: -20%; left: -10%; transform: rotate(45deg); }
+:where(body[data-page="login"]) .shape-2 { bottom: -10%; right: -20%; border-radius: 50%; }

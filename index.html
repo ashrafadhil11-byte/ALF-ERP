@@ -14,12 +14,12 @@
     <script src="/pwa.js" defer></script>
     <title>Redirecting to Al-Farha Cargo...</title>
     
-    <!-- Primary Redirect: Instantly routes to login.html -->
-    <meta http-equiv="refresh" content="0; url=login.html">
+    <!-- Primary Redirect: Instantly routes to the sign-in page -->
+    <meta http-equiv="refresh" content="0; url=/app/login">
     
     <!-- Fallback Redirect: Uses JavaScript to replace the history state -->
     <script>
-        window.location.replace("login.html");
+        window.location.replace("/app/login");
     </script>
 </head>
 <body style="background-color: #f3f4f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #6b7280;">

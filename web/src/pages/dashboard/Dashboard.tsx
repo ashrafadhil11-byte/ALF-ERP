@@ -81,7 +81,7 @@ export function Dashboard() {
         const token = session.token(); if (!token) return;
         try {
             const res = await fetch(`/api/dashboard${code ? `?branch=${encodeURIComponent(code)}` : ''}`, { headers: { Authorization: `Bearer ${token}` } });
-            if (res.status === 401) { localStorage.removeItem('cargo_auth_token'); location.replace('/login.html'); return; }
+            if (res.status === 401) { localStorage.removeItem('cargo_auth_token'); location.replace('/app/login'); return; }
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to load');
             setDash(data);

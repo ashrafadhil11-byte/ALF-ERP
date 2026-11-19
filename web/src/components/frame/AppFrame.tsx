@@ -3,7 +3,7 @@
 // lays them out as children of <body> (the React root uses display:contents).
 import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
-import { pageByPath, type PageFile } from '../../lib/pages';
+import { pageByPath, TITLES, type PageFile } from '../../lib/pages';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { TopBar } from './TopBar';
@@ -48,6 +48,7 @@ export function AppFrame({ children, mainClassName = MAIN_CLASS, onSearch, after
     // page-only styles (pages/*.css) apply under :where(body[data-page="<page>"]) — like the old pages' own <style>
     useLayoutEffect(() => {
         document.body.dataset.page = (current || '').replace(/\.html$/, '');
+        if (current && TITLES[current as PageFile]) document.title = `${TITLES[current as PageFile]} - Al-Farha Cargo`;
         return () => { delete document.body.dataset.page; };
     }, [current]);
     // a page change closes the phone menu

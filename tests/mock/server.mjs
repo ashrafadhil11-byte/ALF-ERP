@@ -121,6 +121,9 @@ http.createServer((req, res) => {
       drivers: [{ id:'u1', full_name:'Rashid Ali', branch:'ALFKNR' }, { id:'u2', full_name:'Shameer K', branch:'ALFKNR' }],
       reasons: ['Customer not reachable','Customer not available','Wrong / incomplete address','Customer refused','Other'], me: { id:'u1', role, is_driver: true } });
   }
+  if (u.pathname === '/api/login') { let b=''; req.on('data',c=>b+=c); req.on('end',()=>{ const j=JSON.parse(b||'{}');   // sample sign-in: any user except "bad"
+    if (j.username === 'bad') { res.statusCode = 401; return send({ error: 'Invalid username or password.' }); }
+    send({ session: { access_token: 'h.eyJzdWIiOiJ1MSJ9.s', user: { id: 'u1' } }, role: 'super_admin', is_warehouse: false }); }); return; }
   if (u.pathname === '/api/track') {
     if (req.method === 'POST') return send({ success: true, awb: 'AFC-849190' });
     return send({ awb: (u.searchParams.get('awb')||'').toUpperCase(), status: 'Delivered', stage: 8, origin: 'Salalah, Oman', destination: 'Kannur, India', pieces: 2, booked_at: new Date(Date.now()-6*864e5).toISOString(), delivered_at: new Date().toISOString(),

@@ -35,6 +35,9 @@ function Shell() {
 
 // Pages are added here as they are converted (see docs/REACT_MIGRATION.md and lib/pages.ts).
 export const router = createBrowserRouter([
+    // public pages: no sign-in, no frame
+    { path: '/login', lazy: () => import('./pages/Login').then(m => ({ Component: m.Login })) },
+    { path: '/track', lazy: () => import('./pages/Track').then(m => ({ Component: m.Track })) },
     {
         element: <Shell />,
         children: [

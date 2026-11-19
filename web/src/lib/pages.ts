@@ -17,6 +17,14 @@ export const PAGES: Page[] = ([
 export const CONVERTED = new Set<PageFile>(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html']);
 PAGES.forEach(p => { p.react = CONVERTED.has(p.file); });
 
+/** The browser-tab title of each page (same as the old pages' <title>). */
+export const TITLES: Record<PageFile, string> = {
+    'super-dashboard.html': 'Dashboard', 'shipments.html': 'Shipments', 'booking.html': 'New Booking', 'status-update.html': 'Scan & Update',
+    'delivery.html': 'Delivery & POD', 'consolidation.html': 'Consolidation & Bulk', 'customers.html': 'Customers', 'crm.html': 'CRM · WhatsApp',
+    'accounts.html': 'Accounts', 'warehouse.html': 'Warehouse', 'attendance.html': 'Attendance', 'create-user.html': 'Staff & Users',
+    'branches.html': 'Branch Network', 'integrations.html': 'Integrations', 'activity.html': 'Activity Log'
+};
+
 export const pageByFile = (file: string) => PAGES.find(p => p.file === file);
 export const pageByPath = (path: string) => PAGES.find(p => p.path === path);
 /** Where a link to this page goes right now. */

@@ -21,6 +21,6 @@ export const session = {
     signOut() {
         for (const k of ['cargo_auth_token', 'cargo_user_role', 'cargo_is_warehouse']) localStorage.removeItem(k);
         try { sessionStorage.removeItem('alf_wh_token'); } catch { /* ignore */ }
-        location.replace('/login.html');
+        location.replace('/app/login');
     }
 };
