@@ -28,3 +28,14 @@ kept at Main Office and paid from the Payments list like any other bill.
 2. Branch Network → add the Main Office location (type "Main Office").
 3. Users → tick "Main Office cashier" for the right people. They sign out and in once.
 4. Each cashier sets a PIN on first open of Main Office.
+
+## Booking code, cargo stock, shared consolidation costs (migration 022)
+- Main Office and the warehouse make no bookings: their AWB digit is always 0. Only branches need a unique digit.
+- Every box knows where it is. A transfer moves only the boxes that arrive: boxes left behind stay in the
+  sender's stock, missing boxes are in nobody's stock. A shipment moves to the receiver once no box is left
+  at the sender. Consolidation & Bulk shows cargo on hand / coming in / sent; the warehouse has a Cargo tab,
+  separate from Packing materials.
+- A cost bill on a consolidation is shared between the branches that booked its shipments (chargeable kg,
+  containers by CBM) — even when the cargo now sits in the warehouse. Each branch carries its share as its own
+  cost; the branch that took the bill is owed the rest through Main Office. Needs the Main Office location;
+  without it (or for another currency) the whole bill stays with the branch that took it.

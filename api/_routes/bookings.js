@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     const loadBranch = async (requested) => {
         const code = isAdmin ? requested : session.branch;
         if (!code) throw new UserError(isAdmin ? 'Choose the branch for this shipment.' : 'Your account has no branch assigned.');
-        const r = await fetch(`${rest}/branches?branch_code=eq.${enc(code)}&select=branch_code,branch_name,location,currency,tax_rate&limit=1`, { headers: serviceHeaders() });
+        const r = await fetch(`${rest}/branches?branch_code=eq.${enc(code)}&select=branch_code,branch_name,branch_type,location,currency,tax_rate&limit=1`, { headers: serviceHeaders() });
         const branch = (r.ok ? await r.json() : [])[0];
         if (!branch) throw new UserError(`Branch ${code} does not exist.`);
         return branch;
@@ -209,7 +209,13 @@ export default async function handler(req, res) {
             if (errors.length) throw new UserError(errors.join(' '));
             if ('shipper' in fields && !fields.shipper) throw new UserError('Shipper cannot be empty.');
             if ('consignee' in fields && !fields.consignee) throw new UserError('Consignee cannot be empty.');
-            if (isAdmin && body.branch_code && body.branch_code !== b.branch_code) fields.branch_code = (await loadBranch(body.branch_code)).branch_code;
+            if (isAdmin && body.branch_code && body.branch_code !== b.branch_code) {
+                const br = await loadBranch(body.branch_code);
+                if (br.branch_type && br.branch_type !== 'branch') throw new UserError('A shipment belongs to a branch, not to the warehouse or Main Office.');
+                // a booking moved by an admin now belongs to that branch (its boxes follow; costs and revenue go there)
+                fields.branch_code = br.branch_code;
+                fields.booked_branch = br.branch_code;
+            }
 
             const norm = (v) => (v != null && typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''));
             const changed = Object.keys(fields).filter(k => norm(fields[k]) !== norm(b[k]));

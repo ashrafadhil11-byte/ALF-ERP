@@ -41,13 +41,18 @@ export default async function handler(req, res) {
             const q = req.query || {};
             if (q.id) {
                 const c = await load(q.id);
-                const [items, costs, alloc] = await Promise.all([
+                const [items, costs, alloc, shares, names] = await Promise.all([
                     get(`consolidation_items?consolidation_id=eq.${enc(q.id)}&select=added_at,pieces,bookings(awb,shipper,consignee,dest_city,dest_country,pieces,weight,chargeable_weight,current_status,current_status_code,branch_code,booking_pieces(piece_no,weight,l,w,h,status))&order=added_at.asc`),
-                    get(`cost_bills?consolidation_id=eq.${enc(q.id)}&status=neq.void&select=id,bill_no,cost_type,description,currency,amount,paid,status,bill_ref,bill_date,suppliers(name)&order=id`),
-                    fetch(`${rest}/rpc/consolidation_allocation`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify({ p_id: Number(q.id) }) }).then(r => r.ok ? r.json() : [])
+                    get(`cost_bills?consolidation_id=eq.${enc(q.id)}&status=neq.void&select=id,bill_no,branch_code,cost_type,description,currency,amount,paid,status,bill_ref,bill_date,split,suppliers(name),cost_bill_shares(branch_code,amount)&order=id`),
+                    fetch(`${rest}/rpc/consolidation_allocation`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify({ p_id: Number(q.id) }) }).then(r => r.ok ? r.json() : []),
+                    // how a bill on this consolidation is shared between the branches that booked its shipments
+                    fetch(`${rest}/rpc/consolidation_branch_shares`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify({ p_id: Number(q.id) }) }).then(r => r.ok ? r.json() : []),
+                    get('branches?select=branch_code,branch_name')
                 ]);
+                const nm = Object.fromEntries(names.map(x => [x.branch_code, x.branch_name]));
                 return res.status(200).json({
                     consolidation: c, costs, allocation: alloc,
+                    branch_shares: shares.map(s => ({ branch: s.branch_code, name: nm[s.branch_code] || s.branch_code, share: +s.share })),
                     items: items.map(i => {
                         const boxes = (i.bookings.booking_pieces || []).sort((a, b) => a.piece_no - b.piece_no);
                         const inside = i.pieces ? boxes.filter(x => i.pieces.includes(x.piece_no)) : boxes;

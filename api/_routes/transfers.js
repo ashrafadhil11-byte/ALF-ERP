@@ -1,5 +1,5 @@
 // File: api/_routes/transfers.js — outbound / inbound between branches (transfer manifests).
-//   GET [?branch=X]          incoming + outgoing manifests, shipments held here, branch list (admins may act for any branch)
+//   GET [?branch=X]          incoming + outgoing manifests, cargo on hand here (box level), branch list (admins may act for any branch)
 //   GET ?id=N                one manifest with its shipments (for checking / printing)
 //   POST { action:'outbound', awbs, to_branch, vehicle?, driver?, seal?, notes?, branch?, pieces?: { AWB: [1,2] } }   boxes sent
 //   POST { action:'inbound',  awbs, note?, branch?, pieces?: { AWB: [1] } }   boxes that arrived (rest = missing)   → per-AWB results (received / wrong_branch / not_expected / …)
@@ -45,16 +45,19 @@ export default async function handler(req, res) {
             const [incoming, outgoing, held, branches] = await Promise.all([
                 get(`transfer_manifests?to_branch=eq.${enc(branch)}&status=in.(in_transit,partial)&select=*,transfers(status,pieces,missing_pieces,bookings(awb,consignee,pieces,weight))&order=created_at.asc`),
                 get(`transfer_manifests?from_branch=eq.${enc(branch)}&created_at=gte.${enc(since)}&select=*,transfers(status,missing_pieces)&order=created_at.desc&limit=60`),
-                get(`bookings?branch_code=eq.${enc(branch)}&archived=is.false&current_stage=lt.8&current_status_code=neq.CANCELLED&select=awb,consignee,dest_city,dest_country,pieces,weight,current_status,current_status_code,transfers(status)&order=updated_at.desc&limit=${MAX}`),
-                get(`branches?select=branch_code,branch_name,is_hub,status&order=branch_name.asc`)
+                // cargo on hand: the boxes that are here (not those already on a manifest that is on the way)
+                fetch(`${rest}/rpc/cargo_stock`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify({ p_branch: branch }) }).then(r => r.ok ? r.json() : []),
+                get(`branches?select=branch_code,branch_name,branch_type,is_hub,status&order=branch_name.asc`)
             ]);
             return res.status(200).json({
                 branch,
                 incoming,
                 outgoing,
-                // shipments already on a pending transfer can't be sent again
-                held: held.filter(b => !(b.transfers || []).some(t => t.status === 'pending')).map(({ transfers, ...b }) => b),
-                branches: branches.filter(b => b.status !== 'Dismissed'),
+                // pieces = boxes here; boxes = which ones (fewer than boxes_total when the rest are elsewhere)
+                held: held.map(h => ({ awb: h.awb, consignee: h.consignee, dest_city: h.dest_city, dest_country: h.dest_country, current_status: h.current_status,
+                                       pieces: (h.boxes || []).length, boxes: h.boxes, boxes_total: h.boxes_total, weight: +h.weight || 0, cbm: +h.cbm || 0 })),
+                // cargo goes to a branch or the warehouse, never to Main Office
+                branches: branches.filter(b => b.status !== 'Dismissed' && b.branch_type !== 'main_office'),
                 can_switch: isAdmin
             });
         }

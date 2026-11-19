@@ -86,12 +86,14 @@ export function Branches() {
         return { ...next, code: hit ? hit[1] : (src.length >= 3 ? `ALF${src.slice(0, 3)}` : next.code) };
     };
     const nextFreeDigit = (ed: any) => {
-        const used = new Set((branches || []).filter(b => !ed || b.id !== ed.id).map(b => String(b.booking_code)));
+        const used = new Set((branches || []).filter(b => (!ed || b.id !== ed.id) && (b.branch_type || 'branch') === 'branch').map(b => String(b.booking_code)));
         for (let i = 1; i < 100; i++) if (!used.has(String(i))) return String(i);
         return '';
     };
-    const digit = f.digit.trim() || '?';
-    const clash = (branches || []).find(b => (!editing || b.id !== editing.id) && String(b.booking_code) === digit);
+    // Main Office and the warehouse make no bookings: their digit is 0 and need not be unique
+    const noBookings = f.type !== 'branch';
+    const digit = noBookings ? '0' : f.digit.trim() || '?';
+    const clash = noBookings ? undefined : (branches || []).find(b => (!editing || b.id !== editing.id) && (b.branch_type || 'branch') === 'branch' && String(b.booking_code) === digit);
 
     const openBranch = async (code?: string) => {
         const ed = code ? branches!.find(b => b.branch_code === code) : null;
@@ -157,7 +159,7 @@ export function Branches() {
         e.preventDefault();
         const c = findCountry(countryText());
         const city = (cityBox.current?.text || '').trim();
-        const vals: Record<string, string> = { b_name: f.name, b_code: f.code, b_digit: f.digit, b_city: city, b_phone: phone.current?.value || '' };
+        const vals: Record<string, string> = { b_name: f.name, b_code: f.code, b_digit: noBookings ? '0' : f.digit, b_city: city, b_phone: phone.current?.value || '' };
         const need = ([['b_name', 'Branch name'], ['b_code', 'Branch code'], ['b_digit', 'AWB digit'], ['b_city', 'City'], ['b_phone', 'Phone']] as [string, string][]).find(([id]) => !vals[id].trim())
             || (!phone.current?.valid ? ['b_phone', 'a valid phone number'] : null);
         if (need) { toast(false, `${need[1]} is required.`); return document.getElementById(need[0])?.focus(); }
@@ -166,7 +168,7 @@ export function Branches() {
         const mgr = managers.find(m => m.id === f.manager);
         const address = composeAddress();
         const body = {
-            id: editing?.id, branchName: f.name.trim(), branchCode: f.code.trim(), bookingCode: f.digit.trim(),
+            id: editing?.id, branchName: f.name.trim(), branchCode: f.code.trim(), bookingCode: noBookings ? '0' : f.digit.trim(),
             country: c.n, postalCode: f.postal.trim(), postOffice: f.po.trim(), state: (stateBox.current?.text || '').trim(),
             location: city, address: address === '—' ? city : address,
             phoneNumber: phone.current!.value, managerId: mgr ? mgr.id : null, managerName: mgr ? (mgr.full_name || mgr.username) : 'Unassigned',
@@ -272,7 +274,7 @@ export function Branches() {
                     <legend className="text-[10px] font-extrabold text-gray-400 uppercase mb-2">Identity</legend>
                     <div className="sm:col-span-3"><label className="ui-label" htmlFor="b_name">Branch name <span className="req">*</span></label><input id="b_name" ref={nameRef} className="field" placeholder="e.g. Al-Farha Cargo Salalah" value={f.name} onChange={e => setF(suggestCode({ ...f, name: e.target.value }))} /></div>
                     <div className="sm:col-span-2"><label className="ui-label" htmlFor="b_code">Branch code <span className="req">*</span></label><input id="b_code" className="field uppercase font-mono" maxLength={6} placeholder="ALFSLL" value={f.code} onChange={e => setF({ ...f, manual: true, code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) })} /></div>
-                    <div className="sm:col-span-1"><label className="ui-label" htmlFor="b_digit">AWB digit <span className="req">*</span></label><input id="b_digit" className="field font-mono text-center" maxLength={2} placeholder="1" value={f.digit} onChange={e => setF({ ...f, digit: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 2) })} /></div>
+                    <div className="sm:col-span-1"><label className="ui-label" htmlFor="b_digit">AWB digit {noBookings ? <span className="text-gray-400 normal-case">(no bookings)</span> : <span className="req">*</span>}</label><input id="b_digit" className="field font-mono text-center" maxLength={2} placeholder="1" disabled={noBookings} title={noBookings ? 'Main Office and the warehouse make no bookings, so their AWB digit is 0.' : undefined} value={noBookings ? '0' : f.digit} onChange={e => setF({ ...f, digit: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 2) })} /></div>
                 </fieldset>
 
                 <div className="rounded-[1.5rem] bg-[#111827] text-white p-4 sm:p-5">
@@ -430,7 +432,7 @@ export function Branches() {
                                                     <p className="text-sm font-extrabold truncate">{b.branch_name}</p>
                                                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                                         <span className="pill-tag pill-dark font-mono">{b.branch_code}</span>
-                                                        <span className="pill-tag pill-coral" title="AWB digit">{`AWB ${b.booking_code || '—'}`}</span>
+                                                        <span className="pill-tag pill-coral" title="AWB digit">{(b.branch_type || 'branch') === 'branch' ? `AWB ${b.booking_code || '—'}` : 'No bookings'}</span>
                                                         {b.is_hub && <span className="pill-tag pill-amber">Hub</span>}{b.branch_type === 'warehouse' && <span className="pill-tag pill-dark">Central warehouse</span>}{b.branch_type === 'main_office' && <span className="pill-tag pill-dark">Main Office</span>}
                                                     </div>
                                                 </div>

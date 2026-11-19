@@ -70,14 +70,16 @@ export default async function handler(req, res) {
                 managerName
             } = req.body;
 
-            if (!branchName || !branchCode || !bookingCode || !country || !location || !address || !phoneNumber) {
+            // Main Office and the warehouse make no bookings: their AWB digit is always 0 (unique only among branches)
+            const digit = ['warehouse', 'main_office'].includes(req.body.branchType) ? '0' : String(bookingCode || '').trim().toUpperCase();
+            if (!branchName || !branchCode || !digit || !country || !location || !address || !phoneNumber) {
                 return res.status(400).json({ error: 'Please complete all required branch fields.' });
             }
 
             const fullPayload = {
                 branch_name: branchName.trim(),
                 branch_code: branchCode.trim().toUpperCase(),
-                booking_code: String(bookingCode).trim().toUpperCase(),
+                booking_code: digit,
                 country: country.trim(),
                 postal_code: (postalCode || '').trim(),
                 post_office: (postOffice || '').trim(),
@@ -124,7 +126,7 @@ export default async function handler(req, res) {
                         return res.status(400).json({ error: 'Branch Code (e.g. ALFSLL) already exists.' });
                     }
                     if (errMsg.includes('booking_code')) {
-                        return res.status(400).json({ error: 'Unique Booking Code digit is already assigned to another branch.' });
+                        return res.status(400).json({ error: 'This AWB digit is already used by another branch.' });
                     }
                     return res.status(400).json({ error: errData?.message || 'Failed to create branch.' });
                 }
@@ -163,7 +165,7 @@ export default async function handler(req, res) {
             const updatePayload = {
                 branch_name: branchName.trim(),
                 branch_code: branchCode.trim().toUpperCase(),
-                booking_code: String(bookingCode).trim().toUpperCase(),
+                booking_code: ['warehouse', 'main_office'].includes(req.body.branchType) ? '0' : String(bookingCode).trim().toUpperCase(),
                 country: country.trim(),
                 location: location.trim(),
                 address: address.trim(),
@@ -185,6 +187,7 @@ export default async function handler(req, res) {
 
             const data = await updateRes.json();
             if (!updateRes.ok) {
+                if (String(data?.message || '').includes('booking_code')) return res.status(400).json({ error: 'This AWB digit is already used by another branch.' });
                 return res.status(400).json({ error: data?.message || 'Failed to update branch.' });
             }
 

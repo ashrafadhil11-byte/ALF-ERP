@@ -85,6 +85,14 @@ export default async function handler(req, res) {
                 return res.status(200).json({ requests: await get(`stock_requests?warehouse=eq.${enc(wh)}&select=*&order=status.asc,requested_at.desc&limit=200`),
                     stock: await get(`branch_products?branch_code=eq.${enc(wh)}&select=product_id,qty,sell_price`) });
             }
+            if (q.view === 'cargo') {
+                // shipments / boxes held in the warehouse (not packing materials), and what is on the way here
+                const [cargo, incoming] = await Promise.all([
+                    fetch(`${process.env.SUPABASE_URL}/rest/v1/rpc/cargo_stock`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify({ p_branch: wh }) }).then(r => r.ok ? r.json() : []),
+                    get(`transfer_manifests?to_branch=eq.${enc(wh)}&status=in.(in_transit,partial)&select=manifest_no,from_branch,created_at,transfers(status,pieces,bookings(awb,pieces))&order=created_at.asc`)
+                ]);
+                return res.status(200).json({ cargo, incoming });
+            }
             if (q.view === 'stock') {
                 const [products, stock, moves] = await Promise.all([
                     get('products?track_stock=is.true&active=is.true&select=id,sku,name,unit&order=name'),

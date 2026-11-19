@@ -26,14 +26,16 @@ const req = (method, { query = {}, body } = {}) => ({ method, query, body, heade
 const STAFF = { id: 'u1', role: 'staff', branch: 'ALFSNY', full_name: 'Ali' };
 const ADMIN = { id: 'u1', role: 'super_admin', branch: null, full_name: 'Boss' };
 
-test('transfers: staff cannot act for another branch; held list hides shipments already in transit', async () => {
+test('transfers: staff cannot act for another branch; held list = boxes on hand here; no cargo to Main Office', async () => {
     const calls = fake(STAFF, {
-        '/rest/v1/bookings?branch_code=eq.ALFSNY': () => [{ awb: 'A1', transfers: [] }, { awb: 'A2', transfers: [{ status: 'pending' }] }, { awb: 'A3', transfers: [{ status: 'received' }] }]
+        '/rpc/cargo_stock': (u, o, body) => body.p_branch === 'ALFSNY' ? [{ awb: 'A1', boxes: [1, 2], boxes_total: 2, weight: '10.5' }, { awb: 'A3', boxes: [2], boxes_total: 3, weight: 4 }] : [],
+        '/rest/v1/branches?': () => [{ branch_code: 'ALFSLL', status: 'Optimal' }, { branch_code: 'ALFHO', branch_type: 'main_office' }, { branch_code: 'AFWRSL', branch_type: 'warehouse' }, { branch_code: 'X', status: 'Dismissed' }]
     });
     const r = res();
     await transfers(req('GET', { query: { branch: 'ALFSLL' } }), r);
     assert.equal(r.body.branch, 'ALFSNY');
-    assert.deepEqual(r.body.held.map(b => b.awb), ['A1', 'A3']);
+    assert.deepEqual(r.body.held.map(b => [b.awb, b.pieces, b.boxes_total, b.weight]), [['A1', 2, 2, 10.5], ['A3', 1, 3, 4]]);
+    assert.deepEqual(r.body.branches.map(b => b.branch_code), ['ALFSLL', 'AFWRSL']);
     assert.ok(!calls.some(c => c.url.includes('ALFSLL')));
 });
 

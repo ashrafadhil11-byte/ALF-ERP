@@ -207,7 +207,7 @@ export function MainOffice() {
         try {
             const o = await mo('/api/main-office?view=split_options');
             setRows([{ branch: '', amount: '' }]);
-            openDlg('split', o, { cost_type: 'freight', date: iso(), mode: 'hand' });
+            openDlg('split', o, { cost_type: 'freight', date: iso(), mode: 'ship' });
         } catch (e) { toast(false, (e as Error).message); }
     }
     async function shareOut() {

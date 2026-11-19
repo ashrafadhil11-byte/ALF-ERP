@@ -15,7 +15,7 @@ const day = (v?: string) => v ? new Date(v).toLocaleDateString('en-GB', { day: '
 const when = (v?: string) => v ? new Date(v).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
 type Tok = { token: string; expires_at: string };
 type Mode = 'enter' | 'set' | 'change';
-type Tab = 'requests' | 'stock' | 'purchases';
+type Tab = 'requests' | 'cargo' | 'stock' | 'purchases';
 
 function Table({ heads, children, empty }: { heads: [string, ('right' | undefined)?][]; children: ReactNode[]; empty: string }) {
     return (
@@ -134,6 +134,8 @@ export function Warehouse() {
                 d = await wh('/api/warehouse?view=requests'); data.current.requests = d;
                 const waiting = d.requests.filter((r: any) => r.status === 'requested').length;
                 setReqCount(waiting ? `· ${waiting}` : '');
+            } else if (t === 'cargo') {
+                d = await wh('/api/warehouse?view=cargo');
             } else if (t === 'stock') {
                 d = await wh('/api/warehouse?view=stock'); data.current.stock = d; setCur(c => d.currency || c);
             } else {
@@ -203,7 +205,7 @@ export function Warehouse() {
     const bKey = useRef(0);
     const newLine = () => ({ k: ++bKey.current, prod: String(data.current.stock?.items[0]?.id ?? ''), qty: '', cost: '' });
     const openBuy = () => {
-        if (!data.current.stock.items.length) return toast(false, 'Add a stock item first (Stock tab → New item).');
+        if (!data.current.stock.items.length) return toast(false, 'Add a stock item first (Packing materials tab → New item).');
         setBuy({ supplier: '', pay: 'cash', ref: '' }); setBLines([newLine()]); setBuyOpen(true);
     };
     const buyTotal = bLines.reduce((t, l) => t + (+l.qty || 0) * (+l.cost || 0), 0);
@@ -236,6 +238,29 @@ export function Warehouse() {
                     <td className="p-3 pr-4 text-right whitespace-nowrap" data-label="">{r.status === 'requested' && <><button type="button" className="btn btn-dark btn-sm" data-send={r.id} onClick={() => openSend(r)}>Send</button>{' '}<button type="button" className="btn btn-light btn-sm" data-reject={r.id} onClick={() => reject(r)}>Reject</button></>}</td></tr>
             ))}
         </Table>;
+    }
+    function Cargo(d: any) {
+        const boxes = d.cargo.reduce((n: number, c: any) => n + (c.boxes || []).length, 0);
+        const kg = d.cargo.reduce((n: number, c: any) => n + (+c.weight || 0), 0), cbm = d.cargo.reduce((n: number, c: any) => n + (+c.cbm || 0), 0);
+        const coming = d.incoming.reduce((n: number, m: any) => n + (m.transfers || []).filter((t: any) => t.status === 'pending').reduce((k: number, t: any) => k + (t.pieces ? t.pieces.length : +t.bookings?.pieces || 1), 0), 0);
+        return <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                {([['Shipments', String(d.cargo.length)], ['Boxes', String(boxes)], ['Weight', `${Math.round(kg * 100) / 100} kg`], ['Coming in', `${coming} box${coming === 1 ? '' : 'es'}`]] as [string, string][]).map(([l, v]) =>
+                    <div key={l} className="bg-[#F8F8FA] rounded-2xl px-4 py-3"><p className="sd-label">{l}</p><p className="text-lg font-extrabold tabular-nums">{v}</p></div>)}
+            </div>
+            <p className="text-xs text-gray-500 mb-3">{`Customer cargo in the warehouse${cbm ? ` · ${Math.round(cbm * 1000) / 1000} CBM` : ''}. Packing materials are on their own tab. Receive or send cargo on `}<a className="font-bold underline" href="/app/consolidation">Consolidation &amp; Bulk</a>.</p>
+            <Table heads={[['Shipment'], ['Receiver'], ['Destination'], ['Boxes here', 'right'], ['Weight', 'right'], ['Status'], ['Since']]} empty="No cargo in the warehouse.">
+                {d.cargo.map((c: any) => (
+                    <tr key={c.awb}><td className="p-3 pl-4 font-mono font-bold" data-label="Shipment">{c.awb}</td>
+                        <td className="p-3" data-label="Receiver">{c.consignee || '—'}</td>
+                        <td className="p-3" data-label="Destination">{[c.dest_city, c.dest_country].filter(Boolean).join(', ') || '—'}</td>
+                        <td className="p-3 text-right font-extrabold" data-label="Boxes here">{(c.boxes || []).length < c.boxes_total ? `${(c.boxes || []).length} of ${c.boxes_total}` : c.boxes_total}{(c.boxes || []).length < c.boxes_total && <span className="block text-[10px] text-gray-400 font-medium">{`box ${c.boxes.join(', ')}`}</span>}</td>
+                        <td className="p-3 text-right" data-label="Weight">{`${+c.weight || 0} kg`}</td>
+                        <td className="p-3" data-label="Status">{c.current_status || ''}</td>
+                        <td className="p-3 pr-4" data-label="Since">{when(c.since)}</td></tr>
+                ))}
+            </Table>
+        </>;
     }
     function Stock(d: any) {
         const value = d.items.reduce((t: number, i: any) => t + i.qty * i.avg_cost, 0);
@@ -366,7 +391,7 @@ export function Warehouse() {
     </>;
 
     const pane = !view ? null : paneErr ? <p className="text-center text-gray-400 p-10">{paneErr}</p>
-        : view.tab === 'requests' ? Requests(view.d) : view.tab === 'stock' ? Stock(view.d) : Purchases(view.d);
+        : view.tab === 'requests' ? Requests(view.d) : view.tab === 'cargo' ? Cargo(view.d) : view.tab === 'stock' ? Stock(view.d) : Purchases(view.d);
     const pinField = (ref: React.Ref<HTMLInputElement> | null, id: string, k: 'cur' | 'pin' | 'pin2', placeholder: string, label: string, hidden: boolean) => (
         <input id={id} ref={ref} className={`field pin-box${hidden ? ' hidden' : ''}`} type="password" inputMode="numeric" pattern="\d*" maxLength={6} placeholder={placeholder} aria-label={label} autoComplete="off"
             value={pins[k]} onChange={e => setPins({ ...pins, [k]: e.target.value })} />
@@ -408,7 +433,8 @@ export function Warehouse() {
                 <div id="work" className={working ? '' : 'hidden'}>
                     <div className="flex flex-wrap gap-1 bg-[#F8F8FA] p-1 rounded-full self-start w-fit mb-5" role="tablist">
                         <button type="button" className="opt px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="requests" aria-pressed={tab === 'requests'} onClick={() => pick('requests')}>Requests <span id="reqCount">{reqCount}</span></button>
-                        <button type="button" className="opt px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="stock" aria-pressed={tab === 'stock'} onClick={() => pick('stock')}>Stock</button>
+                        <button type="button" className="opt px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="cargo" aria-pressed={tab === 'cargo'} onClick={() => pick('cargo')}>Cargo</button>
+                        <button type="button" className="opt px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="stock" aria-pressed={tab === 'stock'} onClick={() => pick('stock')}>Packing materials</button>
                         <button type="button" className="opt px-4 py-2 rounded-full text-[11px] font-extrabold" data-tab="purchases" aria-pressed={tab === 'purchases'} onClick={() => pick('purchases')}>Purchases</button>
                     </div>
                     <div id="pane" key={view?.n || 0} className="ui-fade">{pane}</div>

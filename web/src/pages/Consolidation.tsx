@@ -78,15 +78,17 @@ export function Consolidation() {
     // ---------- outbound ----------
     async function addOutbound(awb: string) {
         const h = T.held.find((x: any) => x.awb === awb);
+        const here = (x: any) => x && x.boxes && x.boxes.length < +x.boxes_total ? x.boxes : null;   // only the boxes at this branch
         if (h && +h.pieces > 1) {
-            const pick = await pickBoxes(awb, { title: 'Boxes to send', confirmText: 'Add' });
+            const pick = await pickBoxes(awb, { title: 'Boxes to send', confirmText: 'Add', only: here(h) });
             if (!pick) return false;
             setObPieces(p => { const x = { ...p }; if (pick.pieces) x[awb] = pick.pieces; else delete x[awb]; return x; });
         }
         setBatch(b => new Set(b).add(awb)); return true;
     }
     const reBoxOut = async (awb: string) => {
-        const pick = await pickBoxes(awb, { title: 'Boxes to send', confirmText: 'Save' });
+        const h = T.held.find((x: any) => x.awb === awb);
+        const pick = await pickBoxes(awb, { title: 'Boxes to send', confirmText: 'Save', only: h && h.boxes && h.boxes.length < +h.boxes_total ? h.boxes : null });
         if (pick) setObPieces(p => { const x = { ...p }; if (pick.pieces) x[awb] = pick.pieces; else delete x[awb]; return x; });
     };
     const q = obFilter.trim().toLowerCase();
@@ -264,7 +266,8 @@ export function Consolidation() {
         e.preventDefault();
         try {
             const r = await api('/api/accounts', { method: 'POST', body: { action: 'cost_bill', branch: detail.consolidation.origin_branch, consolidation_id: detail.consolidation.id, cost_type: kf.type, supplier_id: kf.party || null, amount: kf.amt, pay_method: kf.pay, bill_ref: kf.ref, description: kf.desc } });
-            toast(true, `${r.bill_no} saved — split across ${detail.items.length} shipment(s).`);
+            const sh: any[] = r.shares || [];
+            toast(true, sh.length > 1 ? `${r.bill_no} saved — shared: ${sh.map(x => `${x.branch} ${(+x.amount).toFixed(3)}`).join(' · ')}. Each branch carries its share.` : `${r.bill_no} saved — split across ${detail.items.length} shipment(s).`);
             setKf(blankK); setCostOpen(false);
             await openDetail(detail.consolidation.id, true);
         } catch (err) { toast(false, (err as Error).message); }
@@ -361,6 +364,7 @@ export function Consolidation() {
                 <section id="costBox" className={`${canCost && detail ? '' : 'hidden '}bg-white rounded-[1.5rem] border border-gray-100 p-4 space-y-3`}>
                     <div className="flex items-center justify-between gap-2"><span className="sd-label">Costs · split by <span id="costBasis">{c ? (c.kind === 'container' ? 'CBM (box dimensions)' : 'chargeable weight') : ''}</span></span>
                         <button id="costAdd" type="button" className="btn btn-light btn-sm" onClick={costAdd}><Icon name="plus" />Add cost</button></div>
+                    {detail && canCost && (detail.branch_shares || []).length > 1 && <p id="branchShares" className="text-[11px] text-gray-500">{'Shipments from several branches — each bill here is shared: '}{detail.branch_shares.map((s: any, i: number) => <span key={s.branch}>{i ? ' · ' : ''}<b>{s.name}</b>{` ${Math.round(s.share * 1000) / 10}%`}</span>)}{'. Each branch carries its share as its own cost.'}</p>}
                     <form id="costForm" className={`${costOpen ? '' : 'hidden '}grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[#F8F8FA] rounded-2xl p-3`} onSubmit={saveCost}>
                         <div><label className="ui-label" htmlFor="kType">Cost</label><select id="kType" className="field" value={kf.type} onChange={setK('type')}><option value="freight">Freight (airline / shipping line)</option><option value="customs">Customs &amp; clearance</option><option value="trucking">Trucking / transport</option><option value="handling">Handling / terminal</option><option value="other">Other</option></select></div>
                         <div><label className="ui-label" htmlFor="kParty">Agent / supplier</label><select id="kParty" className="field" value={kf.party} onChange={setK('party')}>
@@ -374,7 +378,7 @@ export function Consolidation() {
                     <div id="costList" className="space-y-1.5">
                         {detail && canCost && (detail.costs.length ? detail.costs.map((k: any) => (
                             <div key={k.bill_no} className="flex items-center justify-between gap-3 text-xs bg-[#F8F8FA] rounded-xl px-3 py-2">
-                                <span><b>{k.bill_no}</b>{` · ${k.cost_type}${k.suppliers?.name ? ' · ' + k.suppliers.name : ''}${k.bill_ref ? ' · bill ' + k.bill_ref : ''}${k.description ? ' · ' + k.description : ''}`}</span>
+                                <span><b>{k.bill_no}</b>{` · ${k.cost_type}${k.suppliers?.name ? ' · ' + k.suppliers.name : ''}${k.bill_ref ? ' · bill ' + k.bill_ref : ''}${k.description ? ' · ' + k.description : ''}`}{k.split && (k.cost_bill_shares || []).length > 0 && <span className="block text-gray-400 mt-0.5">{'shared: ' + k.cost_bill_shares.map((x: any) => `${x.branch_code} ${(+x.amount).toFixed(3)}`).join(' · ')}</span>}</span>
                                 <span className="font-extrabold tabular-nums whitespace-nowrap">{money(k.currency, k.amount) + ' '}<span className={`pill-tag ${k.status === 'paid' ? 'pill-green' : 'pill-amber'}`}>{k.status === 'unpaid' ? 'owed' : k.status}</span></span></div>
                         )) : <p className="text-xs text-gray-400">No costs yet — add the airline / shipping line, customs, trucking bills here.</p>)}
                     </div>
@@ -417,6 +421,18 @@ export function Consolidation() {
                     </div>
                 </section>
 
+                {(() => {   // cargo stock at this location, box level: on hand, on the way in, on the way out
+                    const boxesOf = (t: any) => t.pieces ? t.pieces.length : +t.bookings?.pieces || 1;
+                    const onHand = T.held.reduce((n: number, h: any) => n + (+h.pieces || 0), 0), kg = T.held.reduce((n: number, h: any) => n + (+h.weight || 0), 0);
+                    const inBoxes = T.incoming.reduce((n: number, m: any) => n + (m.transfers || []).filter((t: any) => t.status === 'pending').reduce((k: number, t: any) => k + boxesOf(t), 0), 0);
+                    const outShip = T.outgoing.reduce((n: number, m: any) => n + (m.transfers || []).filter((t: any) => t.status === 'pending').length, 0);
+                    const cell = (label: string, value: string, sub: string) => <div className="bg-white rounded-2xl border border-gray-100 px-4 py-3"><p className="sd-label">{label}</p><p className="text-xl font-extrabold tabular-nums">{value}</p><p className="text-[11px] text-gray-400">{sub}</p></div>;
+                    return <div id="cargoStock" className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                        {cell(`Cargo on hand · ${bname(T.branch) || T.branch || ''}`, `${onHand} box${onHand === 1 ? '' : 'es'}`, `${T.held.length} shipment${T.held.length === 1 ? '' : 's'} · ${Math.round(kg * 100) / 100} kg`)}
+                        {cell('Coming in', `${inBoxes} box${inBoxes === 1 ? '' : 'es'}`, `${T.incoming.length} manifest${T.incoming.length === 1 ? '' : 's'} on the way here`)}
+                        {cell('Sent, not yet received', `${outShip} shipment${outShip === 1 ? '' : 's'}`, 'Left this stock when sent')}
+                    </div>;
+                })()}
                 <div className="flex flex-wrap gap-1.5 bg-[#F8F8FA] p-1.5 rounded-full w-fit mb-5" role="tablist">
                     <button type="button" className="tab px-4 py-2 rounded-full text-xs font-extrabold" data-tab="outbound" role="tab" aria-selected={tab === 'outbound'} onClick={() => showTab('outbound')}>Outbound</button>
                     <button type="button" className="tab px-4 py-2 rounded-full text-xs font-extrabold" data-tab="inbound" role="tab" aria-selected={tab === 'inbound'} onClick={() => showTab('inbound')}>Inbound <span data-count="inbound">{pendingIn ? `· ${pendingIn}` : ''}</span></button>
@@ -452,7 +468,7 @@ export function Consolidation() {
                                                     <td className="p-3 pl-4" data-label=""><input type="checkbox" className="w-4 h-4" data-ob={b.awb} checked={batch.has(b.awb)} aria-label={`Select ${b.awb}`}
                                                         onChange={async e => { if (e.target.checked) await addOutbound(b.awb); else { setBatch(s => { const x = new Set(s); x.delete(b.awb); return x; }); setObPieces(p => { const x = { ...p }; delete x[b.awb]; return x; }); } }} /></td>
                                                     <td className="p-3 font-extrabold font-mono" data-label="AWB">{b.awb}</td>
-                                                    <td className="p-3" data-label="Receiver">{b.consignee || '—'}{+b.pieces > 1 && <button type="button" onClick={() => reBoxOut(b.awb)} className={`block text-[10px] font-extrabold ${obPieces[b.awb] ? 'text-[#D55C48]' : 'text-gray-400'} hover:underline`}>{(obPieces[b.awb] ? `Boxes ${obPieces[b.awb].join(', ')} of ${b.pieces}` : `${b.pieces} boxes`) + (batch.has(b.awb) ? ' · change' : '')}</button>}</td>
+                                                    <td className="p-3" data-label="Receiver">{b.consignee || '—'}{+b.pieces > 1 && <button type="button" onClick={() => reBoxOut(b.awb)} className={`block text-[10px] font-extrabold ${obPieces[b.awb] ? 'text-[#D55C48]' : 'text-gray-400'} hover:underline`}>{(obPieces[b.awb] ? `Boxes ${obPieces[b.awb].join(', ')} of ${b.boxes_total || b.pieces}` : +b.boxes_total > +b.pieces ? `Boxes ${b.boxes.join(', ')} here (of ${b.boxes_total})` : `${b.pieces} boxes`) + (batch.has(b.awb) ? ' · change' : '')}</button>}</td>
                                                     <td className="p-3" data-label="Destination">{[b.dest_city, b.dest_country].filter(Boolean).join(', ') || '—'}</td>
                                                     <td className="p-3" data-label="Status"><span className="pill-tag pill-gray">{b.current_status || ''}</span></td></tr>
                                             )) : <tr><td colSpan={5} className="p-8 text-center text-gray-400">{q ? 'No match.' : 'No shipments held at this branch.'}</td></tr>}
