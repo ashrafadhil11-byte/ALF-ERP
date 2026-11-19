@@ -1,0 +1,32 @@
+# Checks every push and pull request: server tests, page tests, type check and build.
+# A red cross on GitHub means something broke — fix it before it reaches the live site.
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Server tests (api)
+        run: node --test tests/*.test.mjs
+
+      - name: Install web packages
+        run: npm --prefix web ci --no-audit --no-fund
+
+      - name: Page tests
+        run: npm --prefix web test
+
+      - name: Type check and build
+        run: npm --prefix web run build
