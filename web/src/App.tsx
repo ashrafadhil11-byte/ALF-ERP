@@ -57,6 +57,8 @@ export const router = createBrowserRouter([
             { path: '/consolidation', lazy: () => import('./pages/Consolidation').then(m => ({ Component: m.Consolidation })) },
             { path: '/shipments', lazy: () => import('./pages/Shipments').then(m => ({ Component: m.Shipments })) },
             { path: '/main-office', lazy: () => import('./pages/MainOffice').then(m => ({ Component: m.MainOffice })) },
+            { path: '/assistant', lazy: () => import('./pages/Assistant').then(m => ({ Component: m.Assistant })) },
+            { path: '/backups', lazy: () => import('./pages/Backups').then(m => ({ Component: m.Backups })) },
             { path: '/summary', lazy: () => import('./pages/Summary').then(m => ({ Component: m.Summary })) },
             { path: '/pickups', lazy: () => import('./pages/Pickups').then(m => ({ Component: m.Pickups })) },
             { path: '/messages', lazy: () => import('./pages/Messages').then(m => ({ Component: m.Messages })) },

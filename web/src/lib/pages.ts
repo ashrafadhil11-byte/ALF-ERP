@@ -3,18 +3,18 @@
 export type PageFile =
     | 'super-dashboard.html' | 'shipments.html' | 'booking.html' | 'status-update.html' | 'delivery.html'
     | 'consolidation.html' | 'customers.html' | 'crm.html' | 'accounts.html' | 'warehouse.html'
-    | 'attendance.html' | 'create-user.html' | 'branches.html' | 'integrations.html' | 'activity.html' | 'reports.html' | 'main-office.html' | 'messages.html' | 'pickups.html' | 'summary.html';
+    | 'attendance.html' | 'create-user.html' | 'branches.html' | 'integrations.html' | 'activity.html' | 'reports.html' | 'main-office.html' | 'messages.html' | 'pickups.html' | 'summary.html' | 'backups.html' | 'assistant.html';
 
 type Page = { file: PageFile; path: string; react: boolean };
 
 export const PAGES: Page[] = ([
     'super-dashboard', 'shipments', 'booking', 'status-update', 'delivery', 'consolidation', 'customers', 'crm',
-    'accounts', 'warehouse', 'attendance', 'create-user', 'branches', 'integrations', 'activity', 'reports', 'main-office', 'messages', 'pickups', 'summary'
+    'accounts', 'warehouse', 'attendance', 'create-user', 'branches', 'integrations', 'activity', 'reports', 'main-office', 'messages', 'pickups', 'summary', 'backups', 'assistant'
 ] as const).map(name => ({ file: `${name}.html` as PageFile, path: `/${name}`, react: false }));
 
 /** Converted pages (flip `react` to true here when a page is approved). */
 // Keep in step with REACT_PAGES in admin/components/sidebar.js (the old pages' menu).
-export const CONVERTED = new Set<PageFile>(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html', 'main-office.html', 'messages.html', 'pickups.html', 'summary.html']);
+export const CONVERTED = new Set<PageFile>(['activity.html', 'crm.html', 'status-update.html', 'customers.html', 'integrations.html', 'super-dashboard.html', 'attendance.html', 'warehouse.html', 'create-user.html', 'delivery.html', 'booking.html', 'branches.html', 'consolidation.html', 'shipments.html', 'accounts.html', 'reports.html', 'main-office.html', 'messages.html', 'pickups.html', 'summary.html', 'backups.html', 'assistant.html']);
 PAGES.forEach(p => { p.react = CONVERTED.has(p.file); });
 
 /** The browser-tab title of each page (same as the old pages' <title>). */
@@ -22,7 +22,7 @@ export const TITLES: Record<PageFile, string> = {
     'super-dashboard.html': 'Dashboard', 'shipments.html': 'Shipments', 'booking.html': 'New Booking', 'status-update.html': 'Scan & Update',
     'delivery.html': 'Delivery & POD', 'consolidation.html': 'Consolidation & Bulk', 'customers.html': 'Customers', 'crm.html': 'CRM · WhatsApp',
     'accounts.html': 'Accounts', 'warehouse.html': 'Warehouse', 'attendance.html': 'Attendance', 'create-user.html': 'Staff & Users',
-    'branches.html': 'Branch Network', 'integrations.html': 'Integrations', 'activity.html': 'Activity Log', 'reports.html': 'Reports', 'main-office.html': 'Main Office', 'messages.html': 'Messages', 'pickups.html': 'Pickups', 'summary.html': 'Daily summary'
+    'branches.html': 'Branch Network', 'integrations.html': 'Integrations', 'activity.html': 'Activity Log', 'reports.html': 'Reports', 'main-office.html': 'Main Office', 'messages.html': 'Messages', 'pickups.html': 'Pickups', 'summary.html': 'Daily summary', 'backups.html': 'Backups', 'assistant.html': 'AI Assistant'
 };
 
 export const pageByFile = (file: string) => PAGES.find(p => p.file === file);

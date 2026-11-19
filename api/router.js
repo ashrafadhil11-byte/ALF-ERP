@@ -3,8 +3,10 @@
 // To add an endpoint: create api/_routes/<name>.js, import it below, add it to ROUTES.
 import { withAudit } from './_lib/audit.js';
 import accounts from './_routes/accounts.js';
+import assistant from './_routes/assistant.js';
 import activity from './_routes/activity.js';
 import attendance from './_routes/attendance.js';
+import backups from './_routes/backups.js';
 import bookings from './_routes/bookings.js';
 import chat from './_routes/chat.js';
 import branches from './_routes/branches.js';
@@ -33,8 +35,10 @@ import warehouse from './_routes/warehouse.js';
 
 const ROUTES = {
     accounts,
+    assistant,
     activity,
     attendance,
+    backups,
     bookings,
     chat,
     branches,

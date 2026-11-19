@@ -5,7 +5,8 @@
 //   GET ?thread=ID[&after=ID|&before=ID]  { thread, members:[{ id, name, role, branch, last_read_at }], messages:[…], more }
 //   POST { action:'direct', user_id }                   → { thread }   open / find the one-to-one chat
 //   POST { action:'group', title, members:[ids] }       → { thread }
-//   POST { action:'send', thread, body, reply_to? }     → { message }
+//   POST { action:'send', thread, body?, reply_to?, file?: { name, data: dataURL }, awb? }  → { message }   (a photo / PDF up to 3 MB, or a shipment card)
+//   POST { action:'typing', thread }                    shows "typing…" to the others for a few seconds
 //   POST { action:'read', thread }                      marks the chat read up to now
 //   POST { action:'delete', id }                        own message → "message deleted"
 //   POST { action:'rename', thread, title } | { action:'add', thread, members:[ids] } | { action:'leave', thread }   (groups)
@@ -17,6 +18,29 @@ const PAGE = 60;
 const MAX_BODY = 4000;
 class UserError extends Error { constructor(m, s = 400) { super(m); this.status = s; } }
 const isId = (v) => /^[0-9a-f-]{36}$/i.test(String(v || ''));
+const MAX_FILE = 3 * 1024 * 1024;             // the request limit of the host is ~4.5 MB of base64
+const FILE_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'application/pdf': 'pdf' };
+const storage = () => `${process.env.SUPABASE_URL}/storage/v1`;
+/** a dataURL → the private chat-files bucket; returns { path, type, size } */
+async function putFile(threadId, name, dataUrl) {
+    const m = /^data:([a-z]+\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/=]+)$/i.exec(String(dataUrl || ''));
+    const type = m && m[1].toLowerCase();
+    if (!m || !FILE_TYPES[type]) throw new UserError('Send a photo (JPEG, PNG, WebP, GIF) or a PDF.');
+    const bytes = Buffer.from(m[2], 'base64');
+    if (bytes.length > MAX_FILE) throw new UserError('The file is too large (max 3 MB).');
+    const path = `${threadId}/${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}.${FILE_TYPES[type]}`;
+    const h = serviceHeaders();
+    const r = await fetch(`${storage()}/object/chat-files/${path}`, { method: 'POST', headers: { apikey: h.apikey, Authorization: h.Authorization, 'Content-Type': type }, body: bytes });
+    if (!r.ok) throw new UserError(`Could not save the file (${r.status}).`, 500);
+    return { path, type, size: bytes.length };
+}
+/** 10-minute links for the files on a page of messages */
+async function signFiles(paths) {
+    if (!paths.length) return {};
+    const r = await fetch(`${storage()}/object/sign/chat-files`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify({ expiresIn: 600, paths }) });
+    const list = r.ok ? await r.json() : [];
+    return Object.fromEntries((Array.isArray(list) ? list : []).filter(x => x.signedURL).map(x => [x.path, `${storage()}${x.signedURL}`]));
+}
 
 export default async function handler(req, res) {
     const session = await requireSession(req, res);
@@ -68,17 +92,24 @@ export default async function handler(req, res) {
                 const after = /^\d+$/.test(String(q.after || '')) ? `&id=gt.${q.after}` : '';
                 const before = /^\d+$/.test(String(q.before || '')) ? `&id=lt.${q.before}` : '';
                 const [members, rows] = await Promise.all([
-                    get(`chat_members?thread_id=eq.${t.id}&select=employee_id,last_read_at,employees(full_name,role,branch)`),
-                    get(`chat_messages?thread_id=eq.${t.id}${after}${before}&select=id,sender_id,sender_name,body,reply_to,system,created_at,edited_at,deleted_at&order=id.${after ? 'asc' : 'desc'}&limit=${after ? 200 : PAGE + 1}`)
+                    get(`chat_members?thread_id=eq.${t.id}&select=employee_id,last_read_at,typing_at,employees(full_name,role,branch)`),
+                    get(`chat_messages?thread_id=eq.${t.id}${after}${before}&select=id,sender_id,sender_name,body,reply_to,system,created_at,edited_at,deleted_at,file_path,file_name,file_type,file_size,awb&order=id.${after ? 'asc' : 'desc'}&limit=${after ? 200 : PAGE + 1}`)
                 ]);
                 const more = !after && rows.length > PAGE;
-                const list = (after ? rows : rows.slice(0, PAGE).reverse()).map(m => m.deleted_at ? { ...m, body: '' } : m);
+                const raw = after ? rows : rows.slice(0, PAGE).reverse();
+                // files: short-lived links; shipments: a live card
+                const urls = await signFiles(raw.filter(m => m.file_path && !m.deleted_at).map(m => m.file_path));
+                const awbs = [...new Set(raw.filter(m => m.awb && !m.deleted_at).map(m => m.awb))];
+                const cards = awbs.length ? await get(`bookings?awb=in.(${awbs.map(a => `"${a}"`).join(',')})&select=awb,consignee,dest_city,dest_country,current_status,current_status_code,pieces,weight,chargeable_weight,branch_code`) : [];
+                const list = raw.map(({ file_path, ...m }) => m.deleted_at ? { ...m, body: '', file_name: null, file_type: null, awb: null }
+                    : { ...m, file_url: file_path ? urls[file_path] || null : null, card: m.awb ? cards.find(c => c.awb === m.awb) || null : null });
                 // quoted messages that are not on this page
                 const need = [...new Set(list.map(m => m.reply_to).filter(id => id && !list.some(x => x.id === id)))];
                 const quoted = need.length ? await get(`chat_messages?id=in.(${need.join(',')})&thread_id=eq.${t.id}&select=id,sender_name,body,deleted_at`) : [];
                 return res.status(200).json({
                     thread: t, more,
-                    members: members.map(m => ({ id: m.employee_id, name: m.employees?.full_name || 'Unnamed', role: m.employees?.role, branch: m.employees?.branch, last_read_at: m.last_read_at })),
+                    members: members.map(m => ({ id: m.employee_id, name: m.employees?.full_name || 'Unnamed', role: m.employees?.role, branch: m.employees?.branch, last_read_at: m.last_read_at,
+                        typing: m.employee_id !== me && m.typing_at && Date.now() - new Date(m.typing_at).getTime() < 6000 })),
                     messages: list,
                     quoted: quoted.map(x => ({ id: x.id, sender_name: x.sender_name, body: x.deleted_at ? '' : String(x.body).slice(0, 200), deleted: !!x.deleted_at }))
                 });
@@ -106,13 +137,32 @@ export default async function handler(req, res) {
             }
             case 'send': {
                 const t = await thread(b.thread);
-                const body = String(b.body || '').replace(/\r\n/g, '\n').trim();
-                if (!body) throw new UserError('Type a message.');
+                let body = String(b.body || '').replace(/\r\n/g, '\n').trim();
                 if (body.length > MAX_BODY) throw new UserError(`Keep it under ${MAX_BODY} characters.`);
+                const extra = {};
+                if (b.awb) {
+                    const awb = String(b.awb).trim().toUpperCase().slice(0, 30);
+                    if (!(await get(`bookings?awb=eq.${enc(awb)}&select=awb`)).length) throw new UserError(`Shipment ${awb} not found.`);
+                    extra.awb = awb;
+                    body = body || `📦 Shipment ${awb}`;
+                }
+                if (b.file) {
+                    const fname = String(b.file.name || 'file').replace(/[\\/\r\n]/g, ' ').trim().slice(0, 120) || 'file';
+                    const f = await putFile(t.id, fname, b.file.data);
+                    Object.assign(extra, { file_path: f.path, file_name: fname, file_type: f.type, file_size: f.size });
+                    body = body || `${f.type.startsWith('image/') ? '📷' : '📎'} ${fname}`;
+                }
+                if (!body) throw new UserError('Type a message.');
                 let reply = null;
                 if (/^\d+$/.test(String(b.reply_to || ''))) reply = (await get(`chat_messages?id=eq.${b.reply_to}&thread_id=eq.${t.id}&select=id`))[0]?.id || null;
-                const m = (await send('POST', 'chat_messages', { thread_id: t.id, sender_id: me, sender_name: myName, body, reply_to: reply }))[0];
+                const m = (await send('POST', 'chat_messages', { thread_id: t.id, sender_id: me, sender_name: myName, body, reply_to: reply, ...extra }))[0];
+                await send('PATCH', `chat_members?thread_id=eq.${t.id}&employee_id=eq.${enc(me)}`, { typing_at: null }, 'return=minimal').catch(() => {});
                 return res.status(200).json({ success: true, message: m });
+            }
+            case 'typing': {
+                const t = await thread(b.thread);
+                await send('PATCH', `chat_members?thread_id=eq.${t.id}&employee_id=eq.${enc(me)}`, { typing_at: new Date().toISOString() }, 'return=minimal');
+                return res.status(200).json({ success: true });
             }
             case 'read': {
                 const t = await thread(b.thread);
@@ -121,9 +171,11 @@ export default async function handler(req, res) {
             }
             case 'delete': {
                 if (!/^\d+$/.test(String(b.id || ''))) throw new UserError('Message not found.', 404);
-                const m = (await get(`chat_messages?id=eq.${b.id}&sender_id=eq.${enc(me)}&deleted_at=is.null&select=id,thread_id`))[0];
+                const m = (await get(`chat_messages?id=eq.${b.id}&sender_id=eq.${enc(me)}&deleted_at=is.null&select=id,thread_id,file_path`))[0];
                 if (!m) throw new UserError('You can delete only your own messages.', 403);
-                await send('PATCH', `chat_messages?id=eq.${m.id}`, { deleted_at: new Date().toISOString(), body: '(deleted)' }, 'return=minimal');
+                await send('PATCH', `chat_messages?id=eq.${m.id}`, { deleted_at: new Date().toISOString(), body: '(deleted)', file_path: null, awb: null }, 'return=minimal');
+                // a deleted file is removed from storage too
+                if (m.file_path) await fetch(`${storage()}/object/chat-files`, { method: 'DELETE', headers: serviceHeaders(), body: JSON.stringify({ prefixes: [m.file_path] }) }).catch(() => {});
                 return res.status(200).json({ success: true });
             }
             case 'rename': {

@@ -14,8 +14,41 @@ import './messages.css';
 
 type Person = { id: string; name: string; role?: string; branch?: string; branch_name?: string };
 type Thread = { id: number; kind: 'direct' | 'group'; title?: string | null; last_message_at: string; last_message?: string | null; last_sender?: string | null; unread: number; members: Person[] };
-type Msg = { id: number; sender_id: string | null; sender_name: string | null; body: string; reply_to?: number | null; system?: boolean; created_at: string; deleted_at?: string | null; pending?: boolean; failed?: boolean };
-type Member = Person & { last_read_at: string };
+type Card = { awb: string; consignee?: string; dest_city?: string; dest_country?: string; current_status?: string; current_status_code?: string; pieces?: number; weight?: number; chargeable_weight?: number };
+type Msg = { id: number; sender_id: string | null; sender_name: string | null; body: string; reply_to?: number | null; system?: boolean; created_at: string; deleted_at?: string | null; pending?: boolean; failed?: boolean;
+    file_name?: string | null; file_type?: string | null; file_size?: number | null; file_url?: string | null; awb?: string | null; card?: Card | null };
+type Member = Person & { last_read_at: string; typing?: boolean };
+type Outgoing = { body: string; file?: { name: string; data: string; type: string; size: number; preview?: string } | null; awb?: string | null };
+
+const kb = (n?: number | null) => !n ? '' : n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+const MAX_FILE = 3 * 1024 * 1024;
+/** photos are made smaller before sending (longest side 1600 px, JPEG); PDFs go as they are */
+async function readFile(f: File): Promise<NonNullable<Outgoing['file']>> {
+    const asData = (b: Blob) => new Promise<string>((ok, bad) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => bad(r.error); r.readAsDataURL(b); });
+    if (f.type.startsWith('image/') && f.type !== 'image/gif') {
+        const img = await createImageBitmap(f);
+        const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+        const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+        const blob = await new Promise<Blob>((ok) => c.toBlob(b => ok(b!), 'image/jpeg', 0.85));
+        const data = await asData(blob);
+        return { name: f.name.replace(/\.[a-z0-9]+$/i, '') + '.jpg', data, type: 'image/jpeg', size: blob.size, preview: data };
+    }
+    if (f.type !== 'application/pdf' && f.type !== 'image/gif') throw new Error('Send a photo or a PDF.');
+    if (f.size > MAX_FILE) throw new Error('The file is too large (max 3 MB).');
+    const data = await asData(f);
+    return { name: f.name, data, type: f.type, size: f.size, preview: f.type === 'image/gif' ? data : undefined };
+}
+
+function ShipmentCard({ c, mine }: { c: Card; mine: boolean }) {
+    return <a href={`/app/shipments?awb=${encodeURIComponent(c.awb)}`} className={`block mt-1 mb-1.5 rounded-xl px-3 py-2.5 no-underline ${mine ? 'bg-white/10 hover:bg-white/15' : 'bg-white hover:bg-gray-50'} border ${mine ? 'border-white/15' : 'border-gray-100'}`}>
+        <span className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider opacity-70"><Icon name="box" cls="w-3.5 h-3.5" />Shipment</span>
+        <span className="block font-mono font-extrabold text-sm mt-0.5">{c.awb}</span>
+        <span className="block text-xs opacity-80">{[c.consignee, [c.dest_city, c.dest_country].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</span>
+        <span className="flex items-center justify-between gap-2 mt-1.5 text-[11px]"><span className={`pill-tag ${mine ? '!bg-white/15 !text-white' : 'pill-gray'}`}>{c.current_status || '—'}</span>
+            <span className="opacity-70">{[c.pieces && `${c.pieces} pcs`, (c.chargeable_weight || c.weight) && `${c.chargeable_weight || c.weight} kg`].filter(Boolean).join(' · ')}</span></span>
+    </a>;
+}
 type Open = { thread: { id: number; kind: 'direct' | 'group'; title?: string | null }; members: Member[]; messages: Msg[]; more: boolean; quoted: { id: number; sender_name: string; body: string; deleted: boolean }[] };
 
 const ME = () => String(jwtPayload()?.sub || '');
@@ -149,15 +182,18 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
     useLayoutEffect(() => { const el = box.current; if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 140) + 'px'; } }, [draft]);
     useEffect(() => { if (active) setTimeout(() => box.current?.focus(), 50); }, [active]);
 
-    async function sendNow(text = draft) {
+    async function sendNow(text = draft, extra: Partial<Outgoing> = {}) {
         const body = text.trim();
-        if (!body || !open) return;
-        const temp: Msg = { id: -Date.now(), sender_id: me, sender_name: 'You', body, reply_to: reply?.id || null, created_at: new Date().toISOString(), pending: true };
+        const file = extra.file === undefined ? pending : extra.file;
+        if ((!body && !file && !extra.awb) || !open) return;
+        const temp: Msg = { id: -Date.now(), sender_id: me, sender_name: 'You', body: body || (file ? `📎 ${file.name}` : `📦 Shipment ${extra.awb}`), reply_to: reply?.id || null, created_at: new Date().toISOString(), pending: true,
+            file_name: file?.name, file_type: file?.type, file_size: file?.size, file_url: file?.preview || null };
         const tid = open.thread.id;
         setOpen(o => o ? { ...o, messages: [...o.messages, temp] } : o);
-        setDraft(''); setReply(null); setEmojiOpen(false); stick.current = true;
+        setDraft(''); setReply(null); setEmojiOpen(false); setPending(null); stick.current = true;
         try {
-            const r = await api<{ message: Msg }>('/api/chat', { method: 'POST', body: { action: 'send', thread: tid, body, reply_to: temp.reply_to } });
+            const r = await api<{ message: Msg }>('/api/chat', { method: 'POST', body: { action: 'send', thread: tid, body, reply_to: temp.reply_to, awb: extra.awb || undefined, file: file ? { name: file.name, data: file.data } : undefined } });
+            if (file?.preview && !r.message.file_url) r.message.file_url = file.preview;
             setOpen(o => o && o.thread.id === tid ? { ...o, messages: o.messages.some(m => m.id === r.message.id) ? o.messages.filter(m => m.id !== temp.id) : o.messages.map(m => m.id === temp.id ? r.message : m) } : o);
             qc.invalidateQueries({ queryKey: ['chat-inbox'] });
         } catch (e) {
@@ -166,6 +202,25 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
         }
     }
     const retry = (m: Msg) => { setOpen(o => o ? { ...o, messages: o.messages.filter(x => x.id !== m.id) } : o); sendNow(m.body); };
+    // attachments and shipment cards
+    const [pending, setPending] = useState<Outgoing['file']>(null);
+    const fileInput = useRef<HTMLInputElement>(null);
+    async function pickFile(f?: File | null) {
+        if (!f) return;
+        try { setPending(await readFile(f)); setEmojiOpen(false); box.current?.focus(); } catch (e) { toast(false, (e as Error).message); }
+        if (fileInput.current) fileInput.current.value = '';
+    }
+    function shareShipment() {
+        const awb = window.prompt('Shipment number (AWB) to share:')?.trim().toUpperCase();
+        if (awb) { setEmojiOpen(false); sendNow(draft, { awb, file: null }); }
+    }
+    // "typing…": tell the others at most every 3 s while typing
+    const typedAt = useRef(0);
+    const typing = () => {
+        if (!open || Date.now() - typedAt.current < 3000) return;
+        typedAt.current = Date.now();
+        api('/api/chat', { method: 'POST', body: { action: 'typing', thread: open.thread.id } }).catch(() => {});
+    };
     async function remove(m: Msg) {
         try {
             await api('/api/chat', { method: 'POST', body: { action: 'delete', id: m.id } });
@@ -193,7 +248,8 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
     const current = threads.find(t => t.id === active);
     const others = (open?.members || []).filter(m => m.id !== me);
     const title = open ? (open.thread.kind === 'group' ? open.thread.title || 'Group' : others[0]?.name || current?.members[0]?.name || 'Chat') : '';
-    const sub = open ? (open.thread.kind === 'group' ? `${open.members.length} members · ${open.members.map(m => m.id === me ? 'You' : m.name.split(' ')[0]).join(', ')}`
+    const typers = (open?.members || []).filter(m => m.typing && m.id !== me);
+    const sub = typers.length ? `${typers.map(t => t.name.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'are' : 'is'} typing…` : open ? (open.thread.kind === 'group' ? `${open.members.length} members · ${open.members.map(m => m.id === me ? 'You' : m.name.split(' ')[0]).join(', ')}`
         : [ROLE[others[0]?.role || ''] || others[0]?.role, others[0]?.branch].filter(Boolean).join(' · ')) : '';
 
     // "Seen": on my latest message — a direct chat says Seen / Sent; a group says who has seen it
@@ -260,7 +316,7 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                         <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
                             <button type="button" className={`${popup ? '' : 'lg:hidden '}w-9 h-9 rounded-full hover:bg-gray-50 flex items-center justify-center`} aria-label="Back to chats" onClick={() => pick(null)}><Icon name="arrowLeft" /></button>
                             <Avatar name={title || '…'} group={open?.thread.kind === 'group'} size="w-10 h-10" />
-                            <div className="min-w-0 flex-1"><h3 id="chatTitle" className="text-sm font-extrabold truncate">{title || ' '}</h3><p className="text-[11px] text-gray-400 truncate">{sub}</p></div>
+                            <div className="min-w-0 flex-1"><h3 id="chatTitle" className="text-sm font-extrabold truncate">{title || ' '}</h3><p className={`text-[11px] truncate ${typers.length ? 'text-[#E86D58] font-bold' : 'text-gray-400'}`}>{sub}</p></div>
                             {open?.thread.kind === 'group' && <button type="button" id="chatInfo" className="icon-btn" aria-label="Group details" title="Group details" onClick={() => { loadPeople(); setInfoOpen(true); }}><Icon name="users" /></button>}
                             {tools}
                         </header>
@@ -285,7 +341,14 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                                     <div className={`flex items-center gap-1 ${mine ? 'flex-row-reverse' : ''}`}>
                                                         <div tabIndex={-1} className={`bubble outline-none ${mine ? 'bubble-me' : 'bubble-them'} ${sameAsNext ? (mine ? 'join-next-me' : 'join-next-them') : ''} ${sameAsPrev ? (mine ? 'join-prev-me' : 'join-prev-them') : ''} ${m.pending ? 'opacity-60' : ''} ${m.failed ? 'ring-2 ring-[#E86D58]' : ''}`}>
                                                             {q && <span className={`block text-[11px] rounded-xl px-2.5 py-1.5 mb-1.5 border-l-2 ${mine ? 'bg-white/10 border-white/50' : 'bg-white border-[#E86D58]'}`}><b className="block">{q.name}</b><span className="line-clamp-2 opacity-80">{q.body}</span></span>}
-                                                            {m.deleted_at ? <i className="opacity-60">Message deleted</i> : <span className="whitespace-pre-wrap break-words"><Rich text={m.body} /></span>}
+                                                            {m.deleted_at ? <i className="opacity-60">Message deleted</i> : <>
+                                                                {m.file_type?.startsWith('image/') && m.file_url && <a href={m.file_url} target="_blank" rel="noopener" className="block -mx-1.5 -mt-0.5 mb-1.5"><img src={m.file_url} alt={m.file_name || 'photo'} loading="lazy" className="rounded-xl max-h-60 w-auto max-w-full object-cover" /></a>}
+                                                                {m.file_type === 'application/pdf' && <a href={m.file_url || undefined} target="_blank" rel="noopener" className={`flex items-center gap-2.5 rounded-xl px-3 py-2 mb-1.5 no-underline ${m.sender_id === me ? 'bg-white/10' : 'bg-white border border-gray-100'}`}>
+                                                                    <span className="w-8 h-8 rounded-lg bg-[#E86D58] text-white text-[9px] font-extrabold flex items-center justify-center">PDF</span>
+                                                                    <span className="min-w-0"><b className="block text-xs truncate">{m.file_name}</b><span className="block text-[10px] opacity-70">{kb(m.file_size)}{m.file_url ? '' : ' · uploading'}</span></span></a>}
+                                                                {m.card && <ShipmentCard c={m.card} mine={m.sender_id === me} />}
+                                                                {!(m.file_name && /^(📷|📎) /.test(m.body)) && !(m.card && m.body === `📦 Shipment ${m.awb}`) && <span className="whitespace-pre-wrap break-words"><Rich text={m.body} /></span>}
+                                                            </>}
                                                             <span className={`bubble-time ${mine ? 'text-white/60' : 'text-gray-400'}`}>{m.pending ? 'sending…' : clock(m.created_at)}</span>
                                                         </div>
                                                         {!m.deleted_at && !m.pending && !m.failed && <span className="msg-tools flex gap-0.5">
@@ -308,15 +371,24 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                 <Icon name="reply" cls="w-4 h-4 text-[#E86D58]" />
                                 <span className="min-w-0 flex-1 text-xs"><b className="block">{reply.sender_id === me ? 'You' : reply.sender_name}</b><span className="block truncate text-gray-500">{reply.body}</span></span>
                                 <button type="button" className="icon-btn" aria-label="Cancel reply" onClick={() => setReply(null)}><Icon name="x" cls="w-3.5 h-3.5" /></button></div>}
-                            {emojiOpen && <div className="emoji-pop grid grid-cols-8 gap-1 bg-white rounded-2xl border border-gray-100 shadow-lg p-2 mb-2 w-fit">
-                                {EMOJI.map(e => <button key={e} type="button" className="w-9 h-9 rounded-xl hover:bg-[#F8F8FA] text-lg" onClick={() => { setDraft(d => d + e); box.current?.focus(); }}>{e}</button>)}</div>}
+                            {pending && <div id="chatAttach" className="flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-3 py-2 mb-2">
+                                {pending.preview ? <img src={pending.preview} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <span className="w-10 h-10 rounded-lg bg-[#E86D58] text-white text-[10px] font-extrabold flex items-center justify-center">PDF</span>}
+                                <span className="min-w-0 flex-1 text-xs"><b className="block truncate">{pending.name}</b><span className="text-gray-400">{`${kb(pending.size)} · add a caption or press send`}</span></span>
+                                <button type="button" className="icon-btn" aria-label="Remove file" onClick={() => setPending(null)}><Icon name="x" cls="w-3.5 h-3.5" /></button></div>}
+                            {emojiOpen && <div className="emoji-pop bg-white rounded-2xl border border-gray-100 shadow-lg p-2 mb-2 w-fit">
+                                <div className="flex gap-1.5 mb-2">
+                                    <button type="button" id="chatPhoto" className="btn btn-light btn-sm" onClick={() => fileInput.current?.click()}><Icon name="camera" cls="w-3.5 h-3.5" />Photo / PDF</button>
+                                    <button type="button" id="chatShip" className="btn btn-light btn-sm" onClick={shareShipment}><Icon name="box" cls="w-3.5 h-3.5" />Share shipment</button></div>
+                                <div className="grid grid-cols-8 gap-1">{EMOJI.map(e => <button key={e} type="button" className="w-9 h-9 rounded-xl hover:bg-[#F8F8FA] text-lg" onClick={() => { setDraft(d => d + e); box.current?.focus(); }}>{e}</button>)}</div></div>}
+                            <input ref={fileInput} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => pickFile(e.target.files?.[0])} />
                             <form className="flex items-end gap-2" onSubmit={e => { e.preventDefault(); sendNow(); }}>
-                                <button type="button" className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${emojiOpen ? 'bg-[#FFF5F3] text-[#E86D58]' : 'bg-[#F8F8FA] text-gray-500 hover:text-gray-800'}`} aria-label="Emoji" onClick={() => setEmojiOpen(v => !v)}><Icon name="smile" cls="w-5 h-5" /></button>
+                                <button type="button" className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${emojiOpen ? 'bg-[#FFF5F3] text-[#E86D58]' : 'bg-[#F8F8FA] text-gray-500 hover:text-gray-800'}`} aria-label="Attach, share or emoji" title="Photo, PDF, shipment, emoji" onClick={() => setEmojiOpen(v => !v)}><Icon name={emojiOpen ? 'x' : 'plus'} cls="w-5 h-5" /></button>
                                 <textarea ref={box} id="chatInput" rows={1} value={draft} maxLength={4000} placeholder="Write a message…" aria-label={`Message ${title}`}
-                                    onChange={e => setDraft(e.target.value)}
+                                    onChange={e => { setDraft(e.target.value); typing(); }}
+                                    onPaste={e => { const f = Array.from(e.clipboardData.files)[0]; if (f) { e.preventDefault(); pickFile(f); } }}
                                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendNow(); } if (e.key === 'Escape') { setReply(null); setEmojiOpen(false); } }}
                                     className="flex-1 resize-none bg-[#F8F8FA] rounded-[1.4rem] border border-transparent focus:border-gray-200 focus:bg-white outline-none px-4 py-3 text-sm leading-5 custom-scrollbar" />
-                                <button type="submit" id="chatSend" disabled={!draft.trim()} className="w-11 h-11 rounded-full bg-[#E86D58] text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#D55C48] transition-colors" aria-label="Send"><Icon name="send" cls="w-[18px] h-[18px]" /></button>
+                                <button type="submit" id="chatSend" disabled={!draft.trim() && !pending} className="w-11 h-11 rounded-full bg-[#E86D58] text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#D55C48] transition-colors" aria-label="Send"><Icon name="send" cls="w-[18px] h-[18px]" /></button>
                             </form>
                             <p className="hidden sm:block text-[10px] text-gray-300 mt-1.5 ml-14">Enter to send · Shift + Enter for a new line</p>
                         </footer>

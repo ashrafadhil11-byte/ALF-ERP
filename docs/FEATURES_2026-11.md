@@ -19,3 +19,27 @@
   cash closed or not, deliveries, pickups, exceptions, unpaid invoices, and what is still waiting (cargo, cash, requests, materials).
 - Head office sees the company total and every branch. Any past day can be opened.
 - **Every evening at 8 pm Oman** (Vercel Cron → `/api/summary`) the day is saved and the bell tells each manager — and head office for the company.
+
+# Batch 2
+
+## Chat extras (migration 028)
+- In a chat, the **+** button opens: **Photo / PDF** (photos are made smaller before sending; max 3 MB), **Share shipment**
+  (a live card: status, destination, boxes — opens the shipment) and the emoji.
+- Paste a picture straight into the message box. Files sit in the private "chat-files" storage, shown through 10-minute links;
+  deleting your message removes the file.
+- "**… is typing**" shows in the chat header while the other person types.
+
+## Backups you keep (migration 029)
+- Every night, with the 8 pm job, every business table is saved as one compressed file in private storage; the last 14 are kept.
+- Super admin → Settings → **Backups**: download any copy, or **Back up now**.
+- Left out: integration API keys and PIN codes. Sign-in passwords stay with Supabase.
+
+## AI assistant (ready — needs a key)
+- Menu → **AI Assistant**: ask in plain words ("which shipments are stuck in customs?").
+- Switch it on: Integrations → add **Claude (Anthropic)** or **OpenAI-compatible**, paste the API key, save, active.
+- Read-only. It can look at shipments, counts, one shipment's history, the daily summary (managers) and customers —
+  only within what the user may see (their branch; head office everything). Questions are not copied into the Activity Log.
+
+## Needs setting once
+- **CRON_SECRET** in Vercel → Settings → Environment Variables (Production): any long random text. Vercel then signs its
+  scheduled calls; without it the 8 pm summary save and the nightly backup do not run (the pages still work).

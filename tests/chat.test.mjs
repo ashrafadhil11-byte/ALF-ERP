@@ -12,7 +12,7 @@ function fake(employee, routes = {}) {
     const calls = [];
     globalThis.fetch = async (u, opts = {}) => {
         const url = decodeURIComponent(String(u));
-        const body = opts.body ? JSON.parse(opts.body) : undefined;
+        const body = typeof opts.body === 'string' ? JSON.parse(opts.body) : undefined;   // uploads are binary
         calls.push({ url, method: opts.method || 'GET', body });
         const json = (b, ok = true) => ({ ok, status: ok ? 200 : 400, json: async () => b, text: async () => JSON.stringify(b) });
         if (url.includes('/auth/v1/user')) return json({ id: employee.id, email: 'a@b.c' });
@@ -109,4 +109,23 @@ test('notifications: a branch user does not see Main Office payment requests', a
     assert.equal(r.code, 200);
     assert.ok(!calls.some(c => c.url.includes('payment_requests?status=eq.requested')));
     assert.ok(!calls.some(c => c.url.includes('branch_type=eq.main_office')));
+});
+
+test('chat: files must be a photo or PDF up to 3 MB; a shipment card needs a real shipment', async () => {
+    const routes = { 'chat_threads?id=eq.5': () => [{ id: 5, kind: 'direct', chat_members: [{ employee_id: ME }] }], '/rest/v1/chat_messages': (u, o, b) => o.method === 'POST' ? [{ id: 9, ...b }] : [], 'bookings?awb=eq.': () => [] };
+    let calls = fake(STAFF, routes);
+    let r = res(); await chat(req('POST', { body: { action: 'send', thread: 5, file: { name: 'a.exe', data: 'data:application/x-msdownload;base64,AAAA' } } }), r);
+    assert.equal(r.code, 400);
+    r = res(); await chat(req('POST', { body: { action: 'send', thread: 5, file: { name: 'big.pdf', data: 'data:application/pdf;base64,' + Buffer.alloc(3 * 1024 * 1024 + 10).toString('base64') } } }), r);
+    assert.match(r.body.error, /too large/);
+    r = res(); await chat(req('POST', { body: { action: 'send', thread: 5, awb: '311000099' } }), r);
+    assert.match(r.body.error, /not found/);
+    assert.ok(!calls.some(c => c.method === 'POST' && c.url.includes('chat_messages')));
+    calls = fake(STAFF, { ...routes, 'bookings?awb=eq.': (u) => u.includes('311000001') ? [{ awb: '311000001' }] : [], '/storage/v1/object/chat-files/': () => ({ Key: 'x' }) });
+    r = res(); await chat(req('POST', { body: { action: 'send', thread: 5, awb: '311000001', file: { name: 'pod.png', data: 'data:image/png;base64,iVBORw0KGgo=' } } }), r);
+    assert.equal(r.code, 200, JSON.stringify(r.body));
+    const w = calls.find(c => c.method === 'POST' && c.url.includes('/rest/v1/chat_messages')).body;
+    assert.equal(w.awb, '311000001');
+    assert.equal(w.file_type, 'image/png');
+    assert.ok(w.file_path.startsWith('5/'));
 });

@@ -1,8 +1,9 @@
 // File: api/_routes/summary.js — daily manager summary.
 //   GET [?date=YYYY-MM-DD&branch=]   managers: their branch; head office: every branch + company total (live)
 //   GET with "Authorization: Bearer <CRON_SECRET>" (Vercel Cron, 8 pm Oman): saves today's summary of every branch
-//   and the company in daily_summaries — the bell then tells managers it is ready.
+//   and the company in daily_summaries — the bell then tells managers it is ready — then makes the nightly backup.
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
+import { runBackup } from '../_lib/backup.js';
 
 const enc = encodeURIComponent;
 const omanDay = () => new Date(Date.now() + 4 * 36e5).toISOString().slice(0, 10);
@@ -48,7 +49,10 @@ export default async function handler(req, res) {
             await fetch(`${rest}/daily_summaries?day=eq.${day}`, { method: 'DELETE', headers: serviceHeaders() });
             const w = await fetch(`${rest}/daily_summaries`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify(rows) });
             if (!w.ok) throw new Error(`save ${w.status}`);
-            return res.status(200).json({ success: true, day, branches: list.length });
+            // the nightly backup rides on the same job (one scheduled job instead of two)
+            let backup = null;
+            try { backup = await runBackup('nightly'); } catch (e) { console.error('[backup] nightly failed:', e.message); backup = { error: e.message }; }
+            return res.status(200).json({ success: true, day, branches: list.length, backup });
         } catch (e) {
             console.error('[summary] evening job failed:', e.message);
             return res.status(500).json({ error: 'Summary job failed.' });

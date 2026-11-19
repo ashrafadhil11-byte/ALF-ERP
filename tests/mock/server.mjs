@@ -31,6 +31,16 @@ http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname === '/__role') { role = u.searchParams.get('r'); return res.end('ok'); }
   const send = (o) => { res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(o)); };
+  // ---------- Backups + AI assistant (sample) ----------
+  if (u.pathname === '/api/backups') {
+    if (req.method === 'POST') return send({ success: true, name: 'alf-erp-2026-11-19-21-40.json.gz', tables: 54, rows: 1287, bytes: 184320 });
+    if (u.searchParams.get('download')) return send({ url: '#' });
+    return send({ keep: 14, backups: ['19-02-00', '18-02-00', '17-02-00'].map((t, i) => ({ name: `alf-erp-2026-11-${t}.json.gz`, size: 180000 - i * 4000 })) });
+  }
+  if (u.pathname === '/api/assistant') {
+    if (req.method === 'POST') return send({ answer: 'There are **2 shipments** in customs:\n311000001 — Kochi\n311000002 — Delhi', tools: ['count_shipments', 'find_shipments'] });
+    return send({ ready: u.searchParams.get('ready') === '1' || globalThis.__aiReady === true, provider: null });
+  }
   // ---------- Daily summary (sample) ----------
   if (u.pathname === '/api/summary') {
     const day = u.searchParams.get('date') || new Date().toISOString().slice(0, 10);
@@ -78,7 +88,9 @@ http.createServer((req, res) => {
         msg(1, 'u2', 'Muhammed Salim', 'Good morning! Sending week 46 cash today.', 300),
         msg(1, 'u1', 'Test User', 'Great, I will confirm when it arrives.', 290),
         msg(1, 'u2', 'Muhammed Salim', 'Bag 22, OMR 85. Also 311000002 has 1 box left here.', 25),
-        msg(1, 'u2', 'Muhammed Salim', 'https://example.com/manifest.pdf', 24)];
+        msg(1, 'u2', 'Muhammed Salim', 'https://example.com/manifest.pdf', 24),
+        msg(1, 'u2', 'Muhammed Salim', '📦 Shipment 311000001', 22, { awb: '311000001', card: { awb: '311000001', consignee: 'Fathima S.', dest_city: 'Kochi', dest_country: 'India', current_status: 'Received at Branch', pieces: 2, chargeable_weight: 37 } }),
+        msg(1, 'u2', 'Muhammed Salim', '📎 week46-manifest.pdf', 21, { file_name: 'week46-manifest.pdf', file_type: 'application/pdf', file_size: 182000, file_url: 'https://example.com/manifest.pdf' })];
       return { P, T, M, next: () => ++id };
     })();
     const me = 'u1', who = (x) => x === me ? { id: me, name: 'Test User', role: 'super_admin', branch: null } : C.P.find(p => p.id === x);
@@ -112,7 +124,7 @@ http.createServer((req, res) => {
     if (tid) { const t = C.T.find(x => x.id === tid && x.members.includes(me)); if (!t) { res.statusCode = 404; return send({ error: 'Chat not found.' }); }
       const after = +u.searchParams.get('after') || 0;
       const ms = C.M.filter(m => m.thread_id === t.id && m.id > after).map(m => m.deleted_at ? { ...m, body: '' } : m);
-      return send({ thread: { id: t.id, kind: t.kind, title: t.title }, more: false, quoted: [], members: t.members.map(x => ({ ...who(x), last_read_at: t.read[x] || new Date(0).toISOString() })), messages: ms }); }
+      return send({ thread: { id: t.id, kind: t.kind, title: t.title }, more: false, quoted: [], members: t.members.map(x => ({ ...who(x), last_read_at: t.read[x] || new Date(0).toISOString(), typing: x === 'u2' })), messages: ms }); }
     return send({ threads: C.T.filter(t => t.members.includes(me) && (t.kind === 'group' || C.M.some(m => m.thread_id === t.id))).map(view).sort((a, b) => b.last_message_at.localeCompare(a.last_message_at)), unread: unread() });
   }
   // ---------- Main Office (sample data) ----------

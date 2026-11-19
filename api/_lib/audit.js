@@ -5,7 +5,7 @@
 import { serviceHeaders } from './auth.js';
 
 const SKIP = new Set(['notifications:seen']);           // noise
-const PRIVATE = new Set(['chat']);                        // private messages are never copied into the activity log
+const PRIVATE = new Set(['chat', 'assistant']);                      // private messages are never copied into the activity log
 const SECRET = /pass|pin|secret|token|api_?key|apikey|signature|photo|authorization|cookie/i;
 const MAX_JSON = 6000;
 const names = new Map();                                 // user id → { name, role, branch, at } (warm-function cache)

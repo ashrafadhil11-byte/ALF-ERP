@@ -497,6 +497,44 @@ export default {
         }
     }
 
+    ,
+    // -----------------------------------------------------------------
+    //  AI — the assistant (api/_lib/assistant.js) uses whichever AI integration is active.
+    //  Paste the key in Admin → Integrations; nothing works until a key is there.
+    // -----------------------------------------------------------------
+    claude: {
+        label: 'Claude (Anthropic) — AI assistant',
+        kinds: ['ai'],
+        baseUrl: 'https://api.anthropic.com',
+        secrets: { api_key: 'ANTHROPIC_API_KEY' },
+        requiredSecrets: ['api_key'],
+        config: { model: 'claude-sonnet-5-5' },
+        headers: ({ secrets }) => ({ 'x-api-key': secrets.api_key, 'anthropic-version': '2023-06-01' }),
+        endpoints: {
+            messages: { method: 'POST', path: '/v1/messages', timeoutMs: 45000, body: ({ params, config }) => ({ model: config.model, max_tokens: 1500, ...params }) }
+        },
+        async test({ call }) {
+            const d = await call('messages', { max_tokens: 20, messages: [{ role: 'user', content: 'Reply with the word OK.' }] });
+            return { ok: true, message: `Answered: ${(d?.content || []).map(c => c.text || '').join('').slice(0, 40)}` };
+        }
+    },
+    openai_compat: {
+        label: 'OpenAI-compatible (OpenAI, Azure, Groq, local…) — AI assistant',
+        kinds: ['ai'],
+        baseUrl: 'https://api.openai.com/v1',
+        secrets: { api_key: 'OPENAI_API_KEY' },
+        requiredSecrets: ['api_key'],
+        config: { model: 'gpt-4o-mini' },
+        headers: ({ secrets }) => ({ Authorization: `Bearer ${secrets.api_key}` }),
+        endpoints: {
+            chat: { method: 'POST', path: '/chat/completions', timeoutMs: 45000, body: ({ params, config }) => ({ model: config.model, ...params }) }
+        },
+        async test({ call }) {
+            const d = await call('chat', { max_tokens: 20, messages: [{ role: 'user', content: 'Reply with the word OK.' }] });
+            return { ok: true, message: `Answered: ${String(d?.choices?.[0]?.message?.content || '').slice(0, 40)}` };
+        }
+    }
+
     // -----------------------------------------------------------------
     //  AI SLOT (reserved — see docs/ROADMAP.md "Phase G — AI")
     //  When we add AI: create a connector here with kinds: ['ai'], its key in

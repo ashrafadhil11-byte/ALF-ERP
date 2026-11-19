@@ -16,7 +16,7 @@ function groups(): Group[] {
     const isWarehouse = session.isWarehouse();
     const isMainOffice = role === 'super_admin' || session.isCashier();
     return ([
-        { id: 'top', items: [[isAdmin ? 'Global Overview' : 'Dashboard', 'super-dashboard.html', 'home', true], ['Messages', 'messages.html', 'chat', true], ['Daily summary', 'summary.html', 'chart', isAdmin || role === 'branch_manager']] },
+        { id: 'top', items: [[isAdmin ? 'Global Overview' : 'Dashboard', 'super-dashboard.html', 'home', true], ['Messages', 'messages.html', 'chat', true], ['AI Assistant', 'assistant.html', 'sparkles', true], ['Daily summary', 'summary.html', 'chart', isAdmin || role === 'branch_manager']] },
         { id: 'ops', label: 'Operations', items: [
             ['Shipments & AWB', 'shipments.html', 'ship', true],
             ['New Booking', 'booking.html', 'plus', true],
@@ -42,7 +42,8 @@ function groups(): Group[] {
         { id: 'admin', label: 'Settings', items: [
             ['Branch Network', 'branches.html', 'building', isAdmin],
             ['Integrations', 'integrations.html', 'link', isAdmin],
-            ['Activity Log', 'activity.html', 'pulse', isAdmin]
+            ['Activity Log', 'activity.html', 'pulse', isAdmin],
+            ['Backups', 'backups.html', 'link', role === 'super_admin']
         ] }
     ] as Group[]).map(g => ({ ...g, items: g.items.filter(i => i[3]) })).filter(g => g.items.length);
 }
