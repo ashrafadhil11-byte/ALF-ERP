@@ -1,6 +1,6 @@
 // File: sw.js — makes the ERP installable and keeps the app shell available offline.
 // API calls (/api/*) are never cached: data is always live.
-const VERSION = 'alf-erp-v7';
+const VERSION = 'alf-erp-v8';
 // The React app (/app/…) is cached as it is used: its files have content hashes, so a new release never mixes with an old one.
 const SHELL = [
     '/offline.html',
@@ -40,4 +40,15 @@ self.addEventListener('fetch', (event) => {
             })
             .catch(() => caches.match(req).then((hit) => hit || (req.mode === 'navigate' ? caches.match('/offline.html') : Response.error())))
     );
+});
+
+// A message notification (shown by the app, lib/alerts.ts): clicking it opens that chat in an open ERP tab, or a new one.
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = (event.notification.data && event.notification.data.url) || '/app/messages';
+    event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((tabs) => {
+        const tab = tabs.find((t) => new URL(t.url).origin === self.location.origin);
+        if (tab) return tab.focus().then((t) => (t && 'navigate' in t ? t.navigate(url) : null)).catch(() => self.clients.openWindow(url));
+        return self.clients.openWindow(url);
+    }));
 });

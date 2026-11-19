@@ -9,6 +9,7 @@ import { BottomNav } from './BottomNav';
 import { TopBar } from './TopBar';
 import { ProfileDrawer } from './ProfileDrawer';
 import { CheckInReminder, useCheckin } from './CheckIn';
+import { ChatWidget } from './ChatWidget';
 
 export const MAIN_CLASS = 'flex-1 min-w-0 bg-white rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-5 lg:p-8 flex flex-col relative z-10 overflow-hidden border border-white';
 const MOBILE_OPEN = 'fixed inset-0 z-[60] p-3 bg-gray-900/40 backdrop-blur-sm';
@@ -66,6 +67,7 @@ export function AppFrame({ children, mainClassName = MAIN_CLASS, onSearch, after
             </main>
             {after}
             <BottomNav current={current} onMenu={() => setMenuOpen(true)} />
+            <ChatWidget />
             <ProfileDrawer open={profileOpen} onClose={() => setProfileOpen(false)} />
             <CheckInReminder ck={ck} onAttendancePage={current === 'attendance.html'} />
         </>

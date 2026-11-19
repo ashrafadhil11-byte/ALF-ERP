@@ -132,7 +132,7 @@ export function CheckInReminder({ ck, onAttendancePage }: { ck: Ck; onAttendance
     };
     return (
         <div id="checkinPop" role="alertdialog" aria-label="Attendance reminder"
-            className="fixed z-[70] right-4 bottom-24 lg:bottom-6 w-[calc(100%-2rem)] max-w-sm bg-white rounded-[1.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-gray-100 p-4 ui-fade">
+            className="fixed z-[70] right-4 bottom-44 lg:right-6 lg:bottom-24 w-[calc(100%-2rem)] max-w-sm bg-white rounded-[1.5rem] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-gray-100 p-4 ui-fade">
             <div className="flex gap-3">
                 <span className={`w-11 h-11 rounded-2xl ${P.tone} text-white flex items-center justify-center flex-shrink-0`}>{kind === 'resume' ? <BreakIcon cls="w-5 h-5" /> : <Icon name="clock" cls="w-5 h-5" />}</span>
                 <div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{P.title}</p><p className="text-xs text-gray-500 mt-0.5">{text}</p>

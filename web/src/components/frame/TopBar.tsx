@@ -5,7 +5,6 @@ import { jwtPayload } from '../../lib/session';
 import { PageLink } from '../PageLink';
 import { CheckInButtons, type useCheckin } from './CheckIn';
 import { Notifications } from './Notifications';
-import { ChatButton } from './ChatButton';
 
 const greeting = () => {
     const hour = new Date().getHours();
@@ -105,7 +104,6 @@ export function TopBar({ ck, onMenu, onProfile, onSearch }: Props) {
                         </button>
                     </div>
 
-                    <ChatButton />
                     <div id="notifSlot"><Notifications /></div>
 
                     <PageLink page="booking.html" title="New booking" aria-label="New booking"

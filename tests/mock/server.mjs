@@ -33,6 +33,7 @@ http.createServer((req, res) => {
   const send = (o) => { res.setHeader('Content-Type','application/json'); res.end(JSON.stringify(o)); };
   // ---------- Messages (sample chat, kept in memory; the other side answers a moment after you write) ----------
   if (u.pathname === '/api/chat') {
+    const realNow = () => new Date(performance.timeOrigin + performance.now()).toISOString();   // chat uses the real clock (replies must be newer than reads)
     const C = globalThis.__chat ||= (() => {
       const P = [{ id: 'u2', name: 'Muhammed Salim', role: 'branch_manager', branch: 'ALFSNY', branch_name: 'Al-Farha Cargo Sannayya' },
                  { id: 'u3', name: 'Fathima Rahman', role: 'staff', branch: 'ALFSLL', branch_name: 'Al-Farha Cargo Salalah' },
@@ -61,24 +62,24 @@ http.createServer((req, res) => {
     const me = 'u1', who = (x) => x === me ? { id: me, name: 'Test User', role: 'super_admin', branch: null } : C.P.find(p => p.id === x);
     const view = (t) => {
       const ms = C.M.filter(m => m.thread_id === t.id), last = ms[ms.length - 1];
-      return { id: t.id, kind: t.kind, title: t.title, last_message_at: last ? last.created_at : new Date().toISOString(), last_message: last?.deleted_at ? '(deleted)' : last?.body, last_sender: last?.sender_name,
+      return { id: t.id, kind: t.kind, title: t.title, last_message_at: last ? last.created_at : realNow(), last_message: last?.deleted_at ? '(deleted)' : last?.body, last_sender: last?.sender_name,
         unread: ms.filter(m => m.sender_id !== me && m.created_at > t.read[me] && !m.deleted_at).length, members: t.members.filter(x => x !== me).map(who) };
     };
     const unread = () => C.T.filter(t => t.members.includes(me)).reduce((n, t) => n + view(t).unread, 0);
     if (req.method === 'POST') { let b = ''; req.on('data', c => b += c); req.on('end', () => { const j = JSON.parse(b || '{}'); const t = C.T.find(x => x.id === +j.thread);
-      if (j.action === 'read' && t) { t.read[me] = new Date().toISOString(); return send({ success: true }); }
+      if (j.action === 'read' && t) { t.read[me] = realNow(); return send({ success: true }); }
       if (j.action === 'send' && t) {
-        const m = { id: C.next(), thread_id: t.id, sender_id: me, sender_name: 'Test User', body: String(j.body), reply_to: j.reply_to || null, system: false, created_at: new Date().toISOString(), deleted_at: null };
+        const m = { id: C.next(), thread_id: t.id, sender_id: me, sender_name: 'Test User', body: String(j.body), reply_to: j.reply_to || null, system: false, created_at: realNow(), deleted_at: null };
         C.M.push(m); t.read[me] = m.created_at;
         const other = t.members.find(x => x !== me);
-        setTimeout(() => { t.read[other] = new Date().toISOString(); }, 1500);
-        setTimeout(() => C.M.push({ id: C.next(), thread_id: t.id, sender_id: other, sender_name: who(other).name, body: ['Noted 👍', 'OK, thanks!', 'Will do.', 'Got it ✅'][C.M.length % 4], reply_to: null, system: false, created_at: new Date().toISOString(), deleted_at: null }), 3000);
+        setTimeout(() => { t.read[other] = realNow(); }, 1500);
+        setTimeout(() => C.M.push({ id: C.next(), thread_id: t.id, sender_id: other, sender_name: who(other).name, body: ['Noted 👍', 'OK, thanks!', 'Will do.', 'Got it ✅'][C.M.length % 4], reply_to: null, system: false, created_at: realNow(), deleted_at: null }), 3000);
         return send({ success: true, message: m });
       }
-      if (j.action === 'delete') { const m = C.M.find(x => x.id === +j.id && x.sender_id === me); if (m) m.deleted_at = new Date().toISOString(); return send({ success: true }); }
-      if (j.action === 'direct') { let t2 = C.T.find(x => x.kind === 'direct' && x.members.includes(j.user_id)); if (!t2) { t2 = { id: C.next(), kind: 'direct', title: null, members: [me, j.user_id], read: { [me]: new Date().toISOString(), [j.user_id]: new Date().toISOString() } }; C.T.push(t2); } return send({ success: true, thread: t2.id }); }
-      if (j.action === 'group') { const t2 = { id: C.next(), kind: 'group', title: j.title, members: [me, ...j.members], read: Object.fromEntries([me, ...j.members].map(x => [x, new Date().toISOString()])) }; C.T.push(t2);
-        C.M.push({ id: C.next(), thread_id: t2.id, sender_id: me, sender_name: 'Test User', body: `Test User created the group “${j.title}”`, system: true, created_at: new Date().toISOString() }); return send({ success: true, thread: t2.id }); }
+      if (j.action === 'delete') { const m = C.M.find(x => x.id === +j.id && x.sender_id === me); if (m) m.deleted_at = realNow(); return send({ success: true }); }
+      if (j.action === 'direct') { let t2 = C.T.find(x => x.kind === 'direct' && x.members.includes(j.user_id)); if (!t2) { t2 = { id: C.next(), kind: 'direct', title: null, members: [me, j.user_id], read: { [me]: realNow(), [j.user_id]: realNow() } }; C.T.push(t2); } return send({ success: true, thread: t2.id }); }
+      if (j.action === 'group') { const t2 = { id: C.next(), kind: 'group', title: j.title, members: [me, ...j.members], read: Object.fromEntries([me, ...j.members].map(x => [x, realNow()])) }; C.T.push(t2);
+        C.M.push({ id: C.next(), thread_id: t2.id, sender_id: me, sender_name: 'Test User', body: `Test User created the group “${j.title}”`, system: true, created_at: realNow() }); return send({ success: true, thread: t2.id }); }
       if (j.action === 'rename' && t) { t.title = j.title; return send({ success: true }); }
       if (j.action === 'add' && t) { t.members.push(...j.members); return send({ success: true }); }
       if (j.action === 'leave' && t) { t.members = t.members.filter(x => x !== me); return send({ success: true }); }

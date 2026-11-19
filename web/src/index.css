@@ -1,3 +1,12 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Floating chat popup (components/frame/ChatWidget.tsx) */
+.chat-popup { opacity: 0; transform: translateY(14px) scale(.97); transform-origin: bottom right; pointer-events: none; visibility: hidden;
+    transition: opacity .18s ease, transform .2s cubic-bezier(.2, .9, .3, 1.2), visibility 0s linear .2s; }
+.chat-popup.open { opacity: 1; transform: none; pointer-events: auto; visibility: visible; transition: opacity .18s ease, transform .22s cubic-bezier(.2, .9, .3, 1.2), visibility 0s; }
+.chat-peek { animation: chat-peek .28s cubic-bezier(.2, .9, .3, 1.2); }
+@keyframes chat-peek { from { opacity: 0; transform: translateY(10px) scale(.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .chat-popup, .chat-popup.open { transition: none; } .chat-peek { animation: none; } }
+@media print { .chat-fab, .chat-popup, .chat-peek { display: none !important; } }

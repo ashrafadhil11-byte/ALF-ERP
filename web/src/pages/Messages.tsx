@@ -2,7 +2,7 @@
 // Left: my chats (unread first in mind, newest on top). Right: the open chat — bubbles grouped by sender, day lines,
 // replies, "Seen", delete own message. New messages arrive by polling (every few seconds while the page is visible).
 // ?t=<chat id> keeps the open chat in the address; ?to=<user id> opens the one-to-one chat with that user.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppFrame } from '../components/frame/AppFrame';
 import { Modal } from '../components/Modal';
@@ -54,11 +54,18 @@ function Rich({ text }: { text: string }) {
             : <span key={i}>{p}</span>)}</>;
 }
 
+/** The Messages page: the chat panel full size. */
 export function Messages() {
+    return <AppFrame><ChatPanel /></AppFrame>;
+}
+
+/** The chat itself — on the Messages page (list beside the chat; the address keeps the open chat) or in the floating
+ *  popup (`popup`: one column, list or chat; `tools` = the popup's own buttons, shown in both headers). */
+export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: ReactNode }) {
     const qc = useQueryClient();
     const me = ME();
-    const params = new URLSearchParams(location.search);
-    const [active, setActive] = useState<number | null>(() => Number(params.get('t')) || null);
+    const params = new URLSearchParams(popup ? '' : location.search);
+    const [active, setActive] = useState<number | null>(() => Number(params.get('t')) || (popup ? Number(sessionStorage.getItem('alf_chat_open')) || null : null));
     const [filter, setFilter] = useState('');
     const inbox = useQuery({ queryKey: ['chat-inbox'], queryFn: () => api<{ threads: Thread[]; unread: number }>('/api/chat'), refetchInterval: 8_000, staleTime: 0 });
     const threads = inbox.data?.threads || [];
@@ -73,7 +80,8 @@ export function Messages() {
 
     const pick = (id: number | null) => {
         setActive(id); setReply(null); setDraft(''); setNewBelow(0);
-        history.replaceState(null, '', id ? `?t=${id}` : location.pathname);
+        if (popup) { try { if (id) sessionStorage.setItem('alf_chat_open', String(id)); else sessionStorage.removeItem('alf_chat_open'); } catch { /* ignore */ } }
+        else history.replaceState(null, '', id ? `?t=${id}` : location.pathname);
     };
     const markRead = (id: number) => api('/api/chat', { method: 'POST', body: { action: 'read', thread: id } })
         .then(() => { qc.invalidateQueries({ queryKey: ['chat-unread'] }); qc.invalidateQueries({ queryKey: ['chat-inbox'] }); }).catch(() => {});
@@ -179,7 +187,7 @@ export function Messages() {
             setNewOpen(false); pick(r.thread);
         } catch (e) { toast(false, (e as Error).message); }
     }
-    useEffect(() => { const to = params.get('to'); if (to) direct(to); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { const to = params.get('to'); if (to && !popup) direct(to); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
     const visible = threads.filter(t => !filter.trim() || threadName(t).toLowerCase().includes(filter.trim().toLowerCase()) || t.members.some(m => (m.branch || '').toLowerCase().includes(filter.trim().toLowerCase())));
     const current = threads.find(t => t.id === active);
@@ -208,17 +216,16 @@ export function Messages() {
     };
 
     return (
-        <AppFrame after={<>
+        <>
             <NewChat open={newOpen} onClose={() => setNewOpen(false)} load={loadPeople} onDirect={direct} onGroup={(id) => { setNewOpen(false); pick(id); qc.invalidateQueries({ queryKey: ['chat-inbox'] }); }} />
             {open && <GroupInfo open={infoOpen} onClose={() => setInfoOpen(false)} data={open} me={me} load={loadPeople}
                 onChanged={async (left) => { setInfoOpen(false); qc.invalidateQueries({ queryKey: ['chat-inbox'] }); if (left) pick(null); else if (active) setOpen(await api<Open>(`/api/chat?thread=${active}`)); }} />}
-        </>}>
-            <div id="chatApp" className="chat-app grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 min-h-0">
+            <div id={popup ? 'chatPop' : 'chatApp'} className={`chat-ui ${popup ? 'h-full flex flex-col' : 'chat-app grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4 min-h-0'}`}>
                 {/* ---------- chat list ---------- */}
-                <aside className={`${active ? 'hidden lg:flex' : 'flex'} flex-col min-h-0 bg-[#F8F8FA] rounded-[1.75rem] p-3`}>
+                <aside className={`${active ? (popup ? 'hidden' : 'hidden lg:flex') : 'flex'} flex-col min-h-0 ${popup ? 'flex-1 bg-white p-3' : 'bg-[#F8F8FA] rounded-[1.75rem] p-3'}`}>
                     <div className="flex items-center justify-between px-2 pt-1 pb-3">
                         <div><h2 className="text-lg font-extrabold">Messages</h2><p className="text-[11px] text-gray-400 font-bold">{inbox.data?.unread ? `${inbox.data.unread} unread` : 'Chat with your team'}</p></div>
-                        <button type="button" id="newChat" className="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center hover:bg-[#E86D58] transition-colors" aria-label="New chat" title="New chat" onClick={() => { loadPeople(); setNewOpen(true); }}><Icon name="edit" /></button>
+                        <span className="flex items-center gap-1.5">{tools}<button type="button" id="newChat" className="w-10 h-10 rounded-full bg-[#111827] text-white flex items-center justify-center hover:bg-[#E86D58] transition-colors" aria-label="New chat" title="New chat" onClick={() => { loadPeople(); setNewOpen(true); }}><Icon name="edit" /></button></span>
                     </div>
                     <label className="flex items-center gap-2 bg-white rounded-full border border-gray-100 px-4 py-2.5 mb-3">
                         <Icon name="search" cls="w-4 h-4 text-gray-400" />
@@ -244,17 +251,18 @@ export function Messages() {
                 </aside>
 
                 {/* ---------- open chat ---------- */}
-                <section className={`${active ? 'flex' : 'hidden lg:flex'} flex-col min-h-0 rounded-[1.75rem] border border-gray-100 bg-white overflow-hidden relative`}>
+                <section className={`${active ? 'flex' : (popup ? 'hidden' : 'hidden lg:flex')} flex-col min-h-0 ${popup ? 'flex-1' : 'rounded-[1.75rem] border border-gray-100'} bg-white overflow-hidden relative`}>
                     {!active ? <div className="flex-1 flex flex-col items-center justify-center text-center p-10 chat-empty">
                         <span className="w-20 h-20 rounded-[1.75rem] bg-[#FFF5F3] text-[#E86D58] flex items-center justify-center mb-4"><Icon name="message" cls="w-9 h-9" /></span>
                         <h3 className="text-lg font-extrabold">Your messages</h3><p className="text-sm text-gray-400 mt-1 max-w-xs">Pick a chat on the left, or start a new one with a colleague or a group.</p>
                         <button type="button" className="btn btn-coral mt-5" onClick={() => { loadPeople(); setNewOpen(true); }}><Icon name="plus" />New chat</button>
                     </div> : <>
                         <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-                            <button type="button" className="lg:hidden w-9 h-9 rounded-full hover:bg-gray-50 flex items-center justify-center" aria-label="Back to chats" onClick={() => pick(null)}><Icon name="arrowLeft" /></button>
+                            <button type="button" className={`${popup ? '' : 'lg:hidden '}w-9 h-9 rounded-full hover:bg-gray-50 flex items-center justify-center`} aria-label="Back to chats" onClick={() => pick(null)}><Icon name="arrowLeft" /></button>
                             <Avatar name={title || '…'} group={open?.thread.kind === 'group'} size="w-10 h-10" />
                             <div className="min-w-0 flex-1"><h3 id="chatTitle" className="text-sm font-extrabold truncate">{title || ' '}</h3><p className="text-[11px] text-gray-400 truncate">{sub}</p></div>
                             {open?.thread.kind === 'group' && <button type="button" id="chatInfo" className="icon-btn" aria-label="Group details" title="Group details" onClick={() => { loadPeople(); setInfoOpen(true); }}><Icon name="users" /></button>}
+                            {tools}
                         </header>
                         <div ref={scroller} onScroll={onScroll} id="chatScroll" className="chat-scroll flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 sm:px-6 py-4">
                             {loading && !open ? <div className="space-y-3">{[60, 40, 70, 30].map((w, i) => <div key={i} className={`h-10 rounded-2xl bg-gray-100 animate-pulse ${i % 2 ? 'ml-auto' : ''}`} style={{ width: `${w}%` }} />)}</div> : open && <>
@@ -315,7 +323,7 @@ export function Messages() {
                     </>}
                 </section>
             </div>
-        </AppFrame>
+        </>
     );
 }
 
