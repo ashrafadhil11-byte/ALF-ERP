@@ -21,7 +21,7 @@ export async function aiProvider() {
 export const TOOLS = [
     { name: 'find_shipments', description: 'List shipments (newest first). Filters are optional. Dates are YYYY-MM-DD (Oman time).',
       schema: { type: 'object', properties: { text: { type: 'string', description: 'AWB, sender, receiver or phone to search' }, status: { type: 'string', description: 'status code, e.g. IMPORT_CUSTOMS, DELIVERED' },
-          dest_country: { type: 'string' }, branch: { type: 'string', description: 'branch code (head office only)' }, from: { type: 'string' }, to: { type: 'string' }, limit: { type: 'integer', maximum: 50 } } } },
+          dest_country: { type: 'string' }, branch: { type: 'string', description: 'branch code (head office only)' }, from: { type: 'string' }, to: { type: 'string' }, limit: { type: 'integer', description: 'how many to list, at most 50' } } } },
     { name: 'count_shipments', description: 'Count shipments grouped by status, destination country or branch, with the same optional filters.',
       schema: { type: 'object', properties: { group_by: { type: 'string', enum: ['status', 'dest_country', 'branch'] }, status: { type: 'string' }, dest_country: { type: 'string' }, branch: { type: 'string' }, from: { type: 'string' }, to: { type: 'string' } }, required: ['group_by'] } },
     { name: 'shipment_details', description: 'One shipment with its last tracking events.', schema: { type: 'object', properties: { awb: { type: 'string' } }, required: ['awb'] } },
@@ -92,6 +92,15 @@ const system = (session) => [
     'Amounts: OMR has 3 decimals. Keep answers under 150 words unless a list is asked for.'
 ].join('\n');
 
+// OpenAI-style tools. Optional fields also allow null: some models (gpt-oss on Groq) send null for
+// "not given", and Groq rejects the call when the schema does not allow it. The tools treat null as not given.
+const OPENAI_TOOLS = TOOLS.map(t => {
+    const req = new Set(t.schema.required || []);
+    const properties = Object.fromEntries(Object.entries(t.schema.properties || {}).map(([k, p]) =>
+        [k, req.has(k) ? p : { ...p, type: [p.type, 'null'], ...(p.enum ? { enum: [...p.enum, null] } : {}) }]));
+    return { type: 'function', function: { name: t.name, description: t.description, parameters: { ...t.schema, properties } } };
+});
+
 /** one question (with a short history) → { answer, tools } */
 export async function ask(question, history, session) {
     const row = await aiProvider();
@@ -112,13 +121,13 @@ export async function ask(question, history, session) {
     } else {
         const messages = [{ role: 'system', content: system(session) }, ...past, { role: 'user', content: question }];
         for (let i = 0; i < MAX_ROUNDS; i++) {
-            const d = await callApi('openai_compat', 'chat', { messages, tools: TOOLS.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.schema } })) }, row);
+            const d = await callApi('openai_compat', 'chat', { messages, tools: OPENAI_TOOLS }, row);
             const msg = d?.choices?.[0]?.message || {};
             if (!msg.tool_calls?.length) return { answer: String(msg.content || '').trim(), tools: used };
             messages.push(msg);
             for (const c of msg.tool_calls) {
                 used.push(c.function?.name);
-                let args = {}; try { args = JSON.parse(c.function?.arguments || '{}'); } catch { /* empty */ }
+                let args = {}; try { args = JSON.parse(c.function?.arguments || '{}') || {}; } catch { /* empty */ }
                 messages.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(await runTool(c.function?.name, args, session)).slice(0, 20000) });
             }
         }

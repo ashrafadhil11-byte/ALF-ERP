@@ -87,3 +87,19 @@ test('assistant: OpenAI-compatible uses the saved base URL; a provider 401 never
     assert.equal(r.code, 502);
     assert.match(r.body.error, /API key not valid/);
 });
+
+test('assistant: optional tool fields allow null (Groq checks strictly); null arguments are "not given"', async () => {
+    let body;
+    fake(STAFF, {
+        'integrations?kind=eq.ai': () => [{ id: 3, name: 'Groq', adapter: 'openai_compat', base_url: 'https://api.groq.com/openai/v1', config: { model: 'm' }, secret: { api_key: 'k' } }],
+        'api.groq.com/openai/v1/chat/completions': (u, o, b) => { body = body || b; return b.messages.at(-1).role === 'tool'
+            ? { choices: [{ message: { role: 'assistant', content: 'Done.' } }] }
+            : { choices: [{ message: { role: 'assistant', reasoning: 'r', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'count_shipments', arguments: '{"group_by":"status","branch":null,"status":null}' } }] } }] }; }
+    });
+    const r = res(); await assistant({ method: 'POST', query: {}, body: { question: 'count' }, headers: { authorization: 'Bearer t' } }, r);
+    assert.equal(r.body.answer, 'Done.');
+    const count = body.tools.find(t => t.function.name === 'count_shipments').function.parameters;
+    assert.deepEqual(count.properties.branch.type, ['string', 'null']);
+    assert.equal(count.properties.group_by.type, 'string');   // required stays strict
+    assert.ok(!JSON.stringify(body.tools).includes('maximum'));
+});
