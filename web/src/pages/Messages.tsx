@@ -97,8 +97,10 @@ export function Avatar({ name, group = false, ai = false, size = 'w-11 h-11', te
 
 // links: web addresses, and shipment numbers (9 digits, or AFC-123456) open the shipment
 function Rich({ text, bold = false }: { text: string; bold?: boolean }) {
-    const parts = text.split(bold ? /(\*\*[^*\n]+\*\*|https?:\/\/[^\s]+|\b\d{9}\b|\bAFC-\d{6}\b)/g : /(https?:\/\/[^\s]+|\b\d{9}\b|\bAFC-\d{6}\b)/g);
-    return <>{parts.map((p, i) => bold && /^\*\*[^*]+\*\*$/.test(p) ? <b key={i}>{p.slice(2, -2)}</b> : /^https?:\/\//.test(p) ? <a key={i} href={p} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2 break-all">{p}</a>
+    const parts = text.split(bold ? /(\*\*[^*\n]+\*\*|https?:\/\/[^\s]+|\/app\/[a-z-]+(?:\?[^\s)]*)?|\b\d{9}\b|\bAFC-\d{6}\b)/g : /(https?:\/\/[^\s]+|\b\d{9}\b|\bAFC-\d{6}\b)/g);
+    return <>{parts.map((p, i) => bold && /^\*\*[^*]+\*\*$/.test(p) ? <b key={i}>{p.slice(2, -2)}</b>
+        : bold && /^\/app\/[a-z-]+/.test(p) ? <a key={i} href={p} className="font-bold underline underline-offset-2 break-all">{`Open ${p.replace(/^\/app\//, '').replace(/\?.*$/, '').replace(/-/g, ' ')} ›`}</a>
+        : /^https?:\/\//.test(p) ? <a key={i} href={p} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2 break-all">{p}</a>
         : /^(\d{9}|AFC-\d{6})$/.test(p) ? <a key={i} href={`/app/shipments?awb=${encodeURIComponent(p)}`} className="font-mono font-bold underline underline-offset-2">{p}</a>
             : <span key={i}>{p}</span>)}</>;
 }
@@ -282,7 +284,7 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
     }
     useEffect(() => { const to = params.get('to'); if (to && !popup) direct(to); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
     // ?farah=1 (the old AI Assistant page links here): open Farah's chat
-    useEffect(() => { if (!popup && params.get('farah') && !active) { const f = threads.find(t => t.kind === 'assistant'); if (f) pick(f.id); } }, [threads.length]);   // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { if (!popup && params.get('farah') && !active) { const f = threads.find(t => t.kind === 'assistant'); if (f) { pick(f.id); const ask = params.get('ask'); if (ask) setTimeout(() => setDraft(ask.slice(0, 1000)), 80); } } }, [threads.length]);   // eslint-disable-line react-hooks/exhaustive-deps
 
     const visible = [...threads].sort((a, b) => (b.kind === 'assistant' ? 1 : 0) - (a.kind === 'assistant' ? 1 : 0)).filter(t => !filter.trim() || threadName(t).toLowerCase().includes(filter.trim().toLowerCase()) || t.members.some(m => (m.branch || '').toLowerCase().includes(filter.trim().toLowerCase())));
     const current = threads.find(t => t.id === active);

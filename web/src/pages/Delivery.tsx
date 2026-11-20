@@ -8,6 +8,7 @@ import { Icon } from '../components/Icon';
 import { Combobox, type ComboboxHandle } from '../components/fields/Combobox';
 import { ScanInput } from '../components/fields/Scan';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { clean } from '../lib/format';
 import { beep, toast } from '../lib/toast';
 import './delivery.css';
@@ -41,6 +42,7 @@ export function Delivery() {
     const pick = useRef<HTMLInputElement>(null);
     const dataRef = useRef(data); dataRef.current = data;
 
+    useLive(() => load());   // reload when data changes (here, by Farah, another tab) — lib/live.ts
     async function load(): Promise<any> {
         let d = dataRef.current, m = mine;
         try {

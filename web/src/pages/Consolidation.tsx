@@ -10,6 +10,7 @@ import { Icon } from '../components/Icon';
 import { Combobox, type ComboboxHandle } from '../components/fields/Combobox';
 import { ScanInput } from '../components/fields/Scan';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { confirm } from '../lib/dialogs';
 import { clean } from '../lib/format';
 import { countryItems } from '../lib/geo';
@@ -58,6 +59,7 @@ export function Consolidation() {
     const obInput = useRef<HTMLInputElement>(null), ibInput = useRef<HTMLInputElement>(null), dInput = useRef<HTMLInputElement>(null);
     const bname = (c?: string) => (T.branches.find((b: any) => b.branch_code === c) || {}).branch_name || c;
 
+    useLive(() => { loadCons(); loadTransfers(); });   // reload when data changes (here, by Farah, another tab) — lib/live.ts
     async function loadTransfers(want = actBranch) {
         let d: any;
         try { d = await api('/api/transfers' + (want ? `?branch=${encodeURIComponent(want)}` : '')); } catch (e) { toast(false, (e as Error).message); return; }

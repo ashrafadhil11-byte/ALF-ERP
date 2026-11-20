@@ -80,6 +80,7 @@ export const NAV_ICONS = {
     wallet: "<path d=\"M3 7a2 2 0 012-2h13v4\"/><path d=\"M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z\"/><circle cx=\"16\" cy=\"14.5\" r=\"1.2\"/>",
     chart: "<path d=\"M3 3v18h18\"/><path d=\"M7 15l4-4 3 3 5-6\"/>",
     sparkles: "<path d=\"M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z\"/><path d=\"M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z\"/>",
+    checkCircle: "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12l3 3 5-6\"/>",
     chev: "<path d=\"M6 9l6 6 6-6\"/>",
 } as const;
 

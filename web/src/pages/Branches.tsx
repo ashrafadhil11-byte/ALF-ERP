@@ -10,6 +10,7 @@ import { Combobox, type ComboboxHandle } from '../components/fields/Combobox';
 import { PhoneField, type PhoneHandle } from '../components/fields/PhoneField';
 import { PostalLookup, type Place } from '../components/fields/PostalLookup';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { confirm } from '../lib/dialogs';
 import { citiesOf, countries, countryItems, statesOf, type Item } from '../lib/geo';
 import { hrefFor } from '../lib/pages';
@@ -50,6 +51,7 @@ export function Branches() {
     const setTab = (t: Tab) => { setTabState(t); try { localStorage.setItem('alf_branch_tab', t); } catch { /* ignore */ } };
     const [q, setQ] = useState(''), [statusF, setStatusF] = useState('active');
 
+    useLive(() => loadAll());   // reload when data changes (here, by Farah, another tab) — lib/live.ts
     async function loadAll() {
         try {
             const [b, c] = await Promise.all([api('/api/branches'), api('/api/codes')]);

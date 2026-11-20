@@ -1,6 +1,7 @@
 // Same behaviour as UI.api in admin/components/ui.js:
 // bearer token, JSON in/out, identical GETs in flight share one request, 401 signs out.
 import { session } from './session';
+import { changed, quiet } from './live';
 
 export class ApiError extends Error {
     constructor(message: string, public status: number) { super(message); }
@@ -12,7 +13,13 @@ const inflight = new Map<string, Promise<any>>();
 
 export function api<T = any>(path: string, opts: Opts = {}): Promise<T> {
     const method = (opts.method || 'GET').toUpperCase();
-    if (method !== 'GET') return request<T>(path, opts);
+    if (method !== 'GET') {
+        return request<T>(path, opts).then((out) => {
+            // a save changed data: reads that started before it must not be shared any more, and screens reload
+            if (!quiet(path, opts.body)) { inflight.clear(); changed(path); }
+            return out;
+        });
+    }
     const key = path + '|' + JSON.stringify(opts.headers || {});
     const hit = inflight.get(key);
     if (hit) return hit;

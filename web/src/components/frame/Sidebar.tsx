@@ -16,7 +16,7 @@ function groups(): Group[] {
     const isWarehouse = session.isWarehouse();
     const isMainOffice = role === 'super_admin' || session.isCashier();
     return ([
-        { id: 'top', items: [[isAdmin ? 'Global Overview' : 'Dashboard', 'super-dashboard.html', 'home', true], ['Messages', 'messages.html', 'chat', true], ['Farah · AI', 'assistant.html', 'sparkles', true], ['Daily summary', 'summary.html', 'chart', isAdmin || role === 'branch_manager']] },
+        { id: 'top', items: [[isAdmin ? 'Global Overview' : 'Dashboard', 'super-dashboard.html', 'home', true], ['Messages', 'messages.html', 'chat', true], ['Farah · AI', 'assistant.html', 'sparkles', true], ['To-do', 'todo.html', 'checkCircle', true], ['Daily summary', 'summary.html', 'chart', isAdmin || role === 'branch_manager']] },
         { id: 'ops', label: 'Operations', items: [
             ['Shipments & AWB', 'shipments.html', 'ship', true],
             ['New Booking', 'booking.html', 'plus', true],

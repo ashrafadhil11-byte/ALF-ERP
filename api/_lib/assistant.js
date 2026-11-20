@@ -4,7 +4,8 @@
 // (staff / managers: their branch; head office: everything). It never writes anything.
 import { serviceHeaders, ADMIN_ROLES } from './auth.js';
 import { callApi } from './integrations/http.js';
-import { propose, myReports, profitReport, callRoute, REPORTS } from './ai-tasks.js';
+import { propose, myReports, profitReport, callRoute, REPORTS, whatsWaiting } from './ai-tasks.js';
+import { todoRows, addTodo, setTodo } from '../_routes/todos.js';
 import accountsRoute from '../_routes/accounts.js';
 import customersRoute from '../_routes/customers.js';
 import transfersRoute from '../_routes/transfers.js';
@@ -51,6 +52,14 @@ export const TOOLS = [
     { name: 'profit_report', description: 'Money for a period: invoiced, collected, expenses, receivable, income, costs and PROFIT per currency (use it for "profit this month", "income last month"). Dates YYYY-MM-DD; default this month. Managers: their branch; head office: all or one branch.',
       schema: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, branch: { type: 'string' } } } },
     { name: 'my_reports', description: 'The scheduled reports this user has switched on.', schema: { type: 'object', properties: {} } },
+    { name: 'whats_waiting', description: 'What is waiting for this user now: requests / cash / incoming cargo for their locations, shipment problems, leave requests to decide (managers), their open to-dos. Use it when they greet you, ask "anything for me?", or before suggesting what to do next.',
+      schema: { type: 'object', properties: {} } },
+    { name: 'my_todos', description: 'The user\'s own to-do list (open, and done in the last 7 days).', schema: { type: 'object', properties: {} } },
+    { name: 'add_todo', description: 'Add a to-do to the user\'s OWN list (done at once — it is their personal list). Use it when they ask you to remember / remind / note something, or to break a job into steps. link = an ERP page it is about, e.g. "shipments.html?awb=311000045".',
+      schema: { type: 'object', properties: { title: { type: 'string' }, due_date: { type: 'string', description: 'YYYY-MM-DD' }, notes: { type: 'string' }, link: { type: 'string' } }, required: ['title'] } },
+    { name: 'complete_todo', description: 'Tick off (or reopen with undo=true) one of the user\'s to-dos by id.', schema: { type: 'object', properties: { id: { type: 'integer' }, undo: { type: 'boolean' } }, required: ['id'] } },
+    { name: 'propose_leave_decision', description: 'Prepare approving or rejecting a pending leave request (managers). Give the employee name or the request id; all=true for every match.',
+      schema: { type: 'object', properties: { employee: { type: 'string' }, id: { type: 'integer' }, decision: { type: 'string', enum: ['approved', 'rejected'] }, note: { type: 'string' }, all: { type: 'boolean' } }, required: ['decision'] } },
     // ---- jobs: these only PREPARE the change; the user confirms it on a card ----
     { name: 'propose_status_update', description: 'Prepare a status change for one or more shipments (e.g. Out for Delivery, Delivered, Received at Branch). Some statuses need extra details: driver (Pickup Assigned), to_branch (In Transit to Hub), mawb (Consolidated), remark (holds, failed delivery, returns, cancelled).',
       schema: { type: 'object', properties: { awbs: { type: 'array', items: { type: 'string' } }, status: { type: 'string', description: 'status name or code' }, location: { type: 'string' }, remark: { type: 'string' }, driver: { type: 'string' }, to_branch: { type: 'string' }, mawb: { type: 'string' } }, required: ['awbs', 'status'] } },
@@ -66,7 +75,7 @@ export const TOOLS = [
 
 const READ_PAGES = { accounts: accountsRoute, customers: customersRoute, transfers: transfersRoute, consolidation: consolidationRoute, attendance: attendanceRoute, delivery: deliveryRoute, pickups: pickupsRoute, bookings: bookingsRoute, users: usersRoute, summary: summaryRoute };
 const PROPOSALS = { propose_status_update: ['status', a => a], propose_pickup: ['pickup_create', a => a], propose_pickup_assign: ['pickup_assign', a => a], propose_pickup_done: ['pickup_picked', a => a],
-    propose_message: ['message', a => a], propose_report: ['report', a => ({ kind: a.report, slot: a.slot, branch: a.branch })], propose_report_stop: ['report_stop', a => ({ kind: a.report, slot: a.slot })] };
+    propose_message: ['message', a => a], propose_leave_decision: ['leave_decide', a => a], propose_report: ['report', a => ({ kind: a.report, slot: a.slot, branch: a.branch })], propose_report_stop: ['report_stop', a => ({ kind: a.report, slot: a.slot })] };
 
 /** long lists are cut so one answer fits the AI's limits */
 function shrink(v, depth = 0) {
@@ -137,6 +146,10 @@ export async function runTool(name, args = {}, session, ctx = {}) {
         }
         case 'profit_report': return profitReport(args, ctx.auth);
         case 'my_reports': return { reports: await myReports(session) };
+        case 'whats_waiting': return whatsWaiting(session, ctx.auth);
+        case 'my_todos': return { todos: await todoRows(session.user.id) };
+        case 'add_todo': try { return { added: await addTodo(session.user.id, args, 'farah') }; } catch (e) { return { error: e.message }; }
+        case 'complete_todo': try { return { todo: await setTodo(session.user.id, args.id, { done_at: args.undo ? null : new Date().toISOString() }) }; } catch (e) { return { error: e.message }; }
         default: {
             const job = PROPOSALS[name];
             if (!job) return { error: `Unknown tool ${name}.` };
@@ -162,7 +175,12 @@ const system = (session, opts = {}) => {
         'Amounts: OMR has 3 decimals. Keep answers under 150 words unless a list is asked for. Write references (AWB, MAWB, invoice numbers) exactly as the data has them, with plain "-".',
         'Money for a period (month profit, income, expenses): profit_report. Packing-material stock: erp_read page accounts, view inventory. '
         + 'A consolidation by its MAWB: erp_read page consolidation, params mawb. Other pages: erp_read.',
-        'You can also do jobs: status updates, pickups, chat messages, scheduled reports, only through the propose_* tools. They do NOT change anything: '
+        'Be a real personal assistant: notice what is pending (whats_waiting), mention it briefly and ask what they would like — e.g. "There is a leave request from Ali — want to look at it, or shall I approve it?". '
+        + 'Ask a short question whenever something is unclear instead of guessing; after answering, offer the useful next step. One or two questions at a time, not a list of options. '
+        + 'Help with their to-do list: add things they want to remember, break a bigger job into steps, and help finish each one (look things up, prepare the change). '
+        + 'Payment requests, cash confirmations and warehouse requests need the user\'s own PIN: you cannot approve those — give the link (e.g. /app/main-office?tab=approvals) and offer to explain what is waiting. '
+        + 'When you point to a page, write its link as /app/<page>?… so it can be tapped.',
+        'You can also do jobs: status updates, pickups, chat messages, leave decisions, scheduled reports, only through the propose_* tools. They do NOT change anything: '
         + 'the user gets a card with a Confirm button under your message. Never say a job is done; say what you prepared and ask them to tap Confirm. '
         + 'If details are missing (which shipments, which status, a reason), ask first. Only do what the user asked.'
     ].join('\n');

@@ -8,6 +8,7 @@ import { Icon } from '../components/Icon';
 import { closeMenu, openMenu } from '../components/RowMenu';
 import { PhoneField, type PhoneHandle } from '../components/fields/PhoneField';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { confirm } from '../lib/dialogs';
 import { hrefFor } from '../lib/pages';
 import { session } from '../lib/session';
@@ -55,6 +56,7 @@ export function Users() {
     const [branches, setBranches] = useState<Branch[]>([]);
     const [q, setQ] = useState(''), [roleF, setRoleF] = useState(''), [brF, setBrF] = useState(''), [actF, setActF] = useState('1');
 
+    useLive(() => load());   // reload when data changes (here, by Farah, another tab) — lib/live.ts
     async function load() {
         try { const d = await api<{ users: User[] }>('/api/users'); setUsers(d.users); } catch (e) { toast(false, (e as Error).message); }
     }

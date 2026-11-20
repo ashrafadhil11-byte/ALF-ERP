@@ -28,6 +28,7 @@ import postalLookup from './_routes/postal-lookup.js';
 import profile from './_routes/profile.js';
 import status from './_routes/status.js';
 import summary from './_routes/summary.js';
+import todos from './_routes/todos.js';
 import track from './_routes/track.js';
 import transfers from './_routes/transfers.js';
 import users from './_routes/users.js';
@@ -60,6 +61,7 @@ const ROUTES = {
     profile,
     status,
     summary,
+    todos,
     track,
     transfers,
     users,

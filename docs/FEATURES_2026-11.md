@@ -65,6 +65,23 @@
 - The old AI Assistant page and menu item ("Farah · AI") open her chat.
 - Consolidations can be opened by MAWB (`/api/consolidation?mawb=…`); typographic dashes (‑ –) count as "-".
 
+## Farah as a personal assistant · To-do · live screens (migration 032)
+- **Daily check-in:** on the first visit of the day (from 5 am Oman), if anything is waiting, Farah writes what it is —
+  leave requests to decide, payment / cash / material requests and incoming cargo for your locations (the bell),
+  shipments with problems, to-dos due — and asks what you would like ("Shall I approve Ali's leave, or look first?").
+  Nothing waiting → no message. Sent once a day (the day is claimed first, so two tabs do not both send it).
+- She asks short questions when something is unclear and offers the next step. Links she writes (/app/…) can be tapped.
+- **Leave approvals** through Farah (managers; Confirm card; not your own leave). Payment requests, cash and warehouse
+  requests stay behind the PIN — Farah gives the link instead.
+- **To-do** (menu → To-do): your own list (nobody else sees it), overdue / today / coming up / any time / done.
+  Farah can add ("remind me to…"), list and tick off to-dos; "Ask Farah" on a to-do opens her chat with it ready to send.
+- **Shipment card anywhere:** any link to a shipment (chat cards, AWB numbers in messages, Accounts, Customers, Status
+  Update…) opens the card over the page you are on, with "Open in Shipments" and "Update status". The Shipments page
+  keeps its own buttons (edit, WhatsApp, sync, cancel, delete). Shared code: web/src/components/ShipmentDrawer.tsx.
+- **Changes show at once:** after any save, reads started before it are not reused, cached lists are marked out of
+  date, and the open page reloads (also after Farah's Confirm, a save in another ERP tab, and when you come back to the
+  tab). Chat and "seen" saves are quiet. See web/src/lib/live.ts.
+
 ## Needs setting once
 - **CRON_SECRET** in Vercel → Settings → Environment Variables (Production): any long random text. Vercel then signs its
   scheduled calls; without it the 8 pm summary save and the nightly backup do not run (the pages still work).

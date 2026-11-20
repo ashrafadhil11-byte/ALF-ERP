@@ -6,6 +6,7 @@ import { AppFrame } from '../components/frame/AppFrame';
 import { Modal, useDismiss } from '../components/Modal';
 import { Icon } from '../components/Icon';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { confirm } from '../lib/dialogs';
 import { session } from '../lib/session';
 import { beep, toast } from '../lib/toast';
@@ -74,6 +75,7 @@ export function Attendance() {
     const [shiftOpen, setShiftOpen] = useState(false);
     const [sh, setSh] = useState({ start: '', end: '', brStart: '', brEnd: '', grace: '', off: [] as number[] });
 
+    useLive(() => show());   // reload when data changes (here, by Farah, another tab) — lib/live.ts
     async function show(t: Tab = tab) {
         try {
             let d: any;

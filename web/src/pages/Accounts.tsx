@@ -11,6 +11,7 @@ import { Icon } from '../components/Icon';
 import { PhoneField, type PhoneHandle } from '../components/fields/PhoneField';
 import { CityField, CountryField } from '../components/fields/PlaceFields';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { confirm } from '../lib/dialogs';
 import { markClean } from '../lib/guard';
 import { toast } from '../lib/toast';
@@ -282,6 +283,7 @@ function AccountsPage() {
         journal: async () => { const d = await api(`/api/accounts?view=journal&${qs(cache.current.jAcct ? { account: cache.current.jAcct } : {})}`); cache.current.accounts = d.accounts; return d; },
         chart: async () => { const d = await api(`/api/accounts?view=journal&${qs({ from: '1900-01-01' })}`).catch(() => ({ accounts: [] })); cache.current.accounts = d.accounts; return d; }
     };
+    useLive(() => show(false));   // reload when data changes (here, by Farah, another tab) — lib/live.ts
     async function show(loading = true) {
         const n = ++seq.current, t = LOAD[tabRef.current] ? tabRef.current : 'overview';
         if (loading) setView({ kind: 'loading' });

@@ -9,6 +9,7 @@ import { Icon } from '../components/Icon';
 import { PageLink } from '../components/PageLink';
 import { PhoneField, type PhoneHandle } from '../components/fields/PhoneField';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { confirm } from '../lib/dialogs';
 import { markClean } from '../lib/guard';
 import { day, money } from '../lib/money';
@@ -54,6 +55,7 @@ export function Customers() {
     const [mList, setMList] = useState<Customer[] | null>(null);
     const mSearch = useRef<HTMLInputElement>(null);
 
+    useLive(() => load());   // reload when data changes (here, by Farah, another tab) — lib/live.ts
     async function load(reset = true) {
         if (reset) page.current = 0;
         try {

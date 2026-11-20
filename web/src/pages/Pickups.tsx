@@ -7,6 +7,7 @@ import { AppFrame } from '../components/frame/AppFrame';
 import { Modal } from '../components/Modal';
 import { Icon } from '../components/Icon';
 import { api } from '../lib/api';
+import { useLive } from '../lib/live';
 import { confirm } from '../lib/dialogs';
 import { toast } from '../lib/toast';
 
@@ -34,6 +35,7 @@ export function Pickups() {
     const [f, setF] = useState(blank);
     const set = (k: keyof typeof blank) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF(x => ({ ...x, [k]: e.target.value }));
 
+    useLive(() => load());   // reload when data changes (here, by Farah, another tab) — lib/live.ts
     async function load() {
         try {
             const b = await api<Board>(`/api/pickups?date=${date}${branch ? `&branch=${branch}` : ''}`);

@@ -37,6 +37,19 @@ http.createServer((req, res) => {
     if (u.searchParams.get('download')) return send({ url: '#' });
     return send({ keep: 14, backups: ['19-02-00', '18-02-00', '17-02-00'].map((t, i) => ({ name: `alf-erp-2026-11-${t}.json.gz`, size: 180000 - i * 4000 })) });
   }
+  if (u.pathname === '/api/todos') {          // sample to-do list (kept while the server runs)
+    const T = globalThis.__todos ||= [
+      { id: 1, title: 'Call the agent about MAWB EAG-01', due_date: new Date(Date.now() - 864e5).toISOString().slice(0, 10), source: 'me', done_at: null, created_at: new Date().toISOString() },
+      { id: 2, title: 'Check 311000045 at customs', due_date: new Date().toISOString().slice(0, 10), link: 'shipments.html?awb=311000045', source: 'farah', done_at: null, created_at: new Date().toISOString() },
+      { id: 3, title: 'Order more boxes for Sohar', due_date: null, source: 'me', done_at: null, created_at: new Date().toISOString() }];
+    if (req.method === 'POST') { let b = ''; req.on('data', c => b += c); req.on('end', () => { const j = JSON.parse(b || '{}'); const t = T.find(x => x.id === +j.id);
+      if (j.action === 'add') { const n = { id: T.length + 10, title: j.title, due_date: j.due_date || null, source: 'me', done_at: null, created_at: new Date().toISOString() }; T.push(n); return send({ todo: n }); }
+      if (t && j.action === 'done') t.done_at = new Date().toISOString();
+      if (t && j.action === 'undo') t.done_at = null;
+      if (t && j.action === 'delete') T.splice(T.indexOf(t), 1);
+      send({ success: true }); }); return; }
+    return send({ todos: T });
+  }
   if (u.pathname === '/api/assistant') {
     if (req.method === 'POST') { let b = ''; req.on('data', c => b += c); req.on('end', () => { const j = JSON.parse(b || '{}');
       const C = globalThis.__chat;

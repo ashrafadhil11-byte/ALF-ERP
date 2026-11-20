@@ -7,7 +7,7 @@
 // This route itself is kept out of the activity log (private chat).
 import { requireSession, serviceHeaders } from '../_lib/auth.js';
 import { aiProvider } from '../_lib/assistant.js';
-import { ensureFarah, reply, act, FARAH } from '../_lib/farah.js';
+import { ensureFarah, checkIn, reply, act, FARAH } from '../_lib/farah.js';
 
 export const config = { maxDuration: 60 };
 
@@ -19,6 +19,7 @@ export default async function handler(req, res) {
     try {
         if (req.method === 'GET') {
             const [row] = await Promise.all([aiProvider(), ensureFarah(me, session.employee?.full_name)]);
+            await checkIn(session, auth).catch(e => console.error('[farah] check-in:', e.message));
             const t = await fetch(`${process.env.SUPABASE_URL}/rest/v1/chat_threads?direct_key=eq.${encodeURIComponent('ai:' + me)}&select=id`, { headers: serviceHeaders() }).then(r => r.ok ? r.json() : []);
             return res.status(200).json({ ready: Boolean(row), name: FARAH, thread: t[0]?.id || null, provider: row ? { name: row.name, adapter: row.adapter, model: row.config?.model || null } : null });
         }

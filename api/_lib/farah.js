@@ -6,7 +6,7 @@
 // The jobs live in chat_messages.ai_actions on the server, so Confirm runs exactly what the card showed.
 import { serviceHeaders } from './auth.js';
 import { ask } from './assistant.js';
-import { runProposal } from './ai-tasks.js';
+import { runProposal, whatsWaiting } from './ai-tasks.js';
 
 export const FARAH = 'Farah';
 const enc = encodeURIComponent;
@@ -43,6 +43,45 @@ export async function ensureFarah(employeeId, name) {
         await fetch(`${rest()}/chat_messages`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify({ thread_id: t.id, sender_id: null, sender_name: FARAH, body: greeting(name) }) });
     }
     cache.add(employeeId);
+}
+
+// ---------------------------------------------------------------- the daily check-in
+const fmtDay = (d) => d ? new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+
+/** Farah's "here is what is waiting" message, or null when nothing is waiting */
+export function checkInText(name, w) {
+    const h = omanHour();
+    const hello = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    const lines = [], asks = [];
+    if (w.leave.length) {
+        lines.push(`• ${w.leave.length} leave request${w.leave.length > 1 ? 's' : ''} — ${w.leave.slice(0, 3).map(l => `${firstName(l.employee)} (${fmtDay(l.from)}${l.to && l.to !== l.from ? `–${fmtDay(l.to)}` : ''})`).join(', ')}${w.leave.length > 3 ? '…' : ''}`);
+        asks.push(w.leave.length > 1 ? 'Shall I approve the leave requests, or would you like to look at them first?' : `Shall I approve ${firstName(w.leave[0].employee)}'s leave, or would you like to look at it first?`);
+    }
+    const reqs = w.items.filter(i => i.kind === 'request' || i.kind === 'cash' || i.kind === 'inbound');
+    for (const i of reqs.slice(0, 4)) lines.push(`• ${i.title}${i.detail ? ` — ${String(i.detail).slice(0, 80)}` : ''}${i.link ? `  ${i.link}` : ''}`);
+    if (reqs.length > 4) lines.push(`• …and ${reqs.length - 4} more in the bell 🔔`);
+    if (reqs.some(i => i.needs_pin)) asks.push('The Main Office / warehouse ones need your PIN — tap the link and I can tell you more about any of them.');
+    const ex = w.items.filter(i => i.kind === 'exception').length;
+    if (ex) lines.push(`• ${ex} shipment${ex > 1 ? 's' : ''} with a problem (hold, failed delivery…)`);
+    const due = w.todos.filter(t => !t.due || t.overdue || t.due <= omanDay());
+    if (due.length) lines.push(`• ${due.length} to-do${due.length > 1 ? 's' : ''}: ${due.slice(0, 3).map(t => t.title).join(' · ')}${due.length > 3 ? '…' : ''}${due.some(t => t.overdue) ? ' (some overdue)' : ''}`);
+    if (!lines.length) return null;
+    return `${hello}, ${firstName(name)}! ${h < 12 ? '☀️' : h < 17 ? '👋' : '🌙'} A few things are waiting for you:\n${lines.join('\n')}\n\n${asks[0] || 'Want me to go through them with you, one by one?'}${asks[1] ? '\n' + asks[1] : ''}`;
+}
+
+const checked = new Map();            // employee → Oman day already handled (warm function)
+/** once a day, on the first visit (from 5 am Oman): Farah says what is waiting — only when something is */
+export async function checkIn(session, auth) {
+    const me = session.user.id, today = omanDay();
+    if (checked.get(me) === today || omanHour() < 5) return;
+    checked.set(me, today);
+    const t = (await get(`chat_threads?direct_key=eq.${enc('ai:' + me)}&select=id,ai_checkin_on`))[0];
+    if (!t || t.ai_checkin_on === today) return;
+    // claim the day first, so two tabs opening at once send it only once
+    const r = await fetch(`${rest()}/chat_threads?id=eq.${t.id}&or=(ai_checkin_on.is.null,ai_checkin_on.lt.${today})`, { method: 'PATCH', headers: { ...serviceHeaders(), Prefer: 'return=representation' }, body: JSON.stringify({ ai_checkin_on: today }) });
+    if (!r.ok || !(await r.json()).length) return;
+    const text = checkInText(session.employee?.full_name, await whatsWaiting(session, auth));
+    if (text) await say(t.id, text);
 }
 
 /** this user's own Farah chat, or an error */

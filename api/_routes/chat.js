@@ -119,7 +119,7 @@ export default async function handler(req, res) {
                 });
             }
             // Farah's chat is made (with her greeting) the first time the list is opened
-            try { const { ensureFarah } = await import('../_lib/farah.js'); await ensureFarah(me, session.employee?.full_name); } catch (e) { console.error('[farah] chat:', e.message); }
+            try { const { ensureFarah, checkIn } = await import('../_lib/farah.js'); await ensureFarah(me, session.employee?.full_name); await checkIn(session, req.headers?.authorization); } catch (e) { console.error('[farah] chat:', e.message); }
             const [threads, unread] = await Promise.all([rpc('chat_inbox', { p_me: me }), rpc('chat_unread', { p_me: me })]);
             return res.status(200).json({ threads, unread: +unread || 0 });
         }

@@ -14,6 +14,9 @@ import statusRoute from '../_routes/status.js';
 import pickupsRoute from '../_routes/pickups.js';
 import chatRoute from '../_routes/chat.js';
 import accountsRoute from '../_routes/accounts.js';
+import attendanceRoute from '../_routes/attendance.js';
+import notificationsRoute from '../_routes/notifications.js';
+import { todoRows } from '../_routes/todos.js';
 
 const enc = encodeURIComponent;
 const MANAGERS = [...ADMIN_ROLES, 'branch_manager'];
@@ -131,6 +134,27 @@ export async function propose(kind, a = {}, session) {
             const to = await findEmployee(a.to, session);
             return { kind, payload: { user_id: to.id, text }, title: `Message to ${to.full_name}`, lines: [text, `Sent from you, in Messages.`] };
         }
+        case 'leave_decide': {
+            if (!isManager) throw new TaskError('Only managers decide leave.', 403);
+            const decision = /^rej/i.test(String(a.decision || '')) ? 'rejected' : /^app/i.test(String(a.decision || '')) ? 'approved' : null;
+            if (!decision) throw new TaskError('Approve or reject?');
+            let rows = await get(`leave_requests?status=eq.pending${isAdmin ? '' : `&branch_code=eq.${enc(session.branch || '-')}`}&select=id,employee_id,leave_type,from_date,to_date,reason,branch_code&order=requested_at.asc&limit=50`);
+            rows = rows.filter(r => isAdmin || r.employee_id !== session.user.id);
+            const names = rows.length ? await get(`employees?id=in.(${[...new Set(rows.map(r => r.employee_id))].map(enc).join(',')})&select=id,full_name`) : [];
+            const nm = (r) => names.find(e => e.id === r.employee_id)?.full_name || '—';
+            const want = loose(a.employee || '');
+            const hits = a.id ? rows.filter(r => String(r.id) === String(a.id)) : rows.filter(r => !want || loose(nm(r)).includes(want));
+            if (!hits.length) throw new TaskError(rows.length ? `No pending leave request${a.employee ? ` from ${str(a.employee, 40)}` : ''}. Pending: ${rows.map(r => `${nm(r)} (#${r.id})`).join(', ')}.` : 'There are no pending leave requests.');
+            if (hits.length > 1 && !a.all) throw new TaskError(`${hits.length} requests match: ${hits.map(r => `#${r.id} ${nm(r)} ${r.from_date}–${r.to_date}`).join('; ')}. Which one (or all)?`);
+            const r = hits[0];
+            if (hits.length > 1) {
+                return { kind: 'leave_many', payload: { ids: hits.map(h => h.id), decision, note: str(a.note, 300) || undefined },
+                    title: `${decision === 'approved' ? 'Approve' : 'Reject'} ${hits.length} leave requests`, lines: hits.map(h => `${nm(h)} · ${h.leave_type || 'leave'} · ${h.from_date} → ${h.to_date}`) };
+            }
+            return { kind, payload: { action: 'leave_decide', id: r.id, decision, note: str(a.note, 300) || undefined },
+                title: `${decision === 'approved' ? 'Approve' : 'Reject'} ${nm(r)}'s leave`,
+                lines: [`${r.leave_type || 'Leave'} · ${r.from_date} → ${r.to_date}${r.branch_code ? ` · ${r.branch_code}` : ''}`, ...(r.reason ? [`Reason: ${r.reason}`] : []), ...(a.note ? [`Your note: ${str(a.note, 300)}`] : [])] };
+        }
         case 'report': {
             const r = REPORTS[a.kind];
             if (!r) throw new TaskError(`Reports I can send: ${Object.entries(REPORTS).map(([k, v]) => `${k} (${v.label})`).join(', ')}.`);
@@ -171,6 +195,16 @@ export async function runProposal(p, session, auth) {
         const s = await callRoute('chat', chatRoute, { method: 'POST', body: { action: 'send', thread: t.body?.thread?.id, body: str(payload.text, 2000) } }, auth);
         if (s.status >= 400) fail(s);
         return { ok: true, message: 'Sent.', thread: t.body?.thread?.id };
+    }
+    if (kind === 'leave_decide' || kind === 'leave_many') {
+        const ids = kind === 'leave_many' ? (Array.isArray(payload.ids) ? payload.ids.slice(0, 50) : []) : [payload.id];
+        const errors = [];
+        for (const id of ids) {
+            const r = await callRoute('attendance', attendanceRoute, { method: 'POST', body: { action: 'leave_decide', id, decision: payload.decision, note: payload.note } }, auth);
+            if (r.status >= 400) { if (ids.length === 1) fail(r); errors.push(`#${id}: ${r.body?.error || r.status}`); }
+        }
+        const done = ids.length - errors.length;
+        return { ok: !errors.length, message: `Done — ${done} leave request${done === 1 ? '' : 's'} ${payload.decision}.${errors.length ? ` Not done: ${errors.join('; ')}` : ''}` };
     }
     if (kind === 'report') {
         const again = await propose('report', payload, session);     // permissions may have changed since
@@ -277,6 +311,28 @@ export async function runReports(slot) {
         } catch (err) { failed++; console.error(`[ai-reports] ${r.id}: ${err.message}`); }
     }
     return { slot, sent, failed };
+}
+
+/** what is waiting for this user: requests and cash for their locations (the bell), leave to decide, to-dos due.
+ *  `link` = the ERP page for it (/app/…). PIN pages are marked: Farah cannot act there, the user opens them. */
+export async function whatsWaiting(session, auth) {
+    const isManager = MANAGERS.includes(session.role);
+    const [bell, leave, todos] = await Promise.all([
+        callRoute('notifications', notificationsRoute, { method: 'GET' }, auth).then(r => r.status < 400 ? r.body?.items || [] : []).catch(() => []),
+        isManager ? callRoute('attendance', attendanceRoute, { method: 'GET', query: { view: 'leave', status: 'pending' } }, auth).then(r => r.status < 400 ? r.body?.rows || [] : []).catch(() => []) : [],
+        todoRows(session.user.id).catch(() => [])
+    ]);
+    const appLink = (href) => href ? '/app/' + String(href).replace(/\.html/, '') : null;
+    const items = bell.filter(i => ['request', 'cash', 'inbound', 'exception'].includes(i.kind)).slice(0, 15).map(i => ({
+        kind: i.kind, title: i.title, detail: i.body, at: i.at, link: appLink(i.href),
+        needs_pin: /^(main-office|warehouse)\.html/.test(String(i.href || ''))
+    }));
+    return {
+        items,
+        leave: leave.filter(l => l.employee_id !== session.user.id || ADMIN_ROLES.includes(session.role)).slice(0, 15)
+            .map(l => ({ id: l.id, employee: l.full_name, type: l.leave_type, from: l.from_date, to: l.to_date, reason: l.reason || null })),
+        todos: todos.filter(t => !t.done_at).slice(0, 20).map(t => ({ id: t.id, title: t.title, due: t.due_date, overdue: Boolean(t.due_date && t.due_date < omanDay()), link: t.link ? appLink(t.link) : null }))
+    };
 }
 
 /** profit and money for a period, through the Accounts API (same permissions as the Accounts page) */

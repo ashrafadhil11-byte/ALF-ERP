@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppFrame } from '../../components/frame/AppFrame';
 import { session } from '../../lib/session';
+import { useLive } from '../../lib/live';
 import { Loading, type Dash } from './ui';
 import { WIDGETS } from './widgets';
 import './dashboard.css';
@@ -77,6 +78,7 @@ export function Dashboard() {
     }, []);
 
     // ---------- live data ----------
+    useLive(() => loadData(branchRef.current));   // reload when data changes (here, by Farah, another tab) — lib/live.ts
     async function loadData(code = branch) {
         const token = session.token(); if (!token) return;
         try {
