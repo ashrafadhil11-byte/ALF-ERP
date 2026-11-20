@@ -6,7 +6,7 @@
 //   2. runProposal({ kind, payload }, session, auth) — the user tapped Confirm: the job is done through the same
 //      API the pages use (same permissions, same checks, written to the Activity Log as that user).
 // Reports: runReports('morning' | 'evening') — the scheduled jobs post each user's reports to their
-// "AI Assistant" chat (a chat thread of kind 'assistant'), so they get the chime and the phone notification.
+// Farah chat (a chat thread of kind 'assistant'), so they get the chime and the phone notification.
 import { serviceHeaders, ADMIN_ROLES } from './auth.js';
 import { withAudit } from './audit.js';
 import { totalOf } from './summary-total.js';
@@ -41,7 +41,7 @@ export async function callRoute(name, handler, { method = 'GET', query = {}, bod
         json(b) { out.body = b; return this; },
         setHeader() { return this; }, end() { return this; }, send(b) { out.body = b; return this; }
     };
-    const req = { method, query: { ...query }, body, headers: { authorization: auth, 'user-agent': 'AI Assistant' } };
+    const req = { method, query: { ...query }, body, headers: { authorization: auth, 'user-agent': 'Farah (AI assistant)' } };
     await withAudit(name, handler, req, res);
     return out;
 }
@@ -137,7 +137,7 @@ export async function propose(kind, a = {}, session) {
             if (r.managers && !isManager) throw new TaskError(`The ${r.label.toLowerCase()} report is for managers.`, 403);
             const slot = SLOTS[a.slot] ? a.slot : 'morning';
             const branch = isAdmin && str(a.branch) ? str(a.branch, 20).toUpperCase() : null;
-            return { kind, payload: { kind: a.kind, slot, branch }, title: `${r.label} — ${SLOTS[slot]}`, lines: [`Sent to your "AI Assistant" chat in Messages${branch ? `, branch ${branch}` : isAdmin ? ', whole company' : `, branch ${session.branch}`}.`] };
+            return { kind, payload: { kind: a.kind, slot, branch }, title: `${r.label} — ${SLOTS[slot]}`, lines: [`Sent to you here in our chat${branch ? `, branch ${branch}` : isAdmin ? ', whole company' : `, branch ${session.branch}`}.`] };
         }
         case 'report_stop': {
             const mine = await get(`ai_reports?employee_id=eq.${enc(session.user.id)}&active=is.true&select=id,kind,slot`);
@@ -177,7 +177,7 @@ export async function runProposal(p, session, auth) {
         const row = { employee_id: session.user.id, kind: again.payload.kind, slot: again.payload.slot, branch_code: again.payload.branch, active: true };
         const w = await fetch(`${rest()}/ai_reports?on_conflict=employee_id,kind,slot`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) });
         if (!w.ok) throw new TaskError('Could not save the report.', 500);
-        return { ok: true, message: `Done — you will get it ${SLOTS[row.slot]} in Messages → AI Assistant.` };
+        return { ok: true, message: `Done — you will get it ${SLOTS[row.slot]} right here in our chat.` };
     }
     if (kind === 'report_stop') {
         await fetch(`${rest()}/ai_reports?id=eq.${+payload.id}&employee_id=eq.${enc(session.user.id)}`, { method: 'PATCH', headers: serviceHeaders(), body: JSON.stringify({ active: false }) });
@@ -193,12 +193,12 @@ export async function myReports(session) {
 }
 
 // ---------------------------------------------------------------- 3. scheduled reports
-/** the user's "AI Assistant" chat (made on first use) */
+/** the user's Farah chat (made on first use — see api/_lib/farah.js) */
 async function assistantThread(employeeId) {
     const key = `ai:${employeeId}`;
     let t = (await get(`chat_threads?direct_key=eq.${enc(key)}&select=id`))[0];
     if (!t) {
-        const r = await fetch(`${rest()}/chat_threads?on_conflict=direct_key`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify({ kind: 'assistant', direct_key: key, title: 'AI Assistant' }) });
+        const r = await fetch(`${rest()}/chat_threads?on_conflict=direct_key`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify({ kind: 'assistant', direct_key: key, title: 'Farah' }) });
         t = (r.ok ? await r.json() : [])[0];
         if (!t) throw new Error(`assistant chat for ${employeeId}: ${r.status}`);
         await fetch(`${rest()}/chat_members?on_conflict=thread_id,employee_id`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'resolution=ignore-duplicates,return=minimal' }, body: JSON.stringify({ thread_id: t.id, employee_id: employeeId, last_read_at: '2000-01-01T00:00:00Z' }) });   // nothing read yet: the first report counts as new
@@ -206,10 +206,10 @@ async function assistantThread(employeeId) {
     return t.id;
 }
 
-/** posts a message from "AI Assistant" to one user */
+/** posts a message from Farah to one user */
 export async function postFromAssistant(employeeId, body) {
     const thread = await assistantThread(employeeId);
-    const r = await fetch(`${rest()}/chat_messages`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify({ thread_id: thread, sender_id: null, sender_name: 'AI Assistant', body: String(body).slice(0, 4000) }) });
+    const r = await fetch(`${rest()}/chat_messages`, { method: 'POST', headers: { ...serviceHeaders(), Prefer: 'return=minimal' }, body: JSON.stringify({ thread_id: thread, sender_id: null, sender_name: 'Farah', body: String(body).slice(0, 4000) }) });
     if (!r.ok) throw new Error(`assistant message: ${r.status}`);
 }
 

@@ -55,6 +55,16 @@
   notification. Stop one by asking the assistant.
 - Free Vercel plan: scheduled jobs start some time within their hour (6–7 am / 8–9 pm).
 
+## Farah — the assistant becomes a chat colleague (migration 031)
+- The AI assistant is now **Farah**, a chat in **Messages** (and the floating chat button), pinned at the top with her own
+  avatar. She greets each person by first name when her chat is made, and greets again on their first message of the day.
+- Talk to her like a colleague; she answers in the user's language, shows "Farah is typing…", and puts **Confirm / Cancel**
+  cards right inside her message. The cards are kept on the server (chat_messages.ai_actions), so Confirm runs exactly what
+  was shown; a card can be done only once, and permissions are checked again when it runs.
+- Scheduled reports arrive in the same chat. Text only (no photos or shipment cards to Farah yet).
+- The old AI Assistant page and menu item ("Farah · AI") open her chat.
+- Consolidations can be opened by MAWB (`/api/consolidation?mawb=…`); typographic dashes (‑ –) count as "-".
+
 ## Needs setting once
 - **CRON_SECRET** in Vercel → Settings → Environment Variables (Production): any long random text. Vercel then signs its
   scheduled calls; without it the 8 pm summary save and the nightly backup do not run (the pages still work).

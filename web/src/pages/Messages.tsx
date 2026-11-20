@@ -7,7 +7,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppFrame } from '../components/frame/AppFrame';
 import { Modal } from '../components/Modal';
 import { Icon } from '../components/Icon';
-import { PageLink } from '../components/PageLink';
 import { api } from '../lib/api';
 import { jwtPayload } from '../lib/session';
 import { toast } from '../lib/toast';
@@ -17,7 +16,9 @@ type Person = { id: string; name: string; role?: string; branch?: string; branch
 type Thread = { id: number; kind: 'direct' | 'group' | 'assistant'; title?: string | null; last_message_at: string; last_message?: string | null; last_sender?: string | null; unread: number; members: Person[] };
 type Card = { awb: string; consignee?: string; dest_city?: string; dest_country?: string; current_status?: string; current_status_code?: string; pieces?: number; weight?: number; chargeable_weight?: number };
 type Msg = { id: number; sender_id: string | null; sender_name: string | null; body: string; reply_to?: number | null; system?: boolean; created_at: string; deleted_at?: string | null; pending?: boolean; failed?: boolean;
-    file_name?: string | null; file_type?: string | null; file_size?: number | null; file_url?: string | null; awb?: string | null; card?: Card | null };
+    file_name?: string | null; file_type?: string | null; file_size?: number | null; file_url?: string | null; awb?: string | null; card?: Card | null; ai_actions?: Job[] | null };
+/** a job Farah prepared (status update, pickup, message, report) — done only when the user taps Confirm */
+type Job = { id: string; kind: string; title: string; lines: string[]; state: 'ready' | 'done' | 'cancelled' | 'error'; result?: string };
 type Member = Person & { last_read_at: string; typing?: boolean };
 type Outgoing = { body: string; file?: { name: string; data: string; type: string; size: number; preview?: string } | null; awb?: string | null };
 
@@ -50,6 +51,18 @@ function ShipmentCard({ c, mine }: { c: Card; mine: boolean }) {
             <span className="opacity-70">{[c.pieces && `${c.pieces} pcs`, (c.chargeable_weight || c.weight) && `${c.chargeable_weight || c.weight} kg`].filter(Boolean).join(' · ')}</span></span>
     </a>;
 }
+function JobCard({ j, busy, onAct }: { j: Job; busy: boolean; onAct: (what: 'run' | 'cancel') => void }) {
+    return <div className="farah-job mt-2 mb-1 bg-white border border-gray-200 rounded-xl p-3 space-y-1 text-gray-800" data-job={j.id}>
+        <p className="font-extrabold text-[13px]">{j.title}</p>
+        {j.lines.map((l, i) => <p key={i} className="text-xs text-gray-500 break-words">{l}</p>)}
+        {(j.state === 'ready' || j.state === 'error') && <div className="flex gap-2 pt-1.5">
+            <button type="button" disabled={busy} className="btn btn-coral btn-sm" onClick={() => onAct('run')}><Icon name="check" />{busy ? 'Doing it…' : j.state === 'error' ? 'Try again' : 'Confirm'}</button>
+            <button type="button" disabled={busy} className="btn btn-light btn-sm" onClick={() => onAct('cancel')}>Cancel</button></div>}
+        {j.state === 'done' && <p className="text-xs font-bold text-emerald-600 pt-1">{`✓ ${j.result || 'Done.'}`}</p>}
+        {j.state === 'cancelled' && <p className="text-xs text-gray-400 pt-1">Cancelled — nothing was changed.</p>}
+        {j.state === 'error' && j.result && <p className="text-xs font-bold text-[#D55C48]">{j.result}</p>}
+    </div>;
+}
 type Open = { thread: { id: number; kind: 'direct' | 'group' | 'assistant'; title?: string | null }; members: Member[]; messages: Msg[]; more: boolean; quoted: { id: number; sender_name: string; body: string; deleted: boolean }[] };
 
 const ME = () => String(jwtPayload()?.sub || '');
@@ -73,17 +86,19 @@ const listTime = (iso: string) => {
     if (Date.now() - +d < 6 * 864e5) return d.toLocaleDateString('en-GB', { weekday: 'short' });
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
-const threadName = (t: { kind: string; title?: string | null; members: Person[] }) => t.kind === 'assistant' ? 'AI Assistant' : t.kind === 'group' ? (t.title || 'Group') : (t.members[0]?.name || 'Just you');
+const FARAH = 'Farah';
+const threadName = (t: { kind: string; title?: string | null; members: Person[] }) => t.kind === 'assistant' ? FARAH : t.kind === 'group' ? (t.title || 'Group') : (t.members[0]?.name || 'Just you');
 
-export function Avatar({ name, group = false, size = 'w-11 h-11', text = 'text-xs' }: { name: string; group?: boolean; size?: string; text?: string }) {
+export function Avatar({ name, group = false, ai = false, size = 'w-11 h-11', text = 'text-xs' }: { name: string; group?: boolean; ai?: boolean; size?: string; text?: string }) {
+    if (ai) return <span className={`${size} rounded-full bg-gradient-to-br from-[#E86D58] to-[#111827] text-white flex items-center justify-center flex-shrink-0 select-none`} title="Farah — AI assistant"><Icon name="sparkles" cls="w-1/2 h-1/2" /></span>;
     return <span className={`${size} ${text} ${group ? 'bg-[#FFF5F3] text-[#E86D58]' : `${tone(name)} text-white`} rounded-full flex items-center justify-center font-extrabold flex-shrink-0 select-none`}>
         {group ? <Icon name="users" cls="w-1/2 h-1/2" /> : initials(name)}</span>;
 }
 
 // links: web addresses, and shipment numbers (9 digits, or AFC-123456) open the shipment
-function Rich({ text }: { text: string }) {
-    const parts = text.split(/(https?:\/\/[^\s]+|\b\d{9}\b|\bAFC-\d{6}\b)/g);
-    return <>{parts.map((p, i) => /^https?:\/\//.test(p) ? <a key={i} href={p} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2 break-all">{p}</a>
+function Rich({ text, bold = false }: { text: string; bold?: boolean }) {
+    const parts = text.split(bold ? /(\*\*[^*\n]+\*\*|https?:\/\/[^\s]+|\b\d{9}\b|\bAFC-\d{6}\b)/g : /(https?:\/\/[^\s]+|\b\d{9}\b|\bAFC-\d{6}\b)/g);
+    return <>{parts.map((p, i) => bold && /^\*\*[^*]+\*\*$/.test(p) ? <b key={i}>{p.slice(2, -2)}</b> : /^https?:\/\//.test(p) ? <a key={i} href={p} target="_blank" rel="noreferrer noopener" className="underline underline-offset-2 break-all">{p}</a>
         : /^(\d{9}|AFC-\d{6})$/.test(p) ? <a key={i} href={`/app/shipments?awb=${encodeURIComponent(p)}`} className="font-mono font-bold underline underline-offset-2">{p}</a>
             : <span key={i}>{p}</span>)}</>;
 }
@@ -197,10 +212,32 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
             if (file?.preview && !r.message.file_url) r.message.file_url = file.preview;
             setOpen(o => o && o.thread.id === tid ? { ...o, messages: o.messages.some(m => m.id === r.message.id) ? o.messages.filter(m => m.id !== temp.id) : o.messages.map(m => m.id === temp.id ? r.message : m) } : o);
             qc.invalidateQueries({ queryKey: ['chat-inbox'] });
+            if (open.thread.kind === 'assistant') askFarah(tid);
         } catch (e) {
             setOpen(o => o ? { ...o, messages: o.messages.map(m => m.id === temp.id ? { ...m, pending: false, failed: true } : m) } : o);
             toast(false, (e as Error).message);
         }
+    }
+    // ---------- Farah ----------
+    const [farahBusy, setFarahBusy] = useState(false);
+    const [jobBusy, setJobBusy] = useState<string | null>(null);
+    async function askFarah(tid: number) {
+        setFarahBusy(true); stick.current = true;
+        try {
+            const r = await api<{ message: Msg | null }>('/api/assistant', { method: 'POST', body: { action: 'reply', thread: tid } });
+            if (r.message) { const m = r.message; setOpen(o => o && o.thread.id === tid && !o.messages.some(x => x.id === m.id) ? { ...o, messages: [...o.messages.filter(x => !x.pending), m, ...o.messages.filter(x => x.pending)] } : o); }
+            markRead(tid);
+        } catch (e) { toast(false, (e as Error).message); }
+        finally { setFarahBusy(false); }
+    }
+    async function actJob(m: Msg, j: Job, what: 'run' | 'cancel') {
+        setJobBusy(j.id);
+        try {
+            const r = await api<{ message: { id: number; ai_actions: Job[] }; ok: boolean; result: string }>('/api/assistant', { method: 'POST', body: { action: what, message: m.id, id: j.id } });
+            setOpen(o => o ? { ...o, messages: o.messages.map(x => x.id === m.id ? { ...x, ai_actions: r.message.ai_actions } : x) } : o);
+            if (what === 'run') toast(r.ok, r.result);
+        } catch (e) { toast(false, (e as Error).message); }
+        finally { setJobBusy(null); }
     }
     const retry = (m: Msg) => { setOpen(o => o ? { ...o, messages: o.messages.filter(x => x.id !== m.id) } : o); sendNow(m.body); };
     // attachments and shipment cards
@@ -244,18 +281,21 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
         } catch (e) { toast(false, (e as Error).message); }
     }
     useEffect(() => { const to = params.get('to'); if (to && !popup) direct(to); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+    // ?farah=1 (the old AI Assistant page links here): open Farah's chat
+    useEffect(() => { if (!popup && params.get('farah') && !active) { const f = threads.find(t => t.kind === 'assistant'); if (f) pick(f.id); } }, [threads.length]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-    const visible = threads.filter(t => !filter.trim() || threadName(t).toLowerCase().includes(filter.trim().toLowerCase()) || t.members.some(m => (m.branch || '').toLowerCase().includes(filter.trim().toLowerCase())));
+    const visible = [...threads].sort((a, b) => (b.kind === 'assistant' ? 1 : 0) - (a.kind === 'assistant' ? 1 : 0)).filter(t => !filter.trim() || threadName(t).toLowerCase().includes(filter.trim().toLowerCase()) || t.members.some(m => (m.branch || '').toLowerCase().includes(filter.trim().toLowerCase())));
     const current = threads.find(t => t.id === active);
     const others = (open?.members || []).filter(m => m.id !== me);
-    const title = open ? (open.thread.kind === 'assistant' ? 'AI Assistant' : open.thread.kind === 'group' ? open.thread.title || 'Group' : others[0]?.name || current?.members[0]?.name || 'Chat') : '';
+    const isFarah = open?.thread.kind === 'assistant';
+    const title = open ? (isFarah ? FARAH : open.thread.kind === 'group' ? open.thread.title || 'Group' : others[0]?.name || current?.members[0]?.name || 'Chat') : '';
     const typers = (open?.members || []).filter(m => m.typing && m.id !== me);
-    const sub = typers.length ? `${typers.map(t => t.name.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'are' : 'is'} typing…` : open ? (open.thread.kind === 'group' ? `${open.members.length} members · ${open.members.map(m => m.id === me ? 'You' : m.name.split(' ')[0]).join(', ')}`
+    const sub = isFarah ? (farahBusy ? 'Farah is typing…' : 'AI assistant · reads live ERP data · asks before any change') : typers.length ? `${typers.map(t => t.name.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'are' : 'is'} typing…` : open ? (open.thread.kind === 'group' ? `${open.members.length} members · ${open.members.map(m => m.id === me ? 'You' : m.name.split(' ')[0]).join(', ')}`
         : [ROLE[others[0]?.role || ''] || others[0]?.role, others[0]?.branch].filter(Boolean).join(' · ')) : '';
 
     // "Seen": on my latest message — a direct chat says Seen / Sent; a group says who has seen it
     const seenLine = useMemo(() => {
-        if (!open) return null;
+        if (!open || open.thread.kind === 'assistant') return null;
         const mine = [...open.messages].reverse().find(m => m.sender_id === me && !m.system && !m.deleted_at);
         if (!mine || mine.pending || mine.failed) return null;
         const seenBy = others.filter(o => new Date(o.last_read_at) >= new Date(mine.created_at));
@@ -293,7 +333,7 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                 const name = threadName(t), on = t.id === active;
                                 return <button key={t.id} type="button" data-thread={t.id} onClick={() => pick(t.id)}
                                     className={`chat-row w-full flex items-center gap-3 p-2.5 rounded-2xl text-left transition-colors ${on ? 'bg-white shadow-sm ring-1 ring-gray-100' : 'hover:bg-white/70'}`}>
-                                    <span className="relative"><Avatar name={name} group={t.kind === 'group'} />{t.unread > 0 && !on && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#E86D58] ring-2 ring-[#F8F8FA]" />}</span>
+                                    <span className="relative"><Avatar name={name} group={t.kind === 'group'} ai={t.kind === 'assistant'} />{t.unread > 0 && !on && <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-[#E86D58] ring-2 ring-[#F8F8FA]" />}</span>
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-baseline justify-between gap-2"><b className={`text-[13px] truncate ${t.unread && !on ? 'text-gray-900' : 'text-gray-800'}`}>{name}</b><span className={`text-[10px] flex-shrink-0 ${t.unread && !on ? 'text-[#E86D58] font-extrabold' : 'text-gray-400 font-bold'}`}>{listTime(t.last_message_at)}</span></span>
                                         <span className="flex items-center justify-between gap-2 mt-0.5"><span className={`text-xs truncate ${t.unread && !on ? 'text-gray-800 font-bold' : 'text-gray-400'}`}>
@@ -316,8 +356,8 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                     </div> : <>
                         <header className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
                             <button type="button" className={`${popup ? '' : 'lg:hidden '}w-9 h-9 rounded-full hover:bg-gray-50 flex items-center justify-center`} aria-label="Back to chats" onClick={() => pick(null)}><Icon name="arrowLeft" /></button>
-                            <Avatar name={title || '…'} group={open?.thread.kind === 'group'} size="w-10 h-10" />
-                            <div className="min-w-0 flex-1"><h3 id="chatTitle" className="text-sm font-extrabold truncate">{title || ' '}</h3><p className={`text-[11px] truncate ${typers.length ? 'text-[#E86D58] font-bold' : 'text-gray-400'}`}>{sub}</p></div>
+                            <Avatar name={title || '…'} group={open?.thread.kind === 'group'} ai={isFarah} size="w-10 h-10" />
+                            <div className="min-w-0 flex-1"><h3 id="chatTitle" className="text-sm font-extrabold truncate">{title || ' '}</h3><p className={`text-[11px] truncate ${typers.length || (isFarah && farahBusy) ? 'text-[#E86D58] font-bold' : 'text-gray-400'}`}>{sub}</p></div>
                             {open?.thread.kind === 'group' && <button type="button" id="chatInfo" className="icon-btn" aria-label="Group details" title="Group details" onClick={() => { loadPeople(); setInfoOpen(true); }}><Icon name="users" /></button>}
                             {tools}
                         </header>
@@ -336,7 +376,7 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                         {newDay && <div className="flex items-center gap-3 my-4"><span className="flex-1 h-px bg-gray-100" /><span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">{dayLabel(m.created_at)}</span><span className="flex-1 h-px bg-gray-100" /></div>}
                                         {m.system ? <p className="text-center my-3"><span className="inline-block text-[11px] text-gray-500 bg-[#F8F8FA] rounded-full px-3 py-1">{m.body}</span></p> :
                                             <div className={`chat-msg group flex items-end gap-2 ${mine ? 'justify-end' : ''} ${sameAsPrev ? 'mt-0.5' : 'mt-3'}`} data-msg={m.id}>
-                                                {!mine && (open.thread.kind === 'group' ? (sameAsNext ? <span className="w-8 flex-shrink-0" /> : <Avatar name={m.sender_name || '?'} size="w-8 h-8" text="text-[10px]" />) : null)}
+                                                {!mine && (open.thread.kind === 'group' ? (sameAsNext ? <span className="w-8 flex-shrink-0" /> : <Avatar name={m.sender_name || '?'} size="w-8 h-8" text="text-[10px]" />) : isFarah ? (sameAsNext ? <span className="w-8 flex-shrink-0" /> : <Avatar name={FARAH} ai size="w-8 h-8" />) : null)}
                                                 <div className={`max-w-[78%] sm:max-w-[65%] flex flex-col ${mine ? 'items-end' : 'items-start'}`}>
                                                     {!mine && open.thread.kind === 'group' && !sameAsPrev && <span className="text-[10px] font-extrabold text-gray-500 mb-1 ml-3">{m.sender_name}</span>}
                                                     <div className={`flex items-center gap-1 ${mine ? 'flex-row-reverse' : ''}`}>
@@ -348,7 +388,8 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                                                     <span className="w-8 h-8 rounded-lg bg-[#E86D58] text-white text-[9px] font-extrabold flex items-center justify-center">PDF</span>
                                                                     <span className="min-w-0"><b className="block text-xs truncate">{m.file_name}</b><span className="block text-[10px] opacity-70">{kb(m.file_size)}{m.file_url ? '' : ' · uploading'}</span></span></a>}
                                                                 {m.card && <ShipmentCard c={m.card} mine={m.sender_id === me} />}
-                                                                {!(m.file_name && /^(📷|📎) /.test(m.body)) && !(m.card && m.body === `📦 Shipment ${m.awb}`) && <span className="whitespace-pre-wrap break-words"><Rich text={m.body} /></span>}
+                                                                {!(m.file_name && /^(📷|📎) /.test(m.body)) && !(m.card && m.body === `📦 Shipment ${m.awb}`) && <span className="whitespace-pre-wrap break-words"><Rich text={m.body} bold={isFarah && !mine} /></span>}
+                                                                {m.ai_actions?.map(j => <JobCard key={j.id} j={j} busy={jobBusy === j.id} onAct={(what) => actJob(m, j, what)} />)}
                                                             </>}
                                                             <span className={`bubble-time ${mine ? 'text-white/60' : 'text-gray-400'}`}>{m.pending ? 'sending…' : clock(m.created_at)}</span>
                                                         </div>
@@ -364,12 +405,12 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                             </div>}
                                     </div>;
                                 })}
+                                {isFarah && farahBusy && <div className="flex items-end gap-2 mt-3" id="farahTyping"><Avatar name={FARAH} ai size="w-8 h-8" />
+                                    <div className="bubble bubble-them"><span className="farah-dots inline-flex gap-1 py-1"><i /><i /><i /></span></div></div>}
                             </>}
                         </div>
                         {newBelow > 0 && <button type="button" onClick={toBottom} className="absolute left-1/2 -translate-x-1/2 bottom-24 bg-[#111827] text-white text-[11px] font-extrabold rounded-full px-4 py-2 shadow-lg">{`${newBelow} new message${newBelow > 1 ? 's' : ''} ↓`}</button>}
-                        {open?.thread.kind === 'assistant' ? <footer id="aiChatNote" className="border-t border-gray-100 p-4 text-center text-xs text-gray-400">
-                            Your scheduled reports arrive here. To ask something or change a report, <PageLink page="assistant.html" className="font-bold text-[#E86D58]">open the AI Assistant</PageLink>.
-                        </footer> : <footer className="border-t border-gray-100 p-3 sm:p-4">
+                        <footer className="border-t border-gray-100 p-3 sm:p-4">
                             {reply && <div className="flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-3 py-2 mb-2 border-l-2 border-[#E86D58]">
                                 <Icon name="reply" cls="w-4 h-4 text-[#E86D58]" />
                                 <span className="min-w-0 flex-1 text-xs"><b className="block">{reply.sender_id === me ? 'You' : reply.sender_name}</b><span className="block truncate text-gray-500">{reply.body}</span></span>
@@ -385,16 +426,16 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                 <div className="grid grid-cols-8 gap-1">{EMOJI.map(e => <button key={e} type="button" className="w-9 h-9 rounded-xl hover:bg-[#F8F8FA] text-lg" onClick={() => { setDraft(d => d + e); box.current?.focus(); }}>{e}</button>)}</div></div>}
                             <input ref={fileInput} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => pickFile(e.target.files?.[0])} />
                             <form className="flex items-end gap-2" onSubmit={e => { e.preventDefault(); sendNow(); }}>
-                                <button type="button" className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${emojiOpen ? 'bg-[#FFF5F3] text-[#E86D58]' : 'bg-[#F8F8FA] text-gray-500 hover:text-gray-800'}`} aria-label="Attach, share or emoji" title="Photo, PDF, shipment, emoji" onClick={() => setEmojiOpen(v => !v)}><Icon name={emojiOpen ? 'x' : 'plus'} cls="w-5 h-5" /></button>
-                                <textarea ref={box} id="chatInput" rows={1} value={draft} maxLength={4000} placeholder="Write a message…" aria-label={`Message ${title}`}
+                                {!isFarah && <button type="button" className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${emojiOpen ? 'bg-[#FFF5F3] text-[#E86D58]' : 'bg-[#F8F8FA] text-gray-500 hover:text-gray-800'}`} aria-label="Attach, share or emoji" title="Photo, PDF, shipment, emoji" onClick={() => setEmojiOpen(v => !v)}><Icon name={emojiOpen ? 'x' : 'plus'} cls="w-5 h-5" /></button>}
+                                <textarea ref={box} id="chatInput" rows={1} value={draft} maxLength={4000} placeholder={isFarah ? 'Ask Farah anything…' : 'Write a message…'} aria-label={`Message ${title}`}
                                     onChange={e => { setDraft(e.target.value); typing(); }}
                                     onPaste={e => { const f = Array.from(e.clipboardData.files)[0]; if (f) { e.preventDefault(); pickFile(f); } }}
                                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendNow(); } if (e.key === 'Escape') { setReply(null); setEmojiOpen(false); } }}
                                     className="flex-1 resize-none bg-[#F8F8FA] rounded-[1.4rem] border border-transparent focus:border-gray-200 focus:bg-white outline-none px-4 py-3 text-sm leading-5 custom-scrollbar" />
                                 <button type="submit" id="chatSend" disabled={!draft.trim() && !pending} className="w-11 h-11 rounded-full bg-[#E86D58] text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#D55C48] transition-colors" aria-label="Send"><Icon name="send" cls="w-[18px] h-[18px]" /></button>
                             </form>
-                            <p className="hidden sm:block text-[10px] text-gray-300 mt-1.5 ml-14">Enter to send · Shift + Enter for a new line</p>
-                        </footer>}
+                            <p className={`hidden sm:block text-[10px] text-gray-300 mt-1.5 ${isFarah ? 'ml-2' : 'ml-14'}`}>{isFarah ? 'Farah reads live ERP data and asks you to confirm before changing anything' : 'Enter to send · Shift + Enter for a new line'}</p>
+                        </footer>
                     </>}
                 </section>
             </div>

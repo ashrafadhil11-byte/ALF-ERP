@@ -11,6 +11,8 @@
 //   POST { action:'delete', id }                        own message → "message deleted"
 //   POST { action:'rename', thread, title } | { action:'add', thread, members:[ids] } | { action:'leave', thread }   (groups)
 // Only members can read or write a chat. Messages are private: this route is kept out of the activity log.
+// Everyone also has a chat with Farah, the AI assistant (kind 'assistant', pinned first; see api/_lib/farah.js):
+// text messages only; her answer comes from /api/assistant { action:'reply' }. Her job cards are in ai_actions.
 import { requireSession, serviceHeaders } from '../_lib/auth.js';
 
 const enc = encodeURIComponent;
@@ -93,7 +95,7 @@ export default async function handler(req, res) {
                 const before = /^\d+$/.test(String(q.before || '')) ? `&id=lt.${q.before}` : '';
                 const [members, rows] = await Promise.all([
                     get(`chat_members?thread_id=eq.${t.id}&select=employee_id,last_read_at,typing_at,employees(full_name,role,branch)`),
-                    get(`chat_messages?thread_id=eq.${t.id}${after}${before}&select=id,sender_id,sender_name,body,reply_to,system,created_at,edited_at,deleted_at,file_path,file_name,file_type,file_size,awb&order=id.${after ? 'asc' : 'desc'}&limit=${after ? 200 : PAGE + 1}`)
+                    get(`chat_messages?thread_id=eq.${t.id}${after}${before}&select=id,sender_id,sender_name,body,reply_to,system,created_at,edited_at,deleted_at,file_path,file_name,file_type,file_size,awb,ai_actions&order=id.${after ? 'asc' : 'desc'}&limit=${after ? 200 : PAGE + 1}`)
                 ]);
                 const more = !after && rows.length > PAGE;
                 const raw = after ? rows : rows.slice(0, PAGE).reverse();
@@ -101,8 +103,10 @@ export default async function handler(req, res) {
                 const urls = await signFiles(raw.filter(m => m.file_path && !m.deleted_at).map(m => m.file_path));
                 const awbs = [...new Set(raw.filter(m => m.awb && !m.deleted_at).map(m => m.awb))];
                 const cards = awbs.length ? await get(`bookings?awb=in.(${awbs.map(a => `"${a}"`).join(',')})&select=awb,consignee,dest_city,dest_country,current_status,current_status_code,pieces,weight,chargeable_weight,branch_code`) : [];
-                const list = raw.map(({ file_path, ...m }) => m.deleted_at ? { ...m, body: '', file_name: null, file_type: null, awb: null }
-                    : { ...m, file_url: file_path ? urls[file_path] || null : null, card: m.awb ? cards.find(c => c.awb === m.awb) || null : null });
+                // Farah's job cards go out without what they will send (that stays on the server)
+                const jobs = (a) => Array.isArray(a) ? a.map(({ payload, ...x }) => x) : null;
+                const list = raw.map(({ file_path, ai_actions, ...m }) => m.deleted_at ? { ...m, body: '', file_name: null, file_type: null, awb: null }
+                    : { ...m, ai_actions: jobs(ai_actions), file_url: file_path ? urls[file_path] || null : null, card: m.awb ? cards.find(c => c.awb === m.awb) || null : null });
                 // quoted messages that are not on this page
                 const need = [...new Set(list.map(m => m.reply_to).filter(id => id && !list.some(x => x.id === id)))];
                 const quoted = need.length ? await get(`chat_messages?id=in.(${need.join(',')})&thread_id=eq.${t.id}&select=id,sender_name,body,deleted_at`) : [];
@@ -114,6 +118,8 @@ export default async function handler(req, res) {
                     quoted: quoted.map(x => ({ id: x.id, sender_name: x.sender_name, body: x.deleted_at ? '' : String(x.body).slice(0, 200), deleted: !!x.deleted_at }))
                 });
             }
+            // Farah's chat is made (with her greeting) the first time the list is opened
+            try { const { ensureFarah } = await import('../_lib/farah.js'); await ensureFarah(me, session.employee?.full_name); } catch (e) { console.error('[farah] chat:', e.message); }
             const [threads, unread] = await Promise.all([rpc('chat_inbox', { p_me: me }), rpc('chat_unread', { p_me: me })]);
             return res.status(200).json({ threads, unread: +unread || 0 });
         }
@@ -137,7 +143,7 @@ export default async function handler(req, res) {
             }
             case 'send': {
                 const t = await thread(b.thread);
-                if (t.kind === 'assistant') throw new UserError('This chat only brings your AI reports — ask questions on the AI Assistant page.');
+                if (t.kind === 'assistant' && (b.file || b.awb)) throw new UserError('Farah reads text only for now — type your question.');
                 let body = String(b.body || '').replace(/\r\n/g, '\n').trim();
                 if (body.length > MAX_BODY) throw new UserError(`Keep it under ${MAX_BODY} characters.`);
                 const extra = {};

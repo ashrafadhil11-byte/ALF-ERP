@@ -22,7 +22,7 @@ export const TITLES: Record<PageFile, string> = {
     'super-dashboard.html': 'Dashboard', 'shipments.html': 'Shipments', 'booking.html': 'New Booking', 'status-update.html': 'Scan & Update',
     'delivery.html': 'Delivery & POD', 'consolidation.html': 'Consolidation & Bulk', 'customers.html': 'Customers', 'crm.html': 'CRM · WhatsApp',
     'accounts.html': 'Accounts', 'warehouse.html': 'Warehouse', 'attendance.html': 'Attendance', 'create-user.html': 'Staff & Users',
-    'branches.html': 'Branch Network', 'integrations.html': 'Integrations', 'activity.html': 'Activity Log', 'reports.html': 'Reports', 'main-office.html': 'Main Office', 'messages.html': 'Messages', 'pickups.html': 'Pickups', 'summary.html': 'Daily summary', 'backups.html': 'Backups', 'assistant.html': 'AI Assistant'
+    'branches.html': 'Branch Network', 'integrations.html': 'Integrations', 'activity.html': 'Activity Log', 'reports.html': 'Reports', 'main-office.html': 'Main Office', 'messages.html': 'Messages', 'pickups.html': 'Pickups', 'summary.html': 'Daily summary', 'backups.html': 'Backups', 'assistant.html': 'Farah · AI'
 };
 
 export const pageByFile = (file: string) => PAGES.find(p => p.file === file);

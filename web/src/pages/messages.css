@@ -39,6 +39,12 @@
 
 .chat-ui .emoji-pop { animation: chat-in .15s ease-out; }
 
+/* Farah is typing… */
+.chat-ui .farah-dots i { width: 6px; height: 6px; border-radius: 9999px; background: #9ca3af; display: block; animation: farah-dot 1.2s infinite ease-in-out; }
+.chat-ui .farah-dots i:nth-child(2) { animation-delay: .15s; }
+.chat-ui .farah-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes farah-dot { 0%, 60%, 100% { opacity: .35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+
 @media (prefers-reduced-motion: reduce) {
-    .chat-ui .chat-msg, .chat-ui .emoji-pop { animation: none; }
+    .chat-ui .chat-msg, .chat-ui .emoji-pop, .chat-ui .farah-dots i { animation: none; }
 }

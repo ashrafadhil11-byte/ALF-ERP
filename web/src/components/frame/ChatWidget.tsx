@@ -42,7 +42,7 @@ export function ChatWidget() {
         api<{ threads: Thread[] }>('/api/chat').then(d => {
             const t = d.threads.find(x => x.unread > 0);
             if (!t) return;
-            const name = t.kind === 'assistant' ? 'AI Assistant' : t.kind === 'group' ? t.title || 'Group' : t.members[0]?.name || t.last_sender || 'New message';
+            const name = t.kind === 'assistant' ? 'Farah' : t.kind === 'group' ? t.title || 'Group' : t.members[0]?.name || t.last_sender || 'New message';
             const who = t.kind === 'group' ? `${(t.last_sender || '').split(' ')[0]} · ${name}` : name;
             const text = t.last_message || '';
             chime();

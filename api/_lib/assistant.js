@@ -42,7 +42,7 @@ export const TOOLS = [
     { name: 'customer_lookup', description: 'Find customers by name, phone or customer number, with shipment count.', schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
     { name: 'erp_read', description: 'Read any ERP page the user may open, exactly as that page shows it (head office: every branch; others: their own branch). '
         + 'pages and views: accounts (view = overview | invoices | payments | expenses | balances | cash (params.date) | ledger | inventory (packing-material stock per branch / warehouse) | materials | purchases | profit (profit per shipment) | requests | internal | rates | parties | costs; params from, to, branch, status, q); '
-        + 'customers (params q to search, or id for a full profile); transfers (manifests between branches, cargo on hand; params branch, id); consolidation (params id); '
+        + 'customers (params q to search, or id for a full profile); transfers (manifests between branches, cargo on hand; params branch, id); consolidation (no params = the list; params id or mawb = one with its shipments, costs and branch shares); '
         + 'attendance (view = me | day | report | leave | shifts; params date, from, to, branch, month); delivery (delivery board; params awb); pickups (params date, branch); '
         + 'bookings (params q, status, branch, limit, awb); users (staff list); summary (daily summary; params date, branch). '
         + 'The Main Office (cash, approvals) and Warehouse operator pages need their PIN, so they cannot be read here; send the user to those pages.',
@@ -109,7 +109,7 @@ export async function runTool(name, args = {}, session, ctx = {}) {
             return { total: rows.length, by: Object.fromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1])), capped: rows.length >= 5000 };
         }
         case 'shipment_details': {
-            const awb = String(args.awb || '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
+            const awb = String(args.awb || '').replace(/[‐-―−]/g, '-').toUpperCase().replace(/[^A-Z0-9-]/g, '');
             const b = (await get(`bookings?awb=eq.${enc(awb)}${branch && !isAdmin ? `&branch_code=eq.${enc(branch)}` : ''}&select=id,awb,booked_at,branch_code,shipper,consignee,dest_city,dest_country,pieces,weight,chargeable_weight,current_status,fwd_agent,carrier`))[0];
             if (!b) return { error: `Shipment ${awb} not found${!isAdmin ? ' in your branch' : ''}.` };
             const events = await get(`tracking_events?booking_id=eq.${b.id}&select=status,location,remark,event_at&order=event_at.desc&limit=10`);
@@ -130,7 +130,7 @@ export async function runTool(name, args = {}, session, ctx = {}) {
         case 'erp_read': {
             const handler = READ_PAGES[args.page];
             if (!handler) return { error: `Unknown page ${args.page}.` };
-            const query = Object.fromEntries(Object.entries(args.params && typeof args.params === 'object' ? args.params : {}).filter(([k, v]) => v != null && v !== '' && k !== 'format').map(([k, v]) => [k, String(v).slice(0, 100)]));
+            const query = Object.fromEntries(Object.entries(args.params && typeof args.params === 'object' ? args.params : {}).filter(([k, v]) => v != null && v !== '' && k !== 'format').map(([k, v]) => [k, String(v).replace(/[\u2010-\u2015\u2212]/g, '-').slice(0, 100)]));
             if (args.view) query.view = String(args.view);
             const r = await callRoute(args.page, handler, { method: 'GET', query }, ctx.auth);
             return r.status >= 400 ? { error: r.body?.error || `Not allowed (${r.status}).` } : shrink(r.body);
@@ -150,16 +150,23 @@ export async function runTool(name, args = {}, session, ctx = {}) {
     }
 }
 
-const system = (session) => [
-    'You are the assistant inside Al-Farha Cargo ERP (a cargo / courier company in Oman). Answer in short, plain sentences.',
-    'Use the tools to read live data; never invent numbers, shipment numbers or names. If the tools cannot answer, say so.',
-    `Today is ${omanDay()} (Oman). The user is ${session.employee?.full_name || 'a staff member'}, role ${session.role}${session.branch ? `, branch ${session.branch}` : ', head office (all branches)'}.`,
-    'Amounts: OMR has 3 decimals. Keep answers under 150 words unless a list is asked for.',
-    'Money for a period (month profit, income, expenses): profit_report. Packing-material stock: erp_read page accounts, view inventory. Other pages: erp_read.',
-    'You can also do jobs: status updates, pickups, chat messages, scheduled reports, only through the propose_* tools. They do NOT change anything: '
-    + 'the user gets a card with a Confirm button. Never say a job is done; say what you prepared and ask them to confirm. '
-    + 'If details are missing (which shipments, which status, a reason), ask first. Only do what the user asked.'
-].join('\n');
+const system = (session, opts = {}) => {
+    const first = String(session.employee?.full_name || '').trim().split(/\s+/)[0] || '';
+    return [
+        'You are Farah, the AI colleague inside Al-Farha Cargo ERP (a cargo / courier company in Oman), chatting in the team messenger.',
+        `Talk like a friendly, helpful colleague: warm, natural, short chat messages; call the user ${first || 'by their first name'}; an emoji now and then is fine (not in every message). `
+        + 'Reply in the language the user writes in (English, Arabic, Malayalam, Hindi…). No headings or tables: plain text, short lines, **bold** for key numbers.',
+        opts.firstToday ? `This is ${first || 'the user'}'s first message to you today: start with a short, friendly greeting that fits the time of day in Oman.` : 'Do not greet again — you are already chatting today.',
+        'Use the tools to read live data; never invent numbers, shipment numbers or names. If the tools cannot answer, say so honestly.',
+        `Today is ${omanDay()} (Oman). The user is ${session.employee?.full_name || 'a staff member'}, role ${session.role}${session.branch ? `, branch ${session.branch}` : ', head office (all branches)'}.`,
+        'Amounts: OMR has 3 decimals. Keep answers under 150 words unless a list is asked for. Write references (AWB, MAWB, invoice numbers) exactly as the data has them, with plain "-".',
+        'Money for a period (month profit, income, expenses): profit_report. Packing-material stock: erp_read page accounts, view inventory. '
+        + 'A consolidation by its MAWB: erp_read page consolidation, params mawb. Other pages: erp_read.',
+        'You can also do jobs: status updates, pickups, chat messages, scheduled reports, only through the propose_* tools. They do NOT change anything: '
+        + 'the user gets a card with a Confirm button under your message. Never say a job is done; say what you prepared and ask them to tap Confirm. '
+        + 'If details are missing (which shipments, which status, a reason), ask first. Only do what the user asked.'
+    ].join('\n');
+};
 
 // OpenAI-style tools. Optional fields also allow null: some models (gpt-oss on Groq) send null for
 // "not given", and Groq rejects the call when the schema does not allow it. The tools treat null as not given.
@@ -171,16 +178,16 @@ const OPENAI_TOOLS = TOOLS.map(t => {
 });
 
 /** one question (with a short history) → { answer, tools } */
-export async function ask(question, history, session, auth) {
+export async function ask(question, history, session, auth, opts = {}) {
     const ctx = { auth, proposals: [] };
     const row = await aiProvider();
     if (!row) throw Object.assign(new Error('The AI assistant is not switched on yet — add an AI provider (Claude or OpenAI-compatible) with its key in Admin → Integrations.'), { status: 503, setup: true });
     const used = [];
-    const past = (Array.isArray(history) ? history : []).slice(-8).filter(m => ['user', 'assistant'].includes(m.role) && m.content).map(m => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
+    const past = (Array.isArray(history) ? history : []).slice(-14).filter(m => ['user', 'assistant'].includes(m.role) && m.content).map(m => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
     if (row.adapter === 'claude') {
         const messages = [...past, { role: 'user', content: question }];
         for (let i = 0; i < MAX_ROUNDS; i++) {
-            const d = await callApi('claude', 'messages', { system: system(session), messages, tools: TOOLS.map(t => ({ name: t.name, description: t.description, input_schema: t.schema })) }, row);
+            const d = await callApi('claude', 'messages', { system: system(session, opts), messages, tools: TOOLS.map(t => ({ name: t.name, description: t.description, input_schema: t.schema })) }, row);
             const calls = (d.content || []).filter(c => c.type === 'tool_use');
             if (!calls.length) return { answer: (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim(), tools: used, actions: ctx.proposals };
             messages.push({ role: 'assistant', content: d.content });
@@ -189,7 +196,7 @@ export async function ask(question, history, session, auth) {
             messages.push({ role: 'user', content: results });
         }
     } else {
-        const messages = [{ role: 'system', content: system(session) }, ...past, { role: 'user', content: question }];
+        const messages = [{ role: 'system', content: system(session, opts) }, ...past, { role: 'user', content: question }];
         for (let i = 0; i < MAX_ROUNDS; i++) {
             const d = await callApi('openai_compat', 'chat', { messages, tools: OPENAI_TOOLS }, row);
             const msg = d?.choices?.[0]?.message || {};

@@ -1,6 +1,6 @@
 // File: api/_routes/consolidation.js — MAWB / bag consolidation.
 //   GET                     consolidations (open first, last 90 days) with piece / weight totals
-//   GET ?id=N               one consolidation with its shipments
+//   GET ?id=N  or  ?mawb=X  one consolidation with its shipments
 //   POST { action:'create', mawb, kind:'mawb'|'bag'|'container', carrier?, flight_no?, departure_date?, dest_country?, notes?,
 //          container_size?, seal_no?, vessel?, voyage?, bl_no?, eta? }   (container: mawb = container no.)
 //   POST { action:'add', id, awbs, pieces?: { AWB: [1,2] } }
@@ -38,7 +38,14 @@ export default async function handler(req, res) {
 
     try {
         if (req.method === 'GET') {
-            const q = req.query || {};
+            const q = { ...(req.query || {}) };
+            // ?mawb=… opens the same as ?id= (newest with that MAWB); typographic dashes count as "-"
+            if (!q.id && q.mawb) {
+                const m = String(q.mawb).replace(/[‐-―−]/g, '-').replace(/[*,()"]/g, '').trim();
+                const hit = (await get(`consolidations?mawb=ilike.${enc(m)}${scope}&select=id&order=created_at.desc&limit=1`))[0];
+                if (!hit) throw new UserError(`No consolidation with MAWB ${m}.`, 404);
+                q.id = String(hit.id);
+            }
             if (q.id) {
                 const c = await load(q.id);
                 const [items, costs, alloc, shares, names] = await Promise.all([

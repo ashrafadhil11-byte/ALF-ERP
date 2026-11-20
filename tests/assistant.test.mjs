@@ -2,11 +2,12 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import assistant from '../api/_routes/assistant.js';
-import { runTool } from '../api/_lib/assistant.js';
+import { runTool, ask } from '../api/_lib/assistant.js';
 
 process.env.SUPABASE_URL = 'https://x.supabase.co';
-const res = () => ({ code: 200, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } });
-const STAFF = { id: 'u1', role: 'staff', branch: 'ALFSNY', full_name: 'Ali' };
+const res = () => ({ code: 200, statusCode: 200, status(c) { this.code = c; this.statusCode = c; return this; }, json(b) { this.body = b; return this; } });
+const STAFF = { id: 'u1', role: 'staff', branch: 'ALFSNY', full_name: 'Ali Hassan' };
+const SESSION = { user: { id: 'u1' }, role: 'staff', branch: 'ALFSNY', employee: STAFF };
 
 function fake(employee, routes = {}) {
     const calls = [];
@@ -23,13 +24,12 @@ function fake(employee, routes = {}) {
     return calls;
 }
 
-test('assistant: without an AI key it says how to switch it on', async () => {
+test('assistant: without an AI key — not ready, and ask() says how to switch it on', async () => {
     fake(STAFF);
-    let r = res(); await assistant({ method: 'GET', query: {}, headers: { authorization: 'Bearer t' } }, r);
+    const r = res(); await assistant({ method: 'GET', query: {}, headers: { authorization: 'Bearer t' } }, r);
     assert.equal(r.body.ready, false);
-    r = res(); await assistant({ method: 'POST', query: {}, body: { question: 'how many?' }, headers: { authorization: 'Bearer t' } }, r);
-    assert.equal(r.code, 503);
-    assert.match(r.body.error, /Integrations/);
+    assert.equal(r.body.name, 'Farah');
+    await assert.rejects(ask('how many?', [], SESSION, 'Bearer t'), (e) => e.setup && /Integrations/.test(e.message));
 });
 
 test('assistant tools: staff only see their branch; head office may pick one', async () => {
@@ -44,9 +44,13 @@ test('assistant tools: staff only see their branch; head office may pick one', a
     assert.ok(calls.at(-1).url.includes('branch_code=eq.ALFSLL'));
     const s = await runTool('daily_summary', {}, { role: 'staff', branch: 'ALFSNY' });
     assert.match(s.error, /managers/);
+    // a typographic dash (as the AI sometimes writes it) still finds the shipment
+    calls = fake(STAFF, { 'bookings?awb=eq.AFC-123456': () => [{ id: 'b', awb: 'AFC-123456' }] });
+    const d = await runTool('shipment_details', { awb: 'AFC‑123456' }, { role: 'head_office', branch: null });
+    assert.equal(d.shipment?.awb || d.awb || d.booking?.awb, 'AFC-123456');
 });
 
-test('assistant: a Claude tool round — reads data, then answers', async () => {
+test('assistant: a Claude tool round — reads data, then answers as Farah', async () => {
     let round = 0;
     const calls = fake(STAFF, {
         'integrations?kind=eq.ai': () => [{ id: 1, name: 'Claude', adapter: 'claude', config: { model: 'm' }, secret: { api_key: 'k' } }],
@@ -58,34 +62,30 @@ test('assistant: a Claude tool round — reads data, then answers', async () => 
         },
         'rest/v1/bookings?': () => [{ current_status: 'Awaiting Import Customs' }, { current_status: 'Awaiting Import Customs' }]
     });
-    const r = res(); await assistant({ method: 'POST', query: {}, body: { question: 'How many in customs?' }, headers: { authorization: 'Bearer t' } }, r);
-    assert.equal(r.code, 200);
-    assert.equal(r.body.answer, '2 shipments are in customs.');
-    assert.deepEqual(r.body.tools, ['count_shipments']);
+    const out = await ask('How many in customs?', [], SESSION, 'Bearer t', { firstToday: true });
+    assert.equal(out.answer, '2 shipments are in customs.');
+    assert.deepEqual(out.tools, ['count_shipments']);
     const first = calls.find(c => c.url.includes('anthropic')).body;
-    assert.ok(first.tools.length >= 5 && first.system.includes('branch ALFSNY'));
+    assert.ok(first.tools.length >= 5);
+    assert.ok(first.system.includes('You are Farah') && first.system.includes('branch ALFSNY') && first.system.includes('call the user Ali') && first.system.includes('first message to you today'));
 });
 
-test('assistant: OpenAI-compatible uses the saved base URL; a provider 401 never signs the user out', async () => {
+test('assistant: OpenAI-compatible uses the saved base URL; provider errors keep their message', async () => {
     const row = { id: 2, name: 'Gemini', adapter: 'openai_compat', base_url: 'https://generativelanguage.googleapis.com/v1beta/openai', config: { model: 'g' }, secret: { api_key: 'k' } };
-    let calls = fake(STAFF, {
+    const calls = fake(STAFF, {
         'integrations?kind=eq.ai': () => [row],
         'generativelanguage.googleapis.com/v1beta/openai/chat/completions': () => ({ choices: [{ message: { role: 'assistant', content: 'Hello.' } }] })
     });
-    let r = res(); await assistant({ method: 'POST', query: {}, body: { question: 'hi' }, headers: { authorization: 'Bearer t' } }, r);
-    assert.equal(r.code, 200);
-    assert.equal(r.body.answer, 'Hello.');
+    const out = await ask('hi', [], SESSION, 'Bearer t');
+    assert.equal(out.answer, 'Hello.');
     assert.ok(!calls.some(c => c.url.includes('api.openai.com')));
-
-    // Google sends errors as [{ error: { message } }]; a 401 from the AI must come back as 502, not 401
+    // Google sends errors as [{ error: { message } }]
     fake(STAFF, { 'integrations?kind=eq.ai': () => [row] });
     const real = globalThis.fetch;
     globalThis.fetch = async (u, o) => String(u).includes('generativelanguage')
         ? { ok: false, status: 401, text: async () => JSON.stringify([{ error: { code: 401, message: 'API key not valid.' } }]) }
         : real(u, o);
-    r = res(); await assistant({ method: 'POST', query: {}, body: { question: 'hi' }, headers: { authorization: 'Bearer t' } }, r);
-    assert.equal(r.code, 502);
-    assert.match(r.body.error, /API key not valid/);
+    await assert.rejects(ask('hi', [], SESSION, 'Bearer t'), /API key not valid/);
 });
 
 test('assistant: optional tool fields allow null (Groq checks strictly); null arguments are "not given"', async () => {
@@ -96,8 +96,8 @@ test('assistant: optional tool fields allow null (Groq checks strictly); null ar
             ? { choices: [{ message: { role: 'assistant', content: 'Done.' } }] }
             : { choices: [{ message: { role: 'assistant', reasoning: 'r', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'count_shipments', arguments: '{"group_by":"status","branch":null,"status":null}' } }] } }] }; }
     });
-    const r = res(); await assistant({ method: 'POST', query: {}, body: { question: 'count' }, headers: { authorization: 'Bearer t' } }, r);
-    assert.equal(r.body.answer, 'Done.');
+    const out = await ask('count', [], SESSION, 'Bearer t');
+    assert.equal(out.answer, 'Done.');
     const count = body.tools.find(t => t.function.name === 'count_shipments').function.parameters;
     assert.deepEqual(count.properties.branch.type, ['string', 'null']);
     assert.equal(count.properties.group_by.type, 'string');   // required stays strict

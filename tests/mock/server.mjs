@@ -39,7 +39,16 @@ http.createServer((req, res) => {
   }
   if (u.pathname === '/api/assistant') {
     if (req.method === 'POST') { let b = ''; req.on('data', c => b += c); req.on('end', () => { const j = JSON.parse(b || '{}');
-      if (j.action === 'run') return send({ ok: true, message: 'Done — 2 shipments updated.' });
+      const C = globalThis.__chat;
+      if (j.action === 'reply' && C) { const last = [...C.M].reverse().find(m => m.thread_id === +j.thread && m.sender_id === 'u1');
+        const job = /out for delivery/i.test(last?.body || '');
+        const m = { id: C.next(), thread_id: +j.thread, sender_id: null, sender_name: 'Farah', reply_to: null, system: false, created_at: new Date().toISOString(), deleted_at: null,
+          body: job ? 'Sure, Test! I got these two ready — please check and tap **Confirm** 👍' : 'There are **2 shipments** in customs right now:\n311000001 — Kochi\n311000002 — Delhi',
+          ai_actions: job ? [{ id: 'p1', kind: 'status', title: 'Change 2 shipments to "Out for Delivery"', lines: ['311000001 — Ravi, IN (now: Arrived at Destination Hub)', '311000002 — Sam, IN (now: Arrived at Destination Hub)'], state: 'ready' }] : null };
+        return setTimeout(() => { C.M.push(m); send({ message: m }); }, 1200); }
+      if ((j.action === 'run' || j.action === 'cancel') && C) { const m = C.M.find(x => x.id === +j.message); const a = m?.ai_actions?.find(x => x.id === j.id);
+        if (a) { a.state = j.action === 'run' ? 'done' : 'cancelled'; a.result = j.action === 'run' ? 'Done — 2 shipments updated.' : 'Cancelled — nothing was changed.'; }
+        return send({ message: { id: m?.id, ai_actions: m?.ai_actions }, ok: true, result: a?.result }); }
       if (/out for delivery/i.test(j.question || '')) return send({ answer: 'I prepared the update — please check it and tap **Confirm**.', tools: ['propose_status_update'],
         actions: [{ id: 'p1', kind: 'status', title: 'Change 2 shipments to "Out for Delivery"', lines: ['311000001 — Ravi, IN (now: Arrived at Destination Hub)', '311000002 — Sam, IN (now: Arrived at Destination Hub)', 'location: Kochi'], payload: { awbs: ['311000001', '311000002'], code: 'OUT_FOR_DELIVERY' } }] });
       send({ answer: 'There are **2 shipments** in customs:\n311000001 — Kochi\n311000002 — Delhi', tools: ['count_shipments', 'find_shipments'] }); }); return; }
@@ -82,8 +91,10 @@ http.createServer((req, res) => {
       const T = [
         { id: 1, kind: 'direct', title: null, members: ['u1', 'u2'], read: { u1: ago(30), u2: ago(1) } },
         { id: 2, kind: 'group', title: 'Salalah team', members: ['u1', 'u3', 'u4', 'u5'], read: { u1: ago(2000), u3: ago(5), u4: ago(400), u5: ago(5) } },
-        { id: 3, kind: 'direct', title: null, members: ['u1', 'u5'], read: { u1: ago(1), u5: ago(1) } }];
+        { id: 3, kind: 'direct', title: null, members: ['u1', 'u5'], read: { u1: ago(1), u5: ago(1) } },
+        { id: 4, kind: 'assistant', title: 'Farah', members: ['u1'], read: { u1: ago(5000) } }];
       const M = [
+        msg(4, null, 'Farah', "Good afternoon, Test! 👋 I'm Farah, your assistant here at Al-Farha Cargo.\nAsk me anything — shipments, consolidations, money, stock, pickups, attendance — or tell me what to do (like \"mark 311000045 out for delivery\" or \"send me the daily summary every morning\"). I'll get it ready and you just tap Confirm. 😊", 4000),
         msg(2, 'u1', 'Test User', 'Test User created the group “Salalah team”', 3000, { system: true }),
         msg(2, 'u3', 'Fathima Rahman', 'Container MSKU1234567 closes tomorrow 10:00. Please send the last shipments today.', 2900),
         msg(2, 'u4', 'Rafi Kannur', 'Received 3 boxes of 311000001 at the warehouse ✅', 2890),
@@ -111,6 +122,7 @@ http.createServer((req, res) => {
         const m = { id: C.next(), thread_id: t.id, sender_id: me, sender_name: 'Test User', body: String(j.body), reply_to: j.reply_to || null, system: false, created_at: realNow(), deleted_at: null };
         C.M.push(m); t.read[me] = m.created_at;
         const other = t.members.find(x => x !== me);
+        if (t.kind === 'assistant') return send({ success: true, message: m });
         setTimeout(() => { t.read[other] = realNow(); }, 1500);
         setTimeout(() => C.M.push({ id: C.next(), thread_id: t.id, sender_id: other, sender_name: who(other).name, body: ['Noted 👍', 'OK, thanks!', 'Will do.', 'Got it ✅'][C.M.length % 4], reply_to: null, system: false, created_at: realNow(), deleted_at: null }), 3000);
         return send({ success: true, message: m });
