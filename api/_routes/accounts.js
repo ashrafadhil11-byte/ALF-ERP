@@ -122,9 +122,9 @@ export default async function handler(req, res) {
 
             if (view === 'overview') {
                 const [inv, pay, exp, open, ledger, branches] = await Promise.all([
-                    get(`invoices?status=neq.void&issued_at=gte.${from}${bf(branch)}&select=currency,total`),
-                    get(`payments?void=is.false&received_at=gte.${from}${bf(branch)}&select=currency,amount,method`),
-                    get(`expenses?void=is.false&expense_date=gte.${from}${bf(branch)}&select=currency,amount`),
+                    get(`invoices?status=neq.void&issued_at=gte.${from}&issued_at=lt.${enc(nextDay(to))}${bf(branch)}&select=currency,total`),
+                    get(`payments?void=is.false&received_at=gte.${from}&received_at=lt.${enc(nextDay(to))}${bf(branch)}&select=currency,amount,method`),
+                    get(`expenses?void=is.false&expense_date=gte.${from}&expense_date=lte.${to}${bf(branch)}&select=currency,amount`),
                     get(`invoices?status=in.(unpaid,partial)${bf(branch)}&select=currency,balance,due_date`),
                     rpc('ledger_summary', { p_branch: branch, p_from: from, p_to: to }),
                     get('branches?select=branch_code,branch_name,currency,status&branch_type=neq.main_office&order=branch_name.asc')

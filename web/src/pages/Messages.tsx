@@ -7,13 +7,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AppFrame } from '../components/frame/AppFrame';
 import { Modal } from '../components/Modal';
 import { Icon } from '../components/Icon';
+import { PageLink } from '../components/PageLink';
 import { api } from '../lib/api';
 import { jwtPayload } from '../lib/session';
 import { toast } from '../lib/toast';
 import './messages.css';
 
 type Person = { id: string; name: string; role?: string; branch?: string; branch_name?: string };
-type Thread = { id: number; kind: 'direct' | 'group'; title?: string | null; last_message_at: string; last_message?: string | null; last_sender?: string | null; unread: number; members: Person[] };
+type Thread = { id: number; kind: 'direct' | 'group' | 'assistant'; title?: string | null; last_message_at: string; last_message?: string | null; last_sender?: string | null; unread: number; members: Person[] };
 type Card = { awb: string; consignee?: string; dest_city?: string; dest_country?: string; current_status?: string; current_status_code?: string; pieces?: number; weight?: number; chargeable_weight?: number };
 type Msg = { id: number; sender_id: string | null; sender_name: string | null; body: string; reply_to?: number | null; system?: boolean; created_at: string; deleted_at?: string | null; pending?: boolean; failed?: boolean;
     file_name?: string | null; file_type?: string | null; file_size?: number | null; file_url?: string | null; awb?: string | null; card?: Card | null };
@@ -49,7 +50,7 @@ function ShipmentCard({ c, mine }: { c: Card; mine: boolean }) {
             <span className="opacity-70">{[c.pieces && `${c.pieces} pcs`, (c.chargeable_weight || c.weight) && `${c.chargeable_weight || c.weight} kg`].filter(Boolean).join(' · ')}</span></span>
     </a>;
 }
-type Open = { thread: { id: number; kind: 'direct' | 'group'; title?: string | null }; members: Member[]; messages: Msg[]; more: boolean; quoted: { id: number; sender_name: string; body: string; deleted: boolean }[] };
+type Open = { thread: { id: number; kind: 'direct' | 'group' | 'assistant'; title?: string | null }; members: Member[]; messages: Msg[]; more: boolean; quoted: { id: number; sender_name: string; body: string; deleted: boolean }[] };
 
 const ME = () => String(jwtPayload()?.sub || '');
 const ROLE: Record<string, string> = { super_admin: 'Super admin', head_office: 'Head office', branch_manager: 'Branch manager', staff: 'Staff' };
@@ -72,7 +73,7 @@ const listTime = (iso: string) => {
     if (Date.now() - +d < 6 * 864e5) return d.toLocaleDateString('en-GB', { weekday: 'short' });
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
-const threadName = (t: { kind: string; title?: string | null; members: Person[] }) => t.kind === 'group' ? (t.title || 'Group') : (t.members[0]?.name || 'Just you');
+const threadName = (t: { kind: string; title?: string | null; members: Person[] }) => t.kind === 'assistant' ? 'AI Assistant' : t.kind === 'group' ? (t.title || 'Group') : (t.members[0]?.name || 'Just you');
 
 export function Avatar({ name, group = false, size = 'w-11 h-11', text = 'text-xs' }: { name: string; group?: boolean; size?: string; text?: string }) {
     return <span className={`${size} ${text} ${group ? 'bg-[#FFF5F3] text-[#E86D58]' : `${tone(name)} text-white`} rounded-full flex items-center justify-center font-extrabold flex-shrink-0 select-none`}>
@@ -247,7 +248,7 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
     const visible = threads.filter(t => !filter.trim() || threadName(t).toLowerCase().includes(filter.trim().toLowerCase()) || t.members.some(m => (m.branch || '').toLowerCase().includes(filter.trim().toLowerCase())));
     const current = threads.find(t => t.id === active);
     const others = (open?.members || []).filter(m => m.id !== me);
-    const title = open ? (open.thread.kind === 'group' ? open.thread.title || 'Group' : others[0]?.name || current?.members[0]?.name || 'Chat') : '';
+    const title = open ? (open.thread.kind === 'assistant' ? 'AI Assistant' : open.thread.kind === 'group' ? open.thread.title || 'Group' : others[0]?.name || current?.members[0]?.name || 'Chat') : '';
     const typers = (open?.members || []).filter(m => m.typing && m.id !== me);
     const sub = typers.length ? `${typers.map(t => t.name.split(' ')[0]).join(', ')} ${typers.length > 1 ? 'are' : 'is'} typing…` : open ? (open.thread.kind === 'group' ? `${open.members.length} members · ${open.members.map(m => m.id === me ? 'You' : m.name.split(' ')[0]).join(', ')}`
         : [ROLE[others[0]?.role || ''] || others[0]?.role, others[0]?.branch].filter(Boolean).join(' · ')) : '';
@@ -366,7 +367,9 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                             </>}
                         </div>
                         {newBelow > 0 && <button type="button" onClick={toBottom} className="absolute left-1/2 -translate-x-1/2 bottom-24 bg-[#111827] text-white text-[11px] font-extrabold rounded-full px-4 py-2 shadow-lg">{`${newBelow} new message${newBelow > 1 ? 's' : ''} ↓`}</button>}
-                        <footer className="border-t border-gray-100 p-3 sm:p-4">
+                        {open?.thread.kind === 'assistant' ? <footer id="aiChatNote" className="border-t border-gray-100 p-4 text-center text-xs text-gray-400">
+                            Your scheduled reports arrive here. To ask something or change a report, <PageLink page="assistant.html" className="font-bold text-[#E86D58]">open the AI Assistant</PageLink>.
+                        </footer> : <footer className="border-t border-gray-100 p-3 sm:p-4">
                             {reply && <div className="flex items-center gap-3 bg-[#F8F8FA] rounded-2xl px-3 py-2 mb-2 border-l-2 border-[#E86D58]">
                                 <Icon name="reply" cls="w-4 h-4 text-[#E86D58]" />
                                 <span className="min-w-0 flex-1 text-xs"><b className="block">{reply.sender_id === me ? 'You' : reply.sender_name}</b><span className="block truncate text-gray-500">{reply.body}</span></span>
@@ -391,7 +394,7 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                 <button type="submit" id="chatSend" disabled={!draft.trim() && !pending} className="w-11 h-11 rounded-full bg-[#E86D58] text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#D55C48] transition-colors" aria-label="Send"><Icon name="send" cls="w-[18px] h-[18px]" /></button>
                             </form>
                             <p className="hidden sm:block text-[10px] text-gray-300 mt-1.5 ml-14">Enter to send · Shift + Enter for a new line</p>
-                        </footer>
+                        </footer>}
                     </>}
                 </section>
             </div>

@@ -1,29 +1,16 @@
 // File: api/_routes/summary.js — daily manager summary.
 //   GET [?date=YYYY-MM-DD&branch=]   managers: their branch; head office: every branch + company total (live)
 //   GET with "Authorization: Bearer <CRON_SECRET>" (Vercel Cron, 8 pm Oman): saves today's summary of every branch
-//   and the company in daily_summaries — the bell then tells managers it is ready — then makes the nightly backup.
+//   and the company in daily_summaries — the bell then tells managers it is ready — then makes the nightly backup
+//   and sends the evening AI reports (api/_lib/ai-tasks.js).
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 import { runBackup } from '../_lib/backup.js';
+import { totalOf } from '../_lib/summary-total.js';
+import { runReports } from '../_lib/ai-tasks.js';
 
 const enc = encodeURIComponent;
 const omanDay = () => new Date(Date.now() + 4 * 36e5).toISOString().slice(0, 10);
-const NUM = ['bookings', 'kg', 'delivered', 'delivery_failed', 'pickups', 'pickups_done', 'pickups_open', 'exceptions', 'unpaid_count'];
-const MAPS = ['invoiced', 'received', 'expenses', 'unpaid'];
-
-/** add up branch summaries into one company summary */
-export function totalOf(list, day) {
-    const t = { day, branch: null, branches: list.length, cash_not_closed: [], waiting: { cargo_in: 0, cash_in: 0, payment_requests: 0, materials_in: 0 } };
-    for (const k of NUM) t[k] = Math.round(list.reduce((s, x) => s + (+x[k] || 0), 0) * 10) / 10;
-    for (const k of MAPS) {
-        t[k] = {};
-        for (const x of list) for (const [c, v] of Object.entries(x[k] || {})) t[k][c] = Math.round(((t[k][c] || 0) + +v) * 1000) / 1000;
-    }
-    for (const x of list) {
-        for (const w of Object.keys(t.waiting)) t.waiting[w] += +(x.waiting?.[w] || 0);
-        if (!x.cash_closed && (+x.bookings || Object.keys(x.received || {}).length)) t.cash_not_closed.push(x.branch);
-    }
-    return t;
-}
+export { totalOf };
 
 export default async function handler(req, res) {
     const rest = `${process.env.SUPABASE_URL}/rest/v1`;
@@ -52,7 +39,10 @@ export default async function handler(req, res) {
             // the nightly backup rides on the same job (one scheduled job instead of two)
             let backup = null;
             try { backup = await runBackup('nightly'); } catch (e) { console.error('[backup] nightly failed:', e.message); backup = { error: e.message }; }
-            return res.status(200).json({ success: true, day, branches: list.length, backup });
+            // and the evening AI reports people asked for (Messages → AI Assistant)
+            let reports = null;
+            try { reports = await runReports('evening'); } catch (e) { console.error('[ai-reports] evening failed:', e.message); reports = { error: e.message }; }
+            return res.status(200).json({ success: true, day, branches: list.length, backup, reports });
         } catch (e) {
             console.error('[summary] evening job failed:', e.message);
             return res.status(500).json({ error: 'Summary job failed.' });

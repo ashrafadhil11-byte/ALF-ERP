@@ -4,9 +4,21 @@
 // (staff / managers: their branch; head office: everything). It never writes anything.
 import { serviceHeaders, ADMIN_ROLES } from './auth.js';
 import { callApi } from './integrations/http.js';
+import { propose, myReports, profitReport, callRoute, REPORTS } from './ai-tasks.js';
+import accountsRoute from '../_routes/accounts.js';
+import customersRoute from '../_routes/customers.js';
+import transfersRoute from '../_routes/transfers.js';
+import consolidationRoute from '../_routes/consolidation.js';
+import attendanceRoute from '../_routes/attendance.js';
+import deliveryRoute from '../_routes/delivery.js';
+import pickupsRoute from '../_routes/pickups.js';
+import bookingsRoute from '../_routes/bookings.js';
+import usersRoute from '../_routes/users.js';
+import summaryRoute from '../_routes/summary.js';
 
 const AI = ['claude', 'openai_compat'];
-const MAX_ROUNDS = 5;
+const MAX_ROUNDS = 6;
+const MAX_RESULT = 12000;                 // characters of one tool result sent back to the AI
 const enc = encodeURIComponent;
 const omanDay = () => new Date(Date.now() + 4 * 36e5).toISOString().slice(0, 10);
 
@@ -27,11 +39,45 @@ export const TOOLS = [
     { name: 'shipment_details', description: 'One shipment with its last tracking events.', schema: { type: 'object', properties: { awb: { type: 'string' } }, required: ['awb'] } },
     { name: 'daily_summary', description: 'A branch day: bookings, money received/invoiced, expenses, deliveries, pickups, exceptions, waiting items, unpaid. Managers and head office only.',
       schema: { type: 'object', properties: { date: { type: 'string' }, branch: { type: 'string' } } } },
-    { name: 'customer_lookup', description: 'Find customers by name, phone or customer number, with shipment count.', schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } }
+    { name: 'customer_lookup', description: 'Find customers by name, phone or customer number, with shipment count.', schema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+    { name: 'erp_read', description: 'Read any ERP page the user may open, exactly as that page shows it (head office: every branch; others: their own branch). '
+        + 'pages and views: accounts (view = overview | invoices | payments | expenses | balances | cash (params.date) | ledger | inventory (packing-material stock per branch / warehouse) | materials | purchases | profit (profit per shipment) | requests | internal | rates | parties | costs; params from, to, branch, status, q); '
+        + 'customers (params q to search, or id for a full profile); transfers (manifests between branches, cargo on hand; params branch, id); consolidation (params id); '
+        + 'attendance (view = me | day | report | leave | shifts; params date, from, to, branch, month); delivery (delivery board; params awb); pickups (params date, branch); '
+        + 'bookings (params q, status, branch, limit, awb); users (staff list); summary (daily summary; params date, branch). '
+        + 'The Main Office (cash, approvals) and Warehouse operator pages need their PIN, so they cannot be read here; send the user to those pages.',
+      schema: { type: 'object', properties: { page: { type: 'string', enum: ['accounts', 'customers', 'transfers', 'consolidation', 'attendance', 'delivery', 'pickups', 'bookings', 'users', 'summary'] }, view: { type: 'string' },
+          params: { type: 'object', description: 'other query values as text, e.g. { "from": "2026-11-01", "to": "2026-11-30" }', additionalProperties: { type: 'string' } } }, required: ['page'] } },
+    { name: 'profit_report', description: 'Money for a period: invoiced, collected, expenses, receivable, income, costs and PROFIT per currency (use it for "profit this month", "income last month"). Dates YYYY-MM-DD; default this month. Managers: their branch; head office: all or one branch.',
+      schema: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, branch: { type: 'string' } } } },
+    { name: 'my_reports', description: 'The scheduled reports this user has switched on.', schema: { type: 'object', properties: {} } },
+    // ---- jobs: these only PREPARE the change; the user confirms it on a card ----
+    { name: 'propose_status_update', description: 'Prepare a status change for one or more shipments (e.g. Out for Delivery, Delivered, Received at Branch). Some statuses need extra details: driver (Pickup Assigned), to_branch (In Transit to Hub), mawb (Consolidated), remark (holds, failed delivery, returns, cancelled).',
+      schema: { type: 'object', properties: { awbs: { type: 'array', items: { type: 'string' } }, status: { type: 'string', description: 'status name or code' }, location: { type: 'string' }, remark: { type: 'string' }, driver: { type: 'string' }, to_branch: { type: 'string' }, mawb: { type: 'string' } }, required: ['awbs', 'status'] } },
+    { name: 'propose_pickup', description: 'Prepare a new pickup request (collect cargo at a customer door).',
+      schema: { type: 'object', properties: { customer_name: { type: 'string' }, phone: { type: 'string' }, address: { type: 'string' }, city: { type: 'string' }, pickup_date: { type: 'string', description: 'YYYY-MM-DD, default today' }, slot: { type: 'string', enum: ['morning', 'afternoon', 'evening', 'any'] }, pieces: { type: 'integer' }, notes: { type: 'string' }, branch: { type: 'string', description: 'head office only' } }, required: ['customer_name', 'phone', 'address'] } },
+    { name: 'propose_pickup_assign', description: 'Prepare giving a pickup to a driver (managers).', schema: { type: 'object', properties: { pickup_no: { type: 'string' }, driver: { type: 'string', description: 'driver name' } }, required: ['pickup_no', 'driver'] } },
+    { name: 'propose_pickup_done', description: 'Prepare marking a pickup as picked up.', schema: { type: 'object', properties: { pickup_no: { type: 'string' }, pieces: { type: 'integer' } }, required: ['pickup_no'] } },
+    { name: 'propose_message', description: 'Prepare a chat message from this user to a colleague (sent in Messages).', schema: { type: 'object', properties: { to: { type: 'string', description: 'colleague name' }, text: { type: 'string' } }, required: ['to', 'text'] } },
+    { name: 'propose_report', description: `Prepare a recurring report sent to the user's "AI Assistant" chat: report = ${Object.keys(REPORTS).join(' | ')}; slot = morning (about 6 am, yesterday) | evening (about 8 pm, today).`,
+      schema: { type: 'object', properties: { report: { type: 'string', enum: Object.keys(REPORTS) }, slot: { type: 'string', enum: ['morning', 'evening'] }, branch: { type: 'string', description: 'head office only; empty = whole company' } }, required: ['report'] } },
+    { name: 'propose_report_stop', description: 'Prepare switching off one of the scheduled reports of this user.', schema: { type: 'object', properties: { report: { type: 'string' }, slot: { type: 'string' } }, required: ['report'] } }
 ];
 
+const READ_PAGES = { accounts: accountsRoute, customers: customersRoute, transfers: transfersRoute, consolidation: consolidationRoute, attendance: attendanceRoute, delivery: deliveryRoute, pickups: pickupsRoute, bookings: bookingsRoute, users: usersRoute, summary: summaryRoute };
+const PROPOSALS = { propose_status_update: ['status', a => a], propose_pickup: ['pickup_create', a => a], propose_pickup_assign: ['pickup_assign', a => a], propose_pickup_done: ['pickup_picked', a => a],
+    propose_message: ['message', a => a], propose_report: ['report', a => ({ kind: a.report, slot: a.slot, branch: a.branch })], propose_report_stop: ['report_stop', a => ({ kind: a.report, slot: a.slot })] };
+
+/** long lists are cut so one answer fits the AI's limits */
+function shrink(v, depth = 0) {
+    if (Array.isArray(v)) { const out = v.slice(0, 40).map(x => shrink(x, depth + 1)); if (v.length > 40) out.push(`…${v.length - 40} more not shown — narrow the question`); return out; }
+    if (v && typeof v === 'object' && depth < 6) return Object.fromEntries(Object.entries(v).filter(([, x]) => x !== null && x !== '').map(([k, x]) => [k, shrink(x, depth + 1)]));
+    return v;
+}
+
 /** runs one tool for this user; returns plain JSON for the AI */
-export async function runTool(name, args = {}, session) {
+export async function runTool(name, args = {}, session, ctx = {}) {
+    args = args || {};
     const rest = `${process.env.SUPABASE_URL}/rest/v1`;
     const get = async (path) => { const r = await fetch(`${rest}/${path}`, { headers: serviceHeaders() }); return r.ok ? r.json() : []; };
     const isAdmin = ADMIN_ROLES.includes(session.role);
@@ -81,7 +127,26 @@ export async function runTool(name, args = {}, session) {
             const rows = await get(`customers?merged_into=is.null&or=(name.ilike.*${enc(t)}*,phone.ilike.*${enc(t)}*,customer_no.ilike.*${enc(t)}*)&select=customer_no,name,phone,branch_code,last_booking_at,customer_stats(shipments,kg)&limit=10`);
             return { customers: rows.map(c => ({ ...c, customer_stats: undefined, shipments: (Array.isArray(c.customer_stats) ? c.customer_stats[0] : c.customer_stats)?.shipments || 0 })) };
         }
-        default: return { error: `Unknown tool ${name}.` };
+        case 'erp_read': {
+            const handler = READ_PAGES[args.page];
+            if (!handler) return { error: `Unknown page ${args.page}.` };
+            const query = Object.fromEntries(Object.entries(args.params && typeof args.params === 'object' ? args.params : {}).filter(([k, v]) => v != null && v !== '' && k !== 'format').map(([k, v]) => [k, String(v).slice(0, 100)]));
+            if (args.view) query.view = String(args.view);
+            const r = await callRoute(args.page, handler, { method: 'GET', query }, ctx.auth);
+            return r.status >= 400 ? { error: r.body?.error || `Not allowed (${r.status}).` } : shrink(r.body);
+        }
+        case 'profit_report': return profitReport(args, ctx.auth);
+        case 'my_reports': return { reports: await myReports(session) };
+        default: {
+            const job = PROPOSALS[name];
+            if (!job) return { error: `Unknown tool ${name}.` };
+            try {
+                const p = await propose(job[0], job[1](args), session);
+                const id = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+                (ctx.proposals ||= []).push({ id, ...p });
+                return { prepared: p.title, details: p.lines, note: 'NOT done yet: the user sees this with a Confirm button. Tell them to check it and tap Confirm.' };
+            } catch (e) { return { error: e.message }; }
+        }
     }
 }
 
@@ -89,7 +154,11 @@ const system = (session) => [
     'You are the assistant inside Al-Farha Cargo ERP (a cargo / courier company in Oman). Answer in short, plain sentences.',
     'Use the tools to read live data; never invent numbers, shipment numbers or names. If the tools cannot answer, say so.',
     `Today is ${omanDay()} (Oman). The user is ${session.employee?.full_name || 'a staff member'}, role ${session.role}${session.branch ? `, branch ${session.branch}` : ', head office (all branches)'}.`,
-    'Amounts: OMR has 3 decimals. Keep answers under 150 words unless a list is asked for.'
+    'Amounts: OMR has 3 decimals. Keep answers under 150 words unless a list is asked for.',
+    'Money for a period (month profit, income, expenses): profit_report. Packing-material stock: erp_read page accounts, view inventory. Other pages: erp_read.',
+    'You can also do jobs: status updates, pickups, chat messages, scheduled reports, only through the propose_* tools. They do NOT change anything: '
+    + 'the user gets a card with a Confirm button. Never say a job is done; say what you prepared and ask them to confirm. '
+    + 'If details are missing (which shipments, which status, a reason), ask first. Only do what the user asked.'
 ].join('\n');
 
 // OpenAI-style tools. Optional fields also allow null: some models (gpt-oss on Groq) send null for
@@ -102,7 +171,8 @@ const OPENAI_TOOLS = TOOLS.map(t => {
 });
 
 /** one question (with a short history) → { answer, tools } */
-export async function ask(question, history, session) {
+export async function ask(question, history, session, auth) {
+    const ctx = { auth, proposals: [] };
     const row = await aiProvider();
     if (!row) throw Object.assign(new Error('The AI assistant is not switched on yet — add an AI provider (Claude or OpenAI-compatible) with its key in Admin → Integrations.'), { status: 503, setup: true });
     const used = [];
@@ -112,10 +182,10 @@ export async function ask(question, history, session) {
         for (let i = 0; i < MAX_ROUNDS; i++) {
             const d = await callApi('claude', 'messages', { system: system(session), messages, tools: TOOLS.map(t => ({ name: t.name, description: t.description, input_schema: t.schema })) }, row);
             const calls = (d.content || []).filter(c => c.type === 'tool_use');
-            if (!calls.length) return { answer: (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim(), tools: used };
+            if (!calls.length) return { answer: (d.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim(), tools: used, actions: ctx.proposals };
             messages.push({ role: 'assistant', content: d.content });
             const results = [];
-            for (const c of calls) { used.push(c.name); results.push({ type: 'tool_result', tool_use_id: c.id, content: JSON.stringify(await runTool(c.name, c.input, session)).slice(0, 20000) }); }
+            for (const c of calls) { used.push(c.name); results.push({ type: 'tool_result', tool_use_id: c.id, content: JSON.stringify(await runTool(c.name, c.input, session, ctx)).slice(0, MAX_RESULT) }); }
             messages.push({ role: 'user', content: results });
         }
     } else {
@@ -123,14 +193,14 @@ export async function ask(question, history, session) {
         for (let i = 0; i < MAX_ROUNDS; i++) {
             const d = await callApi('openai_compat', 'chat', { messages, tools: OPENAI_TOOLS }, row);
             const msg = d?.choices?.[0]?.message || {};
-            if (!msg.tool_calls?.length) return { answer: String(msg.content || '').trim(), tools: used };
+            if (!msg.tool_calls?.length) return { answer: String(msg.content || '').trim(), tools: used, actions: ctx.proposals };
             messages.push(msg);
             for (const c of msg.tool_calls) {
                 used.push(c.function?.name);
                 let args = {}; try { args = JSON.parse(c.function?.arguments || '{}') || {}; } catch { /* empty */ }
-                messages.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(await runTool(c.function?.name, args, session)).slice(0, 20000) });
+                messages.push({ role: 'tool', tool_call_id: c.id, content: JSON.stringify(await runTool(c.function?.name, args, session, ctx)).slice(0, MAX_RESULT) });
             }
         }
     }
-    return { answer: 'That needed too many steps — try a narrower question.', tools: used };
+    return { answer: 'That needed too many steps — try a narrower question.', tools: used, actions: ctx.proposals };
 }

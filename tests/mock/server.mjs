@@ -38,8 +38,13 @@ http.createServer((req, res) => {
     return send({ keep: 14, backups: ['19-02-00', '18-02-00', '17-02-00'].map((t, i) => ({ name: `alf-erp-2026-11-${t}.json.gz`, size: 180000 - i * 4000 })) });
   }
   if (u.pathname === '/api/assistant') {
-    if (req.method === 'POST') return send({ answer: 'There are **2 shipments** in customs:\n311000001 — Kochi\n311000002 — Delhi', tools: ['count_shipments', 'find_shipments'] });
-    return send({ ready: u.searchParams.get('ready') === '1' || globalThis.__aiReady === true, provider: null });
+    if (req.method === 'POST') { let b = ''; req.on('data', c => b += c); req.on('end', () => { const j = JSON.parse(b || '{}');
+      if (j.action === 'run') return send({ ok: true, message: 'Done — 2 shipments updated.' });
+      if (/out for delivery/i.test(j.question || '')) return send({ answer: 'I prepared the update — please check it and tap **Confirm**.', tools: ['propose_status_update'],
+        actions: [{ id: 'p1', kind: 'status', title: 'Change 2 shipments to "Out for Delivery"', lines: ['311000001 — Ravi, IN (now: Arrived at Destination Hub)', '311000002 — Sam, IN (now: Arrived at Destination Hub)', 'location: Kochi'], payload: { awbs: ['311000001', '311000002'], code: 'OUT_FOR_DELIVERY' } }] });
+      send({ answer: 'There are **2 shipments** in customs:\n311000001 — Kochi\n311000002 — Delhi', tools: ['count_shipments', 'find_shipments'] }); }); return; }
+    if (u.searchParams.get('ready')) globalThis.__aiReady = u.searchParams.get('ready') === '1';   // ?ready=1 switches the sample assistant on for this run
+    return send({ ready: globalThis.__aiReady === true, provider: globalThis.__aiReady ? { name: 'Groq', adapter: 'openai_compat', model: 'openai/gpt-oss-120b' } : null });
   }
   // ---------- Daily summary (sample) ----------
   if (u.pathname === '/api/summary') {

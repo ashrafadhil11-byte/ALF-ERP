@@ -76,7 +76,7 @@
   "crons": [
     {
       "path": "/api/carrier-sync",
-      "schedule": "0 3 * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/summary",

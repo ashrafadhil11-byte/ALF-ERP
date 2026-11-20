@@ -40,6 +40,21 @@
 - Read-only. It can look at shipments, counts, one shipment's history, the daily summary (managers) and customers —
   only within what the user may see (their branch; head office everything). Questions are not copied into the Activity Log.
 
+## AI assistant — jobs and reports (migration 030)
+- **Reads everything the user may open**, through the same APIs as the pages: super admin / head office every branch,
+  others their own branch. Accounts (money, profit for any period, packing-material stock, invoices…), customers,
+  transfers, consolidations, attendance, deliveries, pickups, bookings, staff, daily summary.
+  Not the Main Office and Warehouse-operator pages (they need their PIN) — the AI sends people there.
+- **Does jobs, after a Confirm tap:** shipment status updates (one or many AWBs), new pickups, giving a pickup to a driver,
+  "picked up", chat messages to a colleague, scheduled reports. The AI only *prepares* a card; nothing changes until the
+  user taps **Confirm**, and then it goes through the normal API — same permissions and checks, in the Activity Log
+  as that user (user agent "AI Assistant").
+- **Scheduled reports** ("send me the daily summary every morning"): daily summary (managers), unpaid invoices (managers),
+  shipments with problems (anyone). Morning ≈ 6 am Oman (yesterday's figures, rides on the carrier-sync job, now 02:00 UTC);
+  evening ≈ 8 pm (today's, rides on the summary job). They arrive in **Messages → AI Assistant** with the chime and phone
+  notification. Stop one by asking the assistant.
+- Free Vercel plan: scheduled jobs start some time within their hour (6–7 am / 8–9 pm).
+
 ## Needs setting once
 - **CRON_SECRET** in Vercel → Settings → Environment Variables (Production): any long random text. Vercel then signs its
   scheduled calls; without it the 8 pm summary save and the nightly backup do not run (the pages still work).

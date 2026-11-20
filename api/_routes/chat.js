@@ -137,6 +137,7 @@ export default async function handler(req, res) {
             }
             case 'send': {
                 const t = await thread(b.thread);
+                if (t.kind === 'assistant') throw new UserError('This chat only brings your AI reports — ask questions on the AI Assistant page.');
                 let body = String(b.body || '').replace(/\r\n/g, '\n').trim();
                 if (body.length > MAX_BODY) throw new UserError(`Keep it under ${MAX_BODY} characters.`);
                 const extra = {};

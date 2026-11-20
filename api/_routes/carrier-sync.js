@@ -1,8 +1,10 @@
 // File: api/carrier-sync.js
-//   GET  — scheduled run (Vercel Cron). Needs header Authorization: Bearer <CRON_SECRET>.
+//   GET  — scheduled run (Vercel Cron, ~6 am Oman). Needs header Authorization: Bearer <CRON_SECRET>.
+//          First sends the morning AI reports (yesterday's figures, api/_lib/ai-tasks.js), then syncs carriers.
 //   POST — "Sync now" from the app: { awb? }. Managers sync their branch, admins everything.
 import { requireSession, ADMIN_ROLES } from '../_lib/auth.js';
 import { runCarrierSync } from '../_lib/carrier-sync.js';
+import { runReports } from '../_lib/ai-tasks.js';
 import { cleanOrderNo } from '../_lib/booking-map.js';
 
 export const config = { maxDuration: 60 };
@@ -14,7 +16,9 @@ export default async function handler(req, res) {
             if (!secret || req.headers.authorization !== `Bearer ${secret}`) {
                 return res.status(401).json({ error: 'Unauthorized' });
             }
-            return res.status(200).json(await runCarrierSync({ limit: 60 }));
+            let reports = null;
+            try { reports = await runReports('morning'); } catch (e) { console.error('[ai-reports] morning failed:', e.message); reports = { error: e.message }; }
+            return res.status(200).json({ ...(await runCarrierSync({ limit: 60 })), reports });
         }
 
         if (req.method === 'POST') {
