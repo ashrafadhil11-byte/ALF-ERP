@@ -81,7 +81,9 @@ export async function callApi(connectorId, endpointName, params = {}, row) {
             const ok = ep.isOk ? ep.isOk(data, res) : res.ok;
             if (ok) return ep.parse ? ep.parse(data, ctx) : data;
 
-            const msg = (data && typeof data === 'object' && (data.message || data.error)) || `HTTP ${res.status}`;
+            // providers shape errors differently: { message }, { error: '…' }, { error: { message } }, [{ error: { message } }] (Google)
+            const e0 = Array.isArray(data) ? data[0] : data;
+            const msg = (e0 && typeof e0 === 'object' && (e0.message || e0.error?.message || (typeof e0.error === 'string' && e0.error))) || `HTTP ${res.status}`;
             lastError = new ApiError(String(msg), res.status, data);
             if (res.status && res.status < 500 && res.status !== 404) break; // auth / bad request: other URLs won't help
         } catch (e) {

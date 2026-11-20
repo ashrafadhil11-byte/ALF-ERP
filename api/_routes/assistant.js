@@ -20,6 +20,9 @@ export default async function handler(req, res) {
         if (!q) return res.status(400).json({ error: 'Ask a question.' });
         return res.status(200).json(await ask(q, req.body?.history, session));
     } catch (e) {
-        return res.status(e.status || 502).json({ error: e.status === 503 ? e.message : `The AI could not answer: ${e.message}` });
+        // never pass the AI provider's own status on: its 401 ("wrong key") would sign the user out of the ERP
+        if (e.setup) return res.status(503).json({ error: e.message });
+        const busy = e.status === 429 || e.status === 503;
+        return res.status(502).json({ error: busy ? 'The AI is busy right now — please ask again in a minute.' : `The AI could not answer: ${e.message}` });
     }
 }

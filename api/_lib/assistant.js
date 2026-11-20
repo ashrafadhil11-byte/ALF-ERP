@@ -12,7 +12,7 @@ const omanDay = () => new Date(Date.now() + 4 * 36e5).toISOString().slice(0, 10)
 
 /** the active AI integration row, or null */
 export async function aiProvider() {
-    const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/integrations?kind=eq.ai&active=is.true&adapter=in.(${AI.join(',')})&select=id,name,adapter,config,secret&order=updated_at.desc.nullslast&limit=1`, { headers: serviceHeaders() });
+    const r = await fetch(`${process.env.SUPABASE_URL}/rest/v1/integrations?kind=eq.ai&active=is.true&adapter=in.(${AI.join(',')})&select=id,name,adapter,base_url,config,secret&order=updated_at.desc.nullslast&limit=1`, { headers: serviceHeaders() });
     const row = (r.ok ? await r.json() : [])[0];
     const key = row?.secret?.api_key || (row?.adapter === 'claude' ? process.env.ANTHROPIC_API_KEY : row ? process.env.OPENAI_API_KEY : null);
     return row && key ? row : null;
@@ -95,7 +95,7 @@ const system = (session) => [
 /** one question (with a short history) → { answer, tools } */
 export async function ask(question, history, session) {
     const row = await aiProvider();
-    if (!row) throw Object.assign(new Error('The AI assistant is not switched on yet — add an AI provider (Claude or OpenAI-compatible) with its key in Admin → Integrations.'), { status: 503 });
+    if (!row) throw Object.assign(new Error('The AI assistant is not switched on yet — add an AI provider (Claude or OpenAI-compatible) with its key in Admin → Integrations.'), { status: 503, setup: true });
     const used = [];
     const past = (Array.isArray(history) ? history : []).slice(-8).filter(m => ['user', 'assistant'].includes(m.role) && m.content).map(m => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
     if (row.adapter === 'claude') {

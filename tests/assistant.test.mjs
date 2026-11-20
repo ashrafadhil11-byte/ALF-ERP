@@ -65,3 +65,25 @@ test('assistant: a Claude tool round — reads data, then answers', async () => 
     const first = calls.find(c => c.url.includes('anthropic')).body;
     assert.ok(first.tools.length >= 5 && first.system.includes('branch ALFSNY'));
 });
+
+test('assistant: OpenAI-compatible uses the saved base URL; a provider 401 never signs the user out', async () => {
+    const row = { id: 2, name: 'Gemini', adapter: 'openai_compat', base_url: 'https://generativelanguage.googleapis.com/v1beta/openai', config: { model: 'g' }, secret: { api_key: 'k' } };
+    let calls = fake(STAFF, {
+        'integrations?kind=eq.ai': () => [row],
+        'generativelanguage.googleapis.com/v1beta/openai/chat/completions': () => ({ choices: [{ message: { role: 'assistant', content: 'Hello.' } }] })
+    });
+    let r = res(); await assistant({ method: 'POST', query: {}, body: { question: 'hi' }, headers: { authorization: 'Bearer t' } }, r);
+    assert.equal(r.code, 200);
+    assert.equal(r.body.answer, 'Hello.');
+    assert.ok(!calls.some(c => c.url.includes('api.openai.com')));
+
+    // Google sends errors as [{ error: { message } }]; a 401 from the AI must come back as 502, not 401
+    fake(STAFF, { 'integrations?kind=eq.ai': () => [row] });
+    const real = globalThis.fetch;
+    globalThis.fetch = async (u, o) => String(u).includes('generativelanguage')
+        ? { ok: false, status: 401, text: async () => JSON.stringify([{ error: { code: 401, message: 'API key not valid.' } }]) }
+        : real(u, o);
+    r = res(); await assistant({ method: 'POST', query: {}, body: { question: 'hi' }, headers: { authorization: 'Bearer t' } }, r);
+    assert.equal(r.code, 502);
+    assert.match(r.body.error, /API key not valid/);
+});
