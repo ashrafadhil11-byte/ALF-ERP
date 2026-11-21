@@ -30,7 +30,7 @@ test('status: "Assigned Forwarding Agent" needs agent + docket and saves them on
     let calls = fake(ADMIN, { 'statuses?code=eq.ASSIGNED': () => [ASSIGNED], 'bookings?awb=in.': (u, o) => o.method === 'PATCH' ? [] : [{ awb: 'A1', branch_code: 'SLL' }], 'rpc/set_status': () => 1 });
     let r = res();
     await status(req('POST', { awbs: ['A1'], code: 'ASSIGNED_TO_AGENT', fwd_agent: 'SMSA' }), r);
-    assert.equal(r.code, 400); assert.match(r.body.error, /fwd docket/);
+    assert.equal(r.code, 400); assert.match(r.body.error, /needs the docket number/);
     r = res();
     await status(req('POST', { awbs: ['A1'], code: 'ASSIGNED_TO_AGENT', fwd_agent: 'SMSA', fwd_docket: '290012345' }), r);
     assert.equal(r.body.success, true);

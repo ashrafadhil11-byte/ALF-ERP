@@ -110,7 +110,9 @@ export async function reply(session, auth, threadId) {
     const firstToday = !past.some(m => m.sender_id === session.user.id && String(m.created_at).slice(0, 10) === omanDay());
     let out;
     try {
-        out = await ask(String(last.body).slice(0, 1000), history, session, auth, { firstToday });
+        // a shared list (📄 … / pasted rows) is read in full; a normal message up to 1000 characters
+        const isList = String(last.body).startsWith('📄') || String(last.body).split('\n').length > 4;
+        out = await ask(String(last.body).slice(0, isList ? 8000 : 1000), history, session, auth, { firstToday });
     } catch (e) {
         const text = e.setup ? `I'm not switched on yet 🙈 — a super admin needs to add an AI key in Integrations.`
             : e.status === 429 || e.status === 503 ? 'Sorry, I\'m a bit swamped right now 😅 — could you ask me again in a minute?'

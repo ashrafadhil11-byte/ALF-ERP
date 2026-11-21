@@ -48,6 +48,8 @@ export const TOOLS = [
       schema: { type: 'object', properties: { page: { type: 'string', enum: ['accounts', 'customers', 'transfers', 'consolidation', 'attendance', 'delivery', 'pickups', 'bookings', 'users', 'summary'] }, view: { type: 'string' },
           params: { type: 'object', additionalProperties: { type: 'string' } } }, required: ['page'] } },
     { name: 'profit_report', description: 'Income, costs, profit, invoiced, collected for a period (default this month).', schema: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, branch: { type: 'string' } } } },
+    { name: 'check_awbs', description: 'Check a list of AWBs in the ERP at once: found or not, this user\'s branch, receiver, destination, current status, agents already set.',
+      schema: { type: 'object', properties: { awbs: { type: 'array', items: { type: 'string' } } }, required: ['awbs'] } },
     { name: 'whats_waiting', description: 'What waits for this user: requests, cash, cargo, problems, leave to decide, to-dos.', schema: { type: 'object', properties: {} } },
     { name: 'more_tools', description: 'Call first when the user wants you to DO something (change status, pickup, message, leave, to-do, reports).', schema: { type: 'object', properties: {} } },
     // ---- jobs (propose_* only prepare a card; the user taps Confirm) ----
@@ -57,6 +59,9 @@ export const TOOLS = [
     { jobs: true, name: 'my_reports', description: 'The user\'s scheduled reports.', schema: { type: 'object', properties: {} } },
     { jobs: true, name: 'propose_status_update', description: 'Status change for shipments. Needs: driver (Pickup Assigned), to_branch (In Transit to Hub), mawb (Consolidated), remark (holds, failed, returns, cancel).',
       schema: { type: 'object', properties: { awbs: { type: 'array', items: { type: 'string' } }, status: { type: 'string' }, location: { type: 'string' }, remark: { type: 'string' }, driver: { type: 'string' }, to_branch: { type: 'string' }, mawb: { type: 'string' } }, required: ['awbs', 'status'] } },
+    { jobs: true, name: 'propose_assign_agent', description: 'Assign the delivery agent (leg=delivery, last mile e.g. Delhivery) or forwarding agent (leg=forwarding) with docket / LR numbers: items [{awb, docket}] each its own, or awbs + one docket.',
+      schema: { type: 'object', properties: { leg: { type: 'string', enum: ['delivery', 'forwarding'] }, agent: { type: 'string' }, items: { type: 'array', items: { type: 'object', properties: { awb: { type: 'string' }, docket: { type: 'string' } }, required: ['awb'] } },
+          awbs: { type: 'array', items: { type: 'string' } }, docket: { type: 'string' }, remark: { type: 'string' } }, required: ['agent'] } },
     { jobs: true, name: 'propose_pickup', description: 'New pickup request.', schema: { type: 'object', properties: { customer_name: { type: 'string' }, phone: { type: 'string' }, address: { type: 'string' }, city: { type: 'string' }, pickup_date: { type: 'string' }, slot: { type: 'string', enum: ['morning', 'afternoon', 'evening', 'any'] }, pieces: { type: 'integer' }, notes: { type: 'string' }, branch: { type: 'string' } }, required: ['customer_name', 'phone', 'address'] } },
     { jobs: true, name: 'propose_pickup_assign', description: 'Give a pickup to a driver.', schema: { type: 'object', properties: { pickup_no: { type: 'string' }, driver: { type: 'string' } }, required: ['pickup_no', 'driver'] } },
     { jobs: true, name: 'propose_pickup_done', description: 'Mark a pickup picked up.', schema: { type: 'object', properties: { pickup_no: { type: 'string' }, pieces: { type: 'integer' } }, required: ['pickup_no'] } },
@@ -67,10 +72,15 @@ export const TOOLS = [
 ];
 
 /** does this message ask Farah to DO something? (then the job tools go with the first step) */
-export const wantsJobs = (text) => /\b(mark|update|change the|approve|reject|create|add|assign|send|message|tell|remind|note down|to-?do|task|tick|schedule|stop|cancel|arrange|put)\b|\bpick ?up\b(?! ?(list|board|requests?\b))/i.test(String(text || ''));
+export const wantsJobs = (text) => {
+    const t = String(text || '');
+    // a shared list (📄 …, or several lines with long numbers — pasted from Excel / WhatsApp) is something to act on
+    if (t.startsWith('📄') || t.split('\n').filter(l => /\d{6,}/.test(l)).length >= 2) return true;
+    return /\b(mark|update|change the|approve|reject|create|add|assign|send|message|tell|remind|note down|to-?do|task|tick|schedule|stop|cancel|arrange|put)\b|\bpick ?up\b(?! ?(list|board|requests?\b))/i.test(t);
+};
 
 const READ_PAGES = { accounts: accountsRoute, customers: customersRoute, transfers: transfersRoute, consolidation: consolidationRoute, attendance: attendanceRoute, delivery: deliveryRoute, pickups: pickupsRoute, bookings: bookingsRoute, users: usersRoute, summary: summaryRoute };
-const PROPOSALS = { propose_status_update: ['status', a => a], propose_pickup: ['pickup_create', a => a], propose_pickup_assign: ['pickup_assign', a => a], propose_pickup_done: ['pickup_picked', a => a],
+const PROPOSALS = { propose_status_update: ['status', a => a], propose_assign_agent: ['assign_agent', a => a], propose_pickup: ['pickup_create', a => a], propose_pickup_assign: ['pickup_assign', a => a], propose_pickup_done: ['pickup_picked', a => a],
     propose_message: ['message', a => a], propose_leave_decision: ['leave_decide', a => a], propose_report: ['report', a => ({ kind: a.report, slot: a.slot, branch: a.branch })], propose_report_stop: ['report_stop', a => ({ kind: a.report, slot: a.slot })] };
 
 /** long lists are cut so one answer fits the AI's limits */
@@ -142,6 +152,18 @@ export async function runTool(name, args = {}, session, ctx = {}) {
         }
         case 'profit_report': return profitReport(args, ctx.auth);
         case 'my_reports': return { reports: await myReports(session) };
+        case 'check_awbs': {
+            const list = [...new Set((Array.isArray(args.awbs) ? args.awbs : []).map(x => String(x || '').replace(/[\u2010-\u2015\u2212]/g, '-').toUpperCase().replace(/[^A-Z0-9-]/g, '')).filter(Boolean))].slice(0, 200);
+            if (!list.length) return { error: 'No AWB numbers given.' };
+            const rows = await get(`bookings?awb=in.(${enc(list.map(x => `"${x}"`).join(','))})&select=awb,branch_code,consignee,dest_city,dest_country,pieces,weight,current_status,fwd_agent,fwd_docket,delivery_agent,delivery_docket`);
+            return { checked: list.length, shipments: list.map(a => {
+                const r = rows.find(x => x.awb === a);
+                if (!r) return { awb: a, found: false };
+                if (!isAdmin && r.branch_code !== session.branch) return { awb: a, found: true, other_branch: r.branch_code };
+                return { awb: a, found: true, consignee: r.consignee, dest: [r.dest_city, r.dest_country].filter(Boolean).join(', '), pieces: r.pieces, weight: r.weight, status: r.current_status,
+                    delivery_agent: r.delivery_agent ? `${r.delivery_agent} / ${r.delivery_docket || '—'}` : null, forwarding_agent: r.fwd_agent ? `${r.fwd_agent} / ${r.fwd_docket || '—'}` : null };
+            }) };
+        }
         case 'whats_waiting': return whatsWaiting(session, ctx.auth);
         case 'more_tools': ctx.jobs = true; return { ok: 'Job tools are now available.' };
         case 'my_todos': return { todos: await todoRows(session.user.id) };
@@ -168,6 +190,9 @@ const system = (session, opts = {}) => {
         opts.firstToday ? 'First message today: begin with a short greeting for the time of day.' : 'Do not greet again.',
         'Use tools for live data; never invent numbers or names. Write references exactly as in the data, with plain "-". Page links as /app/<page>?… (tappable).',
         'Be a personal assistant: mention pending things briefly and ask what they want ("Leave from Ali — look first, or shall I approve?"). Ask one short question when unclear; offer the next step. Help with their to-dos.',
+        'A shared list (a message starting with 📄, or pasted rows): find the AWB in each row (our AWBs are the shipment numbers, e.g. 7 digits like 3131908 or 9 digits), '
+        + 'check them all with check_awbs, then read each row\'s carrier (e.g. DELHIVERY) and docket / LR number (a long number near the carrier). If a carrier or docket is missing, unclear or rows disagree, ask first. '
+        + 'Then prepare ONE propose_assign_agent with every good row (items [{awb, docket}]) and say which AWBs were not found, belong to another branch, or already have an agent.',
         'Jobs only via propose_* tools (call more_tools first if you do not have them): they prepare a card the user Confirms — never say it is done. Ask for missing details first. Payment / cash / warehouse approvals need their PIN: give the link instead.'
     ].join('\n');
 };

@@ -98,6 +98,19 @@
   something; shorter instructions, history and results; her reasoning text is not sent back) — about twice as many
   questions fit in the free plan's per-minute limit.
 
+## Delivery agent · carriers · Farah reads lists (migration 034)
+- New status **Assigned Delivery Agent** (Last mile, before Out for Delivery; customers see "With Delivery Partner"):
+  delivery agent + docket / LR number, kept apart from the forwarding agent. With several shipments, tick
+  "Different docket for each shipment" and enter each in the list (also for the forwarding agent).
+- Carrier sync follows the delivery docket once it is set (e.g. Delhivery LR in India), otherwise the forwarding docket;
+  a new carrier's events are not skipped because of the old carrier's last time. "Delhivery" is in the carrier list.
+- SMSA: its reply came wrapped twice and was silently read as "no scans" — fixed; scan times use their own zone.
+- Delhivery B2B LR tracking (no key): manifested, picked up, latest status.
+- **Farah**: "assign Delhivery as delivery agent for 3131908, LR 322976564…" — one or many AWBs, each its own docket,
+  one Confirm card. **Share a list** (📎 in her chat: CSV / text, or paste rows from Excel / WhatsApp): she finds the
+  AWBs, checks them all in the ERP (found, your branch, already assigned), reads carrier + docket per row, asks when
+  something is missing or unclear, and prepares one card. Photos are not read yet (needs a text-reader library).
+
 ## Needs setting once
 - **CRON_SECRET** in Vercel → Settings → Environment Variables (Production): any long random text. Vercel then signs its
   scheduled calls; without it the 8 pm summary save and the nightly backup do not run (the pages still work).

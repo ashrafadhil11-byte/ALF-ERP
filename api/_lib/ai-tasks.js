@@ -82,7 +82,7 @@ export async function propose(kind, a = {}, session) {
             const want = loose(a.status);
             const st = statuses.find(s => loose(s.code) === want || loose(s.label) === want) || statuses.find(s => loose(s.label).includes(want) && want.length > 3);
             if (!st) throw new TaskError(`Unknown status "${str(a.status, 60)}". Choose one of: ${statuses.map(s => s.label).join(', ')}.`);
-            if (st.requires.includes('agent_docket')) throw new TaskError(`"${st.label}" needs the forwarding agent and docket — please do it on the Status Update page.`);
+            if (st.requires.includes('agent_docket') || st.requires.includes('delivery_docket')) throw new TaskError(`"${st.label}" needs the agent and docket numbers — use propose_assign_agent.`);
             const need = { driver: 'the driver', to_branch: 'the branch it goes to', mawb: 'the MAWB number', remark: 'a reason (remark)' };
             const missing = st.requires.filter(f => need[f] && !str(a[f]));
             if (missing.length) throw new TaskError(`"${st.label}" needs ${missing.map(f => need[f]).join(' and ')}. Ask the user.`);
@@ -104,6 +104,39 @@ export async function propose(kind, a = {}, session) {
                     ...(found.length > 8 ? [`…and ${found.length - 8} more`] : []),
                     ...['location', 'remark', 'driver', 'to_branch', 'mawb'].filter(f => payload[f]).map(f => `${f.replace('_', ' ')}: ${payload[f]}`)
                 ]
+            };
+        }
+        case 'assign_agent': {
+            // "Assigned Delivery Agent" / "Assigned Forwarding Agent" for one or many AWBs, each with its docket (or one for all)
+            const delivery = !/^forw/i.test(String(a.leg || 'delivery'));
+            const code = delivery ? 'ASSIGNED_DELIVERY_AGENT' : 'ASSIGNED_TO_AGENT';
+            const agent = str(a.agent, 60);
+            if (!agent) throw new TaskError(`Which ${delivery ? 'delivery' : 'forwarding'} agent (e.g. Delhivery)?`);
+            const one = str(a.docket, 60);
+            const items = (Array.isArray(a.items) ? a.items : []).map(x => ({ awb: str(x?.awb, 40).toUpperCase(), docket: str(x?.docket, 60) })).filter(x => x.awb);
+            for (const w of (Array.isArray(a.awbs) ? a.awbs : String(a.awbs || '').split(/[\s,]+/)).map(x => str(x, 40).toUpperCase()).filter(Boolean)) if (!items.some(x => x.awb === w)) items.push({ awb: w, docket: '' });
+            if (!items.length) throw new TaskError('Which shipments (AWB numbers)?');
+            if (items.length > 200) throw new TaskError('At most 200 shipments at a time.');
+            const noDocket = items.filter(x => !x.docket && !one).map(x => x.awb);
+            if (noDocket.length) throw new TaskError(`I need the docket / LR number for ${noDocket.slice(0, 10).join(', ')}. Ask the user.`);
+            const st = (await get(`statuses?code=eq.${code}&active=is.true&select=code,label`))[0];
+            if (!st) throw new TaskError(`The status for this is not set up yet.`);
+            const awbs = [...new Set(items.map(x => x.awb))];
+            const found = await get(`bookings?awb=in.(${enc(awbs.map(x => `"${x.replace(/"/g, '')}"`).join(','))})&select=awb,branch_code,consignee,dest_country,current_status`);
+            const notFound = awbs.filter(x => !found.some(f => f.awb === x));
+            if (notFound.length) throw new TaskError(`Not found: ${notFound.slice(0, 10).join(', ')}.`);
+            if (!isAdmin) {
+                const other = found.filter(f => f.branch_code !== session.branch).map(f => f.awb);
+                if (other.length) throw new TaskError(`Held by another branch, so this user cannot update: ${other.slice(0, 10).join(', ')}.`);
+            }
+            const dockets = Object.fromEntries(items.map(x => [x.awb, x.docket || one]));
+            const payload = { awbs, code, [delivery ? 'delivery_agent' : 'fwd_agent']: agent, dockets };
+            if (str(a.remark)) payload.remark = str(a.remark, 200);
+            return {
+                kind: 'status', payload,
+                title: `${st.label}: ${agent} for ${awbs.length} shipment${awbs.length > 1 ? 's' : ''}`,
+                lines: [...awbs.slice(0, 12).map(w => { const f = found.find(x => x.awb === w) || {}; return `${w} → ${dockets[w]}${f.consignee ? ` · ${f.consignee}` : ''}${f.dest_country ? `, ${f.dest_country}` : ''}`; }),
+                    ...(awbs.length > 12 ? [`…and ${awbs.length - 12} more`] : [])]
             };
         }
         case 'pickup_create': {

@@ -13,16 +13,17 @@ import { pickBoxes } from '../lib/pickBoxes';
 import { beep, toast } from '../lib/toast';
 
 const STAGES = ['', 'Booking', 'Pickup', 'Origin', 'Export', 'Transit', 'Destination', 'Last Mile', 'Delivered', 'Review'];
-const CARRIERS = ['SMSA', 'Aramex', 'DHL', 'FedEx', 'UPS', 'India Post', 'Nepal Post'];
+const CARRIERS = ['SMSA', 'Aramex', 'DHL', 'Delhivery', 'FedEx', 'UPS', 'India Post', 'Nepal Post'];
 type Extra = { id: string; label: string; kind: 'agent' | 'docket' | 'text' };
 const EXTRA: Record<string, Extra[]> = {
     agent_docket: [{ id: 'fwd_agent', label: 'Forwarding agent', kind: 'agent' }, { id: 'fwd_docket', label: 'Agent docket no.', kind: 'docket' }],
+    delivery_docket: [{ id: 'delivery_agent', label: 'Delivery agent', kind: 'agent' }, { id: 'delivery_docket', label: 'Docket / LR no.', kind: 'docket' }],
     to_branch: [{ id: 'to_branch', label: 'To branch', kind: 'text' }],
     mawb: [{ id: 'mawb', label: 'MAWB number', kind: 'text' }],
     driver: [{ id: 'driver', label: 'Driver', kind: 'text' }]
 };
 type Status = { code: string; label: string; stage: number; is_exception?: boolean; requires: string[] };
-type Item = { awb: string; consignee?: string; status?: string; error?: string; pieces?: number[] | null; total?: number };
+type Item = { awb: string; consignee?: string; status?: string; error?: string; pieces?: number[] | null; total?: number; docket?: string };
 type LogLine = { status: string; awbs: string[]; at: string };
 
 export function StatusUpdate() {
@@ -44,7 +45,11 @@ export function StatusUpdate() {
 
     const st = statuses.find(s => s.code === code);
     const req = st ? st.requires : [];
-    const extras = req.flatMap(r => EXTRA[r] || []);
+    // a status with an agent docket: one docket for all, or (several shipments) each its own
+    const docketKey = req.includes('delivery_docket') ? 'delivery_docket' : req.includes('agent_docket') ? 'fwd_docket' : null;
+    const [perAwb, setPerAwb] = useState(false);
+    const eachDocket = Boolean(docketKey && perAwb && batch.current.filter(b => !b.error).length > 1);
+    const extras = req.flatMap(r => EXTRA[r] || []).filter(x => !(eachDocket && x.id === docketKey));
     const ok = batch.current.filter(b => !b.error);
 
     async function addAwb(raw: string) {
@@ -73,6 +78,11 @@ export function StatusUpdate() {
         const pieces = Object.fromEntries(ok.filter(b => b.pieces).map(b => [b.awb, b.pieces]));
         const body: Record<string, unknown> = { awbs, pieces, code: st!.code, location: locationV, remark, event_at: eventAt ? new Date(eventAt).toISOString() : undefined };
         extras.forEach(x => { body[x.id] = (extra[x.id] || '').trim(); });
+        if (eachDocket) {
+            const missing = ok.filter(b => !(b.docket || '').trim()).map(b => b.awb);
+            if (missing.length) { toast(false, `Enter the docket number for ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '…' : ''}`); return; }
+            body.dockets = Object.fromEntries(ok.map(b => [b.awb, (b.docket || '').trim()]));
+        }
         if (!await confirm({ title: `Set ${awbs.length} shipment(s) to “${st!.label}”?`, message: awbs.slice(0, 12).join(', ') + (awbs.length > 12 ? ` and ${awbs.length - 12} more` : ''), confirmText: 'Update' })) return;
         setBusy(true);
         try {
@@ -147,7 +157,7 @@ export function StatusUpdate() {
                         <div className="bg-white rounded-[1.5rem] border border-gray-100 overflow-hidden">
                             <table className="rtable w-full text-xs">
                                 <thead><tr className="text-[10px] text-gray-400 uppercase text-left border-b border-gray-100">
-                                    <th className="p-3 pl-4 font-extrabold">AWB</th><th className="p-3 font-extrabold">Consignee</th><th className="p-3 font-extrabold">Current status</th><th className="p-3 w-10"></th>
+                                    <th className="p-3 pl-4 font-extrabold">AWB</th><th className="p-3 font-extrabold">Consignee</th><th className="p-3 font-extrabold">Current status</th>{eachDocket && <th className="p-3 font-extrabold">Docket / LR no.</th>}<th className="p-3 w-10"></th>
                                 </tr></thead>
                                 <tbody id="batchRows" className="divide-y divide-gray-100">
                                     {batch.current.length ? batch.current.map(b => (
@@ -156,9 +166,11 @@ export function StatusUpdate() {
                                             <td className="p-3 truncate max-w-[180px]" data-label="Consignee">{b.error ? <span className="text-coral-600 font-bold">{b.error}</span> : b.consignee || '—'}
                                                 {!b.error && (b.total || 0) > 1 && <button type="button" onClick={() => reBoxes(b)} className={`block text-[10px] font-extrabold ${b.pieces ? 'text-[#D55C48]' : 'text-gray-400'} hover:underline`}>{(b.pieces ? `Boxes ${b.pieces.join(', ')} of ${b.total}` : `All ${b.total} boxes`) + ' · change'}</button>}</td>
                                             <td className="p-3" data-label="Status">{b.error ? '' : <span className="pill-tag pill-coral">{b.status || 'New'}</span>}</td>
+                                            {eachDocket && <td className="p-2" data-label="Docket / LR no.">{!b.error && <input className="field !py-1.5 !w-36" data-docket={b.awb} value={b.docket || ''} placeholder="Docket / LR" aria-label={`Docket number for ${b.awb}`}
+                                                onChange={e => { b.docket = e.target.value; rerender(); }} />}</td>}
                                             <td className="cell-menu p-3"><button type="button" onClick={() => { batch.current = batch.current.filter(x => x !== b); rerender(); }} aria-label={`Remove ${b.awb}`} className="icon-btn !w-7 !h-7 hover:!text-coral-600"><Icon name="x" cls="w-3.5 h-3.5" /></button></td>
                                         </tr>
-                                    )) : <tr><td colSpan={4} className="cell-empty p-6 text-center text-gray-400">Scan AWBs to build the batch.</td></tr>}
+                                    )) : <tr><td colSpan={eachDocket ? 5 : 4} className="cell-empty p-6 text-center text-gray-400">Scan AWBs to build the batch.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -173,6 +185,8 @@ export function StatusUpdate() {
                                 {statuses.length > 0 && <option value="">Choose milestone…</option>}
                                 {Object.entries(groups).map(([g, items]) => <optgroup key={g} label={g}>{items.map(s => <option key={s.code} value={s.code}>{s.label}</option>)}</optgroup>)}
                             </select></div>
+                        {docketKey && batch.current.filter(b => !b.error).length > 1 && <label className="flex items-center gap-2 text-xs font-bold text-gray-600">
+                            <input type="checkbox" id="perAwbDocket" checked={perAwb} onChange={e => setPerAwb(e.target.checked)} />Different docket for each shipment (enter them in the list)</label>}
                         <div id="extraFields" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {extras.map(x => {
                                 const props = { id: `x_${x.id}`, 'data-extra': x.id, className: 'field', value: extra[x.id] || '', onChange: (e: React.ChangeEvent<HTMLInputElement>) => setExtra(v => ({ ...v, [x.id]: e.target.value })) };

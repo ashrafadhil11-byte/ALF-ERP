@@ -1,6 +1,7 @@
 // File: api/_lib/carrier-sync.js — pulls tracking from carriers and updates shipments.
-// Which shipments: not archived, not closed, with a forwarding docket (set on "Handed to Forwarding Agent").
-// Which carrier: carrierForAgent(fwd_agent) in connectors.js.
+// Which shipments: not archived, not closed, with a forwarding docket ("Assigned Forwarding Agent") or a delivery docket
+// ("Assigned Delivery Agent"). The delivery agent's docket wins once set (the last-mile leg, e.g. Delhivery in India).
+// Which carrier: carrierForAgent(agent) in connectors.js.
 import CONNECTORS, { carrierForAgent } from './integrations/connectors.js';
 import { callApi } from './integrations/http.js';
 import { serviceHeaders } from './auth.js';
@@ -15,10 +16,10 @@ const CONCURRENCY = 4;
  */
 export async function runCarrierSync({ awb, branch, limit = 40 } = {}) {
     const rest = `${process.env.SUPABASE_URL}/rest/v1`;
-    const filters = ['archived=is.false', 'fwd_docket=not.is.null', `current_status_code=not.in.(${CLOSED.join(',')})`];
+    const filters = ['archived=is.false', 'or=(fwd_docket.not.is.null,delivery_docket.not.is.null)', `current_status_code=not.in.(${CLOSED.join(',')})`];
     if (awb) filters.push(`awb=eq.${encodeURIComponent(awb)}`);
     if (branch) filters.push(`branch_code=eq.${encodeURIComponent(branch)}`);
-    const br = await fetch(`${rest}/bookings?${filters.join('&')}&select=id,awb,fwd_agent,fwd_docket&order=carrier_synced_at.asc.nullsfirst&limit=${limit}`, { headers: serviceHeaders() });
+    const br = await fetch(`${rest}/bookings?${filters.join('&')}&select=id,awb,fwd_agent,fwd_docket,delivery_agent,delivery_docket&order=carrier_synced_at.asc.nullsfirst&limit=${limit}`, { headers: serviceHeaders() });
     const bookings = br.ok ? await br.json() : [];
 
     // One Integrations lookup for all carriers.
@@ -29,7 +30,10 @@ export async function runCarrierSync({ awb, branch, limit = 40 } = {}) {
     const perCarrier = {};
 
     async function syncOne(b) {
-        const carrier = carrierForAgent(b.fwd_agent);
+        const lastMile = Boolean(String(b.delivery_docket || '').trim());
+        const agent = lastMile ? b.delivery_agent : b.fwd_agent;
+        const docket = lastMile ? b.delivery_docket : b.fwd_docket;
+        const carrier = carrierForAgent(agent);
         const conn = CONNECTORS[carrier];
         // a carrier that needs no key (Delhivery) works without an Integrations row; a row switched off stops it
         const row = rows[carrier] || (conn?.noKey ? { adapter: carrier, config: {}, active: true } : null);
@@ -40,7 +44,7 @@ export async function runCarrierSync({ awb, branch, limit = 40 } = {}) {
         summary.checked++;
         try {
             const call = (endpoint, params) => callApi(carrier, endpoint, params, row);
-            const events = await conn.fetchEvents({ call }, String(b.fwd_docket).trim());
+            const events = await conn.fetchEvents({ call }, String(docket).trim());
             const r = await fetch(`${rest}/rpc/apply_carrier_events`, {
                 method: 'POST',
                 headers: serviceHeaders(),

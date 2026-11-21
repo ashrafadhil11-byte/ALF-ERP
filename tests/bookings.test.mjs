@@ -105,7 +105,7 @@ test('status: staff blocked on other branch AWBs; required fields enforced', asy
     const r2 = res();
     await status(req('POST', { body: { awbs: ['a'], code: 'HANDED_TO_AGENT' } }), r2);
     assert.equal(r2.code, 400);
-    assert.match(r2.body.error, /fwd agent/);
+    assert.match(r2.body.error, /needs the forwarding agent/);
 });
 
 test('status: manager update calls set_status with allow_back and builds remark', async () => {

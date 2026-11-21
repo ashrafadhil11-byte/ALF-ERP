@@ -34,7 +34,7 @@ test('propose status: checks the status, its required details and the branch —
     const calls = fake(STAFF, { 'statuses?active': () => STATUSES, 'bookings?awb=in': (u) => found.filter(f => u.includes(f.awb)) });
     await assert.rejects(propose('status', { awbs: ['311000001'], status: 'flying' }, session(STAFF)), /Unknown status/);
     await assert.rejects(propose('status', { awbs: ['311000001'], status: 'on hold' }, session(STAFF)), /needs a reason/);
-    await assert.rejects(propose('status', { awbs: ['311000001'], status: 'Assigned Forwarding Agent' }, session(STAFF)), /Status Update page/);
+    await assert.rejects(propose('status', { awbs: ['311000001'], status: 'Assigned Forwarding Agent' }, session(STAFF)), /use propose_assign_agent/);
     await assert.rejects(propose('status', { awbs: ['311000002'], status: 'Out for delivery' }, session(STAFF)), /another branch/);
     await assert.rejects(propose('status', { awbs: ['311000009'], status: 'Out for delivery' }, session(STAFF)), /Not found/);
     const p = await propose('status', { awbs: '311000001', status: 'out for delivery', location: 'Sohar' }, session(STAFF));

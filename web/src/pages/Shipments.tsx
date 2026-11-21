@@ -366,7 +366,7 @@ export function Shipments() {
                     {fab('edit', 'Edit', () => editShipment(b.awb))}
                     {fab('box', 'Packing list', () => openPacking(b.awb))}
                     {b.shipper_phone && fab('message', 'WhatsApp', () => whatsapp(b.awb), 'fab-wa')}
-                    {b.fwd_docket && fab('sync', 'Carrier sync', () => syncCarriers(b.awb))}
+                    {(b.fwd_docket || b.delivery_docket) && fab('sync', 'Carrier sync', () => syncCarriers(b.awb))}
                     {!cancelled && fab('ban', 'Cancel', () => cancelShipment(b.awb), 'fab-danger')}
                     {canDelete && fab('trash', 'Delete', () => deleteShipment(b.awb), 'fab-danger')}
                 </div>

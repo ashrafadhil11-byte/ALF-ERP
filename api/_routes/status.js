@@ -1,7 +1,8 @@
 // File: api/status.js — status list + status updates (single or bulk scan).
 //   GET                      active statuses for dropdowns
 //   GET  ?boxes=AWB          the shipment's boxes (for ticking which ones the update is for)
-//   POST { awbs:[...], code, location?, remark?, event_at?, fwd_agent?, fwd_docket?, to_branch?, mawb?, driver?, pieces?: { AWB: [1,2] } }
+//   POST { awbs:[...], code, location?, remark?, event_at?, fwd_agent?, fwd_docket?, delivery_agent?, delivery_docket?,
+//          dockets?: { AWB: 'docket' } (each shipment its own docket / LR), to_branch?, mawb?, driver?, pieces?: { AWB: [1,2] } }
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 import { cleanOrderNo } from '../_lib/booking-map.js';
 
@@ -46,8 +47,17 @@ export default async function handler(req, res) {
         const need = (field, label) => {
             if (status.requires.includes(field) && !String(b[label] || '').trim()) throw new UserError(`"${status.label}" needs ${label.replace('_', ' ')}.`);
         };
-        need('agent_docket', 'fwd_agent');
-        need('agent_docket', 'fwd_docket');
+        // dockets: one for all (fwd_docket / delivery_docket) or one per shipment (dockets: { AWB: … })
+        const dockets = b.dockets && typeof b.dockets === 'object'
+            ? Object.fromEntries(Object.entries(b.dockets).map(([k, v]) => [cleanOrderNo(k), String(v ?? '').trim().slice(0, 60)]).filter(([k, v]) => k && v)) : {};
+        const needDockets = (field, agentKey, docketKey, what) => {
+            if (!status.requires.includes(field)) return;
+            if (!String(b[agentKey] || '').trim()) throw new UserError(`"${status.label}" needs the ${what}.`);
+            const missing = awbs.filter(a => !dockets[a] && !String(b[docketKey] || '').trim());
+            if (missing.length) throw new UserError(`"${status.label}" needs the docket number${missing.length < awbs.length ? ` for ${missing.slice(0, 10).join(', ')}` : ''}.`);
+        };
+        needDockets('agent_docket', 'fwd_agent', 'fwd_docket', 'forwarding agent');
+        needDockets('delivery_docket', 'delivery_agent', 'delivery_docket', 'delivery agent');
         need('to_branch', 'to_branch');
         need('mawb', 'mawb');
         need('driver', 'driver');
@@ -73,7 +83,8 @@ export default async function handler(req, res) {
             b.to_branch && `To: ${b.to_branch}`,
             b.mawb && `MAWB: ${b.mawb}`,
             b.driver && `Driver: ${b.driver}`,
-            b.fwd_agent && `Agent: ${b.fwd_agent} / ${b.fwd_docket}`
+            b.fwd_agent && `Agent: ${b.fwd_agent}${b.fwd_docket ? ` / ${b.fwd_docket}` : dockets[awbs[0]] && awbs.length === 1 ? ` / ${dockets[awbs[0]]}` : ''}`,
+            b.delivery_agent && `Delivery agent: ${b.delivery_agent}${b.delivery_docket ? ` / ${b.delivery_docket}` : dockets[awbs[0]] && awbs.length === 1 ? ` / ${dockets[awbs[0]]}` : ''}`
         ].filter(Boolean);
         const remark = [String(b.remark || '').trim(), ...extras].filter(Boolean).join(' • ') || null;
 
@@ -114,13 +125,21 @@ export default async function handler(req, res) {
         const out = await r.json();
         if (!r.ok) return res.status(400).json({ error: out.message || 'Status update failed.' });
 
-        if (b.fwd_agent || b.fwd_docket) {
-            await fetch(`${rest}/bookings?awb=in.(${enc(list)})`, {
-                method: 'PATCH',
-                headers: { ...serviceHeaders(), Prefer: 'return=minimal' },
-                body: JSON.stringify({ fwd_agent: b.fwd_agent || null, fwd_docket: b.fwd_docket || null })
-            });
-        }
+        // agent + docket on the shipments (each its own docket when given): carrier sync tracks them
+        const saveAgent = async (agentKey, docketKey) => {
+            if (!b[agentKey] && !b[docketKey]) return;
+            const groups = {};
+            for (const a of awbs) (groups[dockets[a] || String(b[docketKey] || '').trim() || ''] ||= []).push(a);
+            for (const [docket, group] of Object.entries(groups)) {
+                await fetch(`${rest}/bookings?awb=in.(${enc(group.map(a => `"${a.replace(/"/g, '')}"`).join(','))})`, {
+                    method: 'PATCH',
+                    headers: { ...serviceHeaders(), Prefer: 'return=minimal' },
+                    body: JSON.stringify({ [agentKey]: String(b[agentKey] || '').trim() || null, [docketKey]: docket || null })
+                });
+            }
+        };
+        if (status.requires.includes('agent_docket') || b.fwd_agent || b.fwd_docket) await saveAgent('fwd_agent', 'fwd_docket');
+        if (status.requires.includes('delivery_docket') || b.delivery_agent || b.delivery_docket) await saveAgent('delivery_agent', 'delivery_docket');
         return res.status(200).json({ success: true, updated: out + partial.length, status: status.label });
     } catch (e) {
         if (e instanceof UserError) return res.status(400).json({ error: e.message });

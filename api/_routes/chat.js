@@ -145,7 +145,9 @@ export default async function handler(req, res) {
                 const t = await thread(b.thread);
                 if (t.kind === 'assistant' && (b.file || b.awb)) throw new UserError('Farah reads text only for now — type your question.');
                 let body = String(b.body || '').replace(/\r\n/g, '\n').trim();
-                if (body.length > MAX_BODY) throw new UserError(`Keep it under ${MAX_BODY} characters.`);
+                // Farah's chat takes longer messages: a shared list of shipments
+                const max = t.kind === 'assistant' ? 8000 : MAX_BODY;
+                if (body.length > max) throw new UserError(`Keep it under ${max} characters.`);
                 const extra = {};
                 if (b.awb) {
                     const awb = String(b.awb).trim().toUpperCase().slice(0, 30);

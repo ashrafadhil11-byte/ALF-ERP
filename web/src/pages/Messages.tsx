@@ -51,6 +51,17 @@ function ShipmentCard({ c, mine }: { c: Card; mine: boolean }) {
             <span className="opacity-70">{[c.pieces && `${c.pieces} pcs`, (c.chargeable_weight || c.weight) && `${c.chargeable_weight || c.weight} kg`].filter(Boolean).join(' · ')}</span></span>
     </a>;
 }
+/** a shared list for Farah: keep the rows that have a long number (AWB / docket), tabs / commas → spaces */
+export function listForFarah(name: string, text: string): string | null {
+    const rows = text.replace(/\r\n?/g, '\n').split('\n')
+        .map(l => l.replace(/[\t,;|]+/g, '  ').replace(/"/g, '').replace(/\s{3,}/g, '  ').trim())
+        .filter(l => /\d{5,}/.test(l));
+    if (!rows.length) return null;
+    let out = `📄 ${name} — ${rows.length} row${rows.length === 1 ? '' : 's'}:\n`;
+    for (const r of rows) { if (out.length + r.length > 7800) { out += '\n…(more rows not sent — share the rest next)'; break; } out += r + '\n'; }
+    return out.trim();
+}
+
 function JobCard({ j, busy, onAct }: { j: Job; busy: boolean; onAct: (what: 'run' | 'cancel') => void }) {
     return <div className="farah-job mt-2 mb-1 bg-white border border-gray-200 rounded-xl p-3 space-y-1 text-gray-800" data-job={j.id}>
         <p className="font-extrabold text-[13px]">{j.title}</p>
@@ -245,6 +256,18 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
     // attachments and shipment cards
     const [pending, setPending] = useState<Outgoing['file']>(null);
     const fileInput = useRef<HTMLInputElement>(null);
+    // Farah: share a list (CSV / text) — the rows go to her as a message; she checks them and asks before any change
+    const docInput = useRef<HTMLInputElement>(null);
+    async function shareWithFarah(f?: File | null) {
+        if (docInput.current) docInput.current.value = '';
+        if (!f) return;
+        if (/^image\//.test(f.type) || /\.pdf$/i.test(f.name)) return toast(false, 'Reading photos and PDFs is not switched on yet — copy the rows (from Excel or WhatsApp) and paste them here, or save the sheet as CSV.');
+        if (/\.xlsx?$/i.test(f.name)) return toast(false, 'Excel files: select the rows in Excel, copy, and paste them here — or save the sheet as CSV and share that.');
+        if (f.size > 2 * 1024 * 1024) return toast(false, 'That file is too large — share up to about 200 rows at a time.');
+        const msg = listForFarah(f.name, await f.text());
+        if (!msg) return toast(false, `No AWB or docket numbers found in ${f.name}.`);
+        sendNow(msg, { file: null });
+    }
     async function pickFile(f?: File | null) {
         if (!f) return;
         try { setPending(await readFile(f)); setEmojiOpen(false); box.current?.focus(); } catch (e) { toast(false, (e as Error).message); }
@@ -427,7 +450,9 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                     <button type="button" id="chatShip" className="btn btn-light btn-sm" onClick={shareShipment}><Icon name="box" cls="w-3.5 h-3.5" />Share shipment</button></div>
                                 <div className="grid grid-cols-8 gap-1">{EMOJI.map(e => <button key={e} type="button" className="w-9 h-9 rounded-xl hover:bg-[#F8F8FA] text-lg" onClick={() => { setDraft(d => d + e); box.current?.focus(); }}>{e}</button>)}</div></div>}
                             <input ref={fileInput} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => pickFile(e.target.files?.[0])} />
+                            <input ref={docInput} type="file" accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values,image/*,.pdf,.xls,.xlsx" className="hidden" onChange={e => shareWithFarah(e.target.files?.[0])} />
                             <form className="flex items-end gap-2" onSubmit={e => { e.preventDefault(); sendNow(); }}>
+                                {isFarah && <button type="button" id="farahDoc" className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-[#F8F8FA] text-gray-500 hover:text-gray-800" aria-label="Share a list with Farah" title="Share a list (CSV) — or paste rows from Excel / WhatsApp" onClick={() => docInput.current?.click()}><Icon name="upload" cls="w-5 h-5" /></button>}
                                 {!isFarah && <button type="button" className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${emojiOpen ? 'bg-[#FFF5F3] text-[#E86D58]' : 'bg-[#F8F8FA] text-gray-500 hover:text-gray-800'}`} aria-label="Attach, share or emoji" title="Photo, PDF, shipment, emoji" onClick={() => setEmojiOpen(v => !v)}><Icon name={emojiOpen ? 'x' : 'plus'} cls="w-5 h-5" /></button>}
                                 <textarea ref={box} id="chatInput" rows={1} value={draft} maxLength={4000} placeholder={isFarah ? 'Ask Farah anything…' : 'Write a message…'} aria-label={`Message ${title}`}
                                     onChange={e => { setDraft(e.target.value); typing(); }}

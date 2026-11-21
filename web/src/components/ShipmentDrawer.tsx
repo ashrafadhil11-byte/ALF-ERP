@@ -199,6 +199,10 @@ export function ShipmentDrawer({ awb, version = 0, onClose, actions }: { awb: st
                             <div><p className="sx-k !text-coral-600">Booked</p><p className="sx-v">{fmtDate(b.booked_at, { day: '2-digit', month: 'short', year: 'numeric' })}</p></div>
                             <span className="sx-chip !bg-white"><Icon name={b.source === 'alfarhaonline' ? 'link' : 'edit'} cls="w-3.5 h-3.5" /><span>{b.source === 'alfarhaonline' ? `Al-Farha ${b.external_ref || ''}` : 'Manual entry'}</span></span>
                         </div>
+                        {(b.delivery_docket || b.delivery_agent) && <div className="sx-tile ui-lift mt-2.5 flex items-center justify-between gap-3" data-delivery-agent>
+                            <div className="min-w-0"><p className="sx-k">Delivery agent</p><p className="sx-v truncate">{`${b.delivery_agent || '—'} `}<span className="text-gray-400 text-[11px]">{`· ${b.delivery_docket || '—'}`}</span></p></div>
+                            <p className="text-[11px] font-bold text-right text-gray-500">{b.carrier_error ? <span className="text-coral-600">{b.carrier_error}</span> : 'Tracked by carrier sync'}</p>
+                        </div>}
                         {(b.fwd_docket || b.fwd_agent) && <div className="sx-tile ui-lift mt-2.5 flex items-center justify-between gap-3">
                             <div className="min-w-0"><p className="sx-k">Forwarding agent</p><p className="sx-v truncate">{`${b.fwd_agent || '—'} `}<span className="text-gray-400 text-[11px]">{`· ${b.fwd_docket || '—'}`}</span></p></div>
                             <p className={`text-[11px] font-bold text-right ${b.carrier_error ? 'text-coral-600' : 'text-gray-500'}`}>{b.carrier_error ? b.carrier_error : b.carrier_synced_at ? `Synced ${fmtDate(b.carrier_synced_at, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}` : 'Not synced yet'}</p>
