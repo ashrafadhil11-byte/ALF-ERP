@@ -258,10 +258,25 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
     const fileInput = useRef<HTMLInputElement>(null);
     // Farah: share a list (CSV / text) — the rows go to her as a message; she checks them and asks before any change
     const docInput = useRef<HTMLInputElement>(null);
+    const [reading, setReading] = useState<number | null>(null);      // % while a photo is being read
     async function shareWithFarah(f?: File | null) {
         if (docInput.current) docInput.current.value = '';
         if (!f) return;
-        if (/^image\//.test(f.type) || /\.pdf$/i.test(f.name)) return toast(false, 'Reading photos and PDFs is not switched on yet — copy the rows (from Excel or WhatsApp) and paste them here, or save the sheet as CSV.');
+        if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') return toast(false, 'PDFs: take a screenshot of the page (or copy the rows) and share that instead.');
+        if (/^image\//.test(f.type)) {
+            if (f.size > 8 * 1024 * 1024) return toast(false, 'That photo is too large (max 8 MB).');
+            setReading(0);
+            try {
+                const { readPhoto } = await import('../lib/readPhoto');
+                const msg = listForFarah(f.name || 'photo', await readPhoto(f, p => setReading(p)));
+                if (!msg) return toast(false, 'I could not find AWB or docket numbers in that photo — try a sharper, straight photo, or paste the rows.');
+                setDraft(msg);                        // shown first, so a misread number can be fixed before sending
+                toast(true, 'Read the photo — check the numbers, then send.');
+                setTimeout(() => box.current?.focus(), 30);
+            } catch (e) { toast(false, `Could not read the photo: ${(e as Error).message}`); }
+            finally { setReading(null); }
+            return;
+        }
         if (/\.xlsx?$/i.test(f.name)) return toast(false, 'Excel files: select the rows in Excel, copy, and paste them here — or save the sheet as CSV and share that.');
         if (f.size > 2 * 1024 * 1024) return toast(false, 'That file is too large — share up to about 200 rows at a time.');
         const msg = listForFarah(f.name, await f.text());
@@ -452,7 +467,7 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                             <input ref={fileInput} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => pickFile(e.target.files?.[0])} />
                             <input ref={docInput} type="file" accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values,image/*,.pdf,.xls,.xlsx" className="hidden" onChange={e => shareWithFarah(e.target.files?.[0])} />
                             <form className="flex items-end gap-2" onSubmit={e => { e.preventDefault(); sendNow(); }}>
-                                {isFarah && <button type="button" id="farahDoc" className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-[#F8F8FA] text-gray-500 hover:text-gray-800" aria-label="Share a list with Farah" title="Share a list (CSV) — or paste rows from Excel / WhatsApp" onClick={() => docInput.current?.click()}><Icon name="upload" cls="w-5 h-5" /></button>}
+                                {isFarah && <button type="button" id="farahDoc" className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 bg-[#F8F8FA] text-gray-500 hover:text-gray-800" aria-label="Share a list with Farah" title="Share a list — photo / screenshot, CSV, or paste rows from Excel / WhatsApp" disabled={reading !== null} onClick={() => docInput.current?.click()}><Icon name="upload" cls="w-5 h-5" /></button>}
                                 {!isFarah && <button type="button" className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${emojiOpen ? 'bg-[#FFF5F3] text-[#E86D58]' : 'bg-[#F8F8FA] text-gray-500 hover:text-gray-800'}`} aria-label="Attach, share or emoji" title="Photo, PDF, shipment, emoji" onClick={() => setEmojiOpen(v => !v)}><Icon name={emojiOpen ? 'x' : 'plus'} cls="w-5 h-5" /></button>}
                                 <textarea ref={box} id="chatInput" rows={1} value={draft} maxLength={4000} placeholder={isFarah ? 'Ask Farah anything…' : 'Write a message…'} aria-label={`Message ${title}`}
                                     onChange={e => { setDraft(e.target.value); typing(); }}
@@ -461,6 +476,7 @@ export function ChatPanel({ popup = false, tools }: { popup?: boolean; tools?: R
                                     className="flex-1 resize-none bg-[#F8F8FA] rounded-[1.4rem] border border-transparent focus:border-gray-200 focus:bg-white outline-none px-4 py-3 text-sm leading-5 custom-scrollbar" />
                                 <button type="submit" id="chatSend" disabled={!draft.trim() && !pending} className="w-11 h-11 rounded-full bg-[#E86D58] text-white flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-[#D55C48] transition-colors" aria-label="Send"><Icon name="send" cls="w-[18px] h-[18px]" /></button>
                             </form>
+                            {isFarah && reading !== null && <p id="farahReading" className="text-[11px] font-bold text-[#E86D58] mt-1.5 ml-2">{`Reading the photo… ${reading}%`}</p>}
                             <p className={`hidden sm:block text-[10px] text-gray-300 mt-1.5 ${isFarah ? 'ml-2' : 'ml-14'}`}>{isFarah ? 'Farah reads live ERP data and asks you to confirm before changing anything' : 'Enter to send · Shift + Enter for a new line'}</p>
                         </footer>
                     </>}
