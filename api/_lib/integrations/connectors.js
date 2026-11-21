@@ -78,6 +78,7 @@ export function carrierTextToStatus(text) {
 export function carrierForAgent(agent) {
     const a = String(agent || '').toUpperCase();
     if (a.includes('SMSA')) return 'smsa';
+    if (a.includes('DELHIVERY')) return 'delhivery';
     if (a.includes('ARAMEX')) return 'aramex';
     if (a.includes('DHL')) return 'dhl';
     return '17track'; // FedEx, UPS, India Post, etc. — 17Track covers most carriers
@@ -91,6 +92,13 @@ const ZIPPO = new Set('AD AR AS AT AU BD BE BG BR CA CH CZ DE DK DO ES FI FO FR 
 const toIso = (v) => {
     const d = new Date(v);
     return Number.isNaN(d.getTime()) ? null : d.toISOString();
+};
+/** a local time without zone ("2026-11-20T18:45:00") + its zone ("+03:00") → ISO; a time that has a zone keeps it */
+export const zonedIso = (v, zone) => {
+    const s = String(v || '').trim();
+    const z = String(zone || '').trim();
+    if (s && /^[+-]\d{2}:?\d{2}$/.test(z) && !/(Z|[+-]\d{2}:?\d{2})$/i.test(s)) return toIso(s + (z.includes(':') ? z : z.slice(0, 3) + ':' + z.slice(3)));
+    return toIso(s);
 };
 
 export default {
@@ -174,8 +182,14 @@ export default {
         scanCodes: { AF: 'ARRIVED_DEST_HUB', CC: 'READY_FOR_COLLECTION', CR: 'IMPORT_CLEARED', DE: 'DELIVERY_FAILED', IC: 'IMPORT_CUSTOMS', ST77: 'IN_TRANSIT', HIP: null, PU: null },
         async fetchEvents({ call }, awb) {
             const d = await call('track', { awb });
-            return (d.Scans || []).map(s => ({
-                at: toIso(s.ScanDateTime),
+            // a reply without a scan list is an error to show, not "nothing new" (this hid a broken reply before)
+            const scans = d && typeof d === 'object' ? (d.Scans ?? d.scans) : undefined;
+            if (!Array.isArray(scans)) {
+                const said = d && typeof d === 'object' ? (d.message || d.Message || d.error || JSON.stringify(d).slice(0, 120)) : String(d || '').slice(0, 120);
+                throw new Error(`SMSA reply not understood${said ? `: ${said}` : ''}`);
+            }
+            return scans.map(s => ({
+                at: zonedIso(s.ScanDateTime, s.ScanTimeZone),
                 description: clean(s.ScanDescription) || `SMSA ${clean(s.ScanType)}`,
                 location: clean(s.City) || null,
                 remark: clean(s.ReceivedBy) ? `Received by ${clean(s.ReceivedBy)}` : null,
@@ -184,14 +198,55 @@ export default {
         },
         testInput: 'AWB',
         async test({ call, input }) {
-            const d = await call('track', { awb: input.value });
-            return { ok: true, message: `${(d.Scans || []).length} scans returned`, sample: (d.Scans || [])[0] };
+            const events = await this.fetchEvents({ call }, input.value);
+            return { ok: true, message: `${events.length} scans returned`, sample: events[0] };
         }
     },
 
     // -----------------------------------------------------------------
     //  DHL — Shipment Tracking Unified API
     // -----------------------------------------------------------------
+    // -----------------------------------------------------------------
+    //  Delhivery B2B (India) — LR tracking, no API key: GET /v2/track/{LR}
+    //  Gives the latest status only (+ manifested / picked-up / delivered times), times in India time (+05:30).
+    // -----------------------------------------------------------------
+    delhivery: {
+        label: 'Delhivery B2B (LR tracking, no key)',
+        kinds: ['carrier'],
+        baseUrl: 'https://btob.api.delhivery.com',
+        secrets: {},
+        noKey: true,                      // works without an Integrations row (add one only to switch it off)
+        endpoints: {
+            track: { method: 'GET', path: ({ params }) => `/v2/track/${enc(clean(params.awb).replace(/\s+/g, ''))}` }
+        },
+        statusCode(status, remark) {
+            const s = String(status || '').toUpperCase().replace(/[\s-]+/g, '_');
+            const map = { DELIVERED: 'DELIVERED', OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY', OFD: 'OUT_FOR_DELIVERY', IN_TRANSIT: 'IN_TRANSIT', INTRANSIT: 'IN_TRANSIT',
+                PICKED_UP: null, MANIFESTED: null, PENDING: null, RTO: 'RETURNED_TO_SHIPPER', RETURNED: 'RETURNED_TO_SHIPPER', UNDELIVERED: 'DELIVERY_FAILED' };
+            return s in map ? map[s] : carrierTextToStatus(`${remark || ''} ${status || ''}`);
+        },
+        async fetchEvents({ call }, lr) {
+            let d;
+            try { d = await call('track', { awb: lr }); }
+            catch (e) { if (e.status === 404) throw new Error(`Delhivery does not know LR ${clean(lr)} (check the LR number)`); throw e; }
+            if (!d || typeof d !== 'object' || !d.status) throw new Error(`Delhivery reply not understood: ${JSON.stringify(d).slice(0, 120)}`);
+            const IST = '+05:30';
+            const where = (v) => clean(v).replace(/_/g, ' ') || null;
+            const out = [];
+            if (d.manifested_date) out.push({ at: zonedIso(d.manifested_date, IST), description: 'Booked with Delhivery (manifested)', location: where(d.origin_branch) || clean(d.origin_city) || null, remark: d.mwbn ? `Waybill ${clean(d.mwbn)}` : null, code: null });
+            if (d.pickup_date) out.push({ at: zonedIso(d.pickup_date, IST), description: 'Picked up by Delhivery', location: where(d.origin_branch) || clean(d.origin_city) || null, remark: null, code: null });
+            const latest = zonedIso(d.delivered_date || d.timestamp, IST);
+            if (latest) out.push({ at: latest, description: clean(d.scan_remark) || clean(d.status), location: where(d.location), remark: d.estimated_date && !d.delivered_date ? `Expected ${String(d.estimated_date).slice(0, 10)}` : null, code: this.statusCode(d.status, d.scan_remark) });
+            return out.filter(e => e.at);
+        },
+        testInput: 'LR number',
+        async test({ call, input }) {
+            const events = await this.fetchEvents({ call }, input.value);
+            const last = events[events.length - 1];
+            return { ok: true, message: `${last?.description || 'No status'}${last?.location ? ' · ' + last.location : ''}`, sample: last };
+        }
+    },
+
     dhl: {
         label: 'DHL (tracking)',
         kinds: ['carrier'],

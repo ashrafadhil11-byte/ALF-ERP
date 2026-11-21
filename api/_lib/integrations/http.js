@@ -77,6 +77,8 @@ export async function callApi(connectorId, endpointName, params = {}, row) {
             const text = await res.text();
             let data = text;
             try { data = JSON.parse(text); } catch (e) { /* XML / plain text stays a string */ }
+            // some APIs (SMSA when asked for JSON) send the JSON wrapped in a JSON string: "{\"AWB\":…}" — unwrap it once more
+            if (typeof data === 'string' && /^\s*[[{]/.test(data)) { try { data = JSON.parse(data); } catch (e) { /* a plain string after all */ } }
 
             const ok = ep.isOk ? ep.isOk(data, res) : res.ok;
             if (ok) return ep.parse ? ep.parse(data, ctx) : data;

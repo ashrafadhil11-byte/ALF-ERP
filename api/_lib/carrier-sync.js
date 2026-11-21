@@ -31,7 +31,8 @@ export async function runCarrierSync({ awb, branch, limit = 40 } = {}) {
     async function syncOne(b) {
         const carrier = carrierForAgent(b.fwd_agent);
         const conn = CONNECTORS[carrier];
-        const row = rows[carrier];
+        // a carrier that needs no key (Delhivery) works without an Integrations row; a row switched off stops it
+        const row = rows[carrier] || (conn?.noKey ? { adapter: carrier, config: {}, active: true } : null);
         if (!conn?.fetchEvents || !row?.active) {
             summary.skipped++;
             return;
@@ -69,7 +70,7 @@ export async function runCarrierSync({ awb, branch, limit = 40 } = {}) {
     }
 
     // Health shown on the dashboard / Integrations page.
-    await Promise.all(Object.entries(perCarrier).map(([carrier, s]) => fetch(`${rest}/integrations?id=eq.${rows[carrier].id}`, {
+    await Promise.all(Object.entries(perCarrier).filter(([carrier]) => rows[carrier]?.id).map(([carrier, s]) => fetch(`${rest}/integrations?id=eq.${rows[carrier].id}`, {
         method: 'PATCH',
         headers: { ...serviceHeaders(), Prefer: 'return=minimal' },
         body: JSON.stringify({ last_sync_at: new Date().toISOString(), last_status: s.ok ? 'ok' : 'error', last_error: s.ok ? null : s.err })
