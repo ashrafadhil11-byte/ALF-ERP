@@ -3,6 +3,7 @@
 //   GET ?id=N                one manifest with its shipments (for checking / printing)
 //   POST { action:'outbound', awbs, to_branch, vehicle?, driver?, seal?, notes?, branch?, pieces?: { AWB: [1,2] } }   boxes sent
 //   POST { action:'inbound',  awbs, note?, branch?, pieces?: { AWB: [1] } }   boxes that arrived (rest = missing)   → per-AWB results (received / wrong_branch / not_expected / …)
+import { packingSummaries } from './packing.js';
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 import { cleanOrderNo } from '../_lib/booking-map.js';
 
@@ -37,7 +38,9 @@ export default async function handler(req, res) {
                 const m = (await get(`transfer_manifests?id=eq.${enc(q.id)}&select=*`))[0];
                 if (!m) return res.status(404).json({ error: 'Manifest not found.' });
                 if (!isAdmin && ![m.from_branch, m.to_branch].includes(session.branch)) return res.status(403).json({ error: 'Not your branch.' });
-                const items = await get(`transfers?manifest_id=eq.${enc(q.id)}&select=status,inbound_at,note,bookings(awb,shipper,consignee,dest_city,dest_country,pieces,weight,current_status)&order=id.asc`);
+                const raw = await get(`transfers?manifest_id=eq.${enc(q.id)}&select=status,inbound_at,note,bookings(id,awb,shipper,consignee,dest_city,dest_country,pieces,weight,chargeable_weight,current_status,branch_code,shipper_phone,shipper_id_no,consignee_phone,receiver_whatsapp,consignee_address,receiver_parts,origin_city,package_type,contents,declared_value,booked_at)&order=id.asc`);
+                const packing = await packingSummaries(raw.map(t => t.bookings?.id).filter(Boolean)).catch(() => ({}));
+                const items = raw.map(t => { if (!t.bookings) return t; const { id, ...bk } = t.bookings; return { ...t, bookings: { ...bk, packing: packing[id] || null } }; });
                 return res.status(200).json({ manifest: m, items });
             }
             const branch = branchFor(q.branch);

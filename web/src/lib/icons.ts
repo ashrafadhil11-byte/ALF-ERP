@@ -58,6 +58,9 @@ export const ICONS = {
     upload: "<path d=\"M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4\"/><path d=\"M17 8l-5-5-5 5M12 3v12\"/>",
     camera: "<path d=\"M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z\"/><circle cx=\"12\" cy=\"13\" r=\"4\"/>",
     sparkles: "<path d=\"M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9z\"/><path d=\"M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z\"/>",
+    chevUp: "<path d=\"M18 15l-6-6-6 6\"/>",
+    chevDown: "<path d=\"M6 9l6 6 6-6\"/>",
+    download: "<path d=\"M12 3v12\"/><path d=\"M7 10l5 5 5-5\"/><path d=\"M5 21h14\"/>",
     sync: "<path d=\"M21 12a9 9 0 01-15.3 6.4L3 16\"/><path d=\"M3 21v-5h5\"/><path d=\"M3 12a9 9 0 0115.3-6.4L21 8\"/><path d=\"M21 3v5h-5\"/>",
 } as const;
 

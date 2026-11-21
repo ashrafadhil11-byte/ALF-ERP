@@ -7,6 +7,7 @@
 //   POST { action:'add', id, awbs }      POST { action:'remove', id, awb }
 //   POST { action:'close' | 'reopen', id }
 // Status for everything inside: the page sends the AWB list to /api/status (same rules as Scan & Update).
+import { packingSummaries } from './packing.js';
 import { requireSession, serviceHeaders, ADMIN_ROLES } from '../_lib/auth.js';
 import { cleanOrderNo } from '../_lib/booking-map.js';
 
@@ -49,7 +50,7 @@ export default async function handler(req, res) {
             if (q.id) {
                 const c = await load(q.id);
                 const [items, costs, alloc, shares, names] = await Promise.all([
-                    get(`consolidation_items?consolidation_id=eq.${enc(q.id)}&select=added_at,pieces,bookings(awb,shipper,consignee,dest_city,dest_country,pieces,weight,chargeable_weight,current_status,current_status_code,branch_code,booking_pieces(piece_no,weight,l,w,h,status))&order=added_at.asc`),
+                    get(`consolidation_items?consolidation_id=eq.${enc(q.id)}&select=added_at,pieces,bookings(id,awb,shipper,consignee,dest_city,dest_country,pieces,weight,chargeable_weight,current_status,current_status_code,branch_code,shipper_phone,shipper_id_no,consignee_phone,receiver_whatsapp,consignee_address,receiver_parts,origin_city,package_type,contents,declared_value,booked_at,booking_pieces(piece_no,weight,l,w,h,status))&order=added_at.asc`),
                     get(`cost_bills?consolidation_id=eq.${enc(q.id)}&status=neq.void&select=id,bill_no,branch_code,cost_type,description,currency,amount,paid,status,bill_ref,bill_date,split,suppliers(name),cost_bill_shares(branch_code,amount)&order=id`),
                     fetch(`${rest}/rpc/consolidation_allocation`, { method: 'POST', headers: serviceHeaders(), body: JSON.stringify({ p_id: Number(q.id) }) }).then(r => r.ok ? r.json() : []),
                     // how a bill on this consolidation is shared between the branches that booked its shipments
@@ -57,14 +58,15 @@ export default async function handler(req, res) {
                     get('branches?select=branch_code,branch_name')
                 ]);
                 const nm = Object.fromEntries(names.map(x => [x.branch_code, x.branch_name]));
+                const packing = await packingSummaries(items.map(i => i.bookings?.id).filter(Boolean)).catch(() => ({}));
                 return res.status(200).json({
                     consolidation: c, costs, allocation: alloc,
                     branch_shares: shares.map(s => ({ branch: s.branch_code, name: nm[s.branch_code] || s.branch_code, share: +s.share })),
                     items: items.map(i => {
                         const boxes = (i.bookings.booking_pieces || []).sort((a, b) => a.piece_no - b.piece_no);
                         const inside = i.pieces ? boxes.filter(x => i.pieces.includes(x.piece_no)) : boxes;
-                        const { booking_pieces, ...bk } = i.bookings;
-                        return { ...bk, added_at: i.added_at, boxes_in: i.pieces, boxes_total: boxes.length, boxes,
+                        const { booking_pieces, id: bookingId, ...bk } = i.bookings;
+                        return { ...bk, packing: packing[bookingId] || null, added_at: i.added_at, boxes_in: i.pieces, boxes_total: boxes.length, boxes,
                                  in_pieces: inside.length, in_weight: Math.round(inside.reduce((s, x) => s + (+x.weight || 0), 0) * 100) / 100 };
                     })
                 });

@@ -102,11 +102,11 @@ async function say(threadId, body, actions) {
 /** answers the user's latest message in their Farah chat → the new message */
 export async function reply(session, auth, threadId) {
     const id = await myFarah(session, threadId);
-    const rows = await get(`chat_messages?thread_id=eq.${id}&deleted_at=is.null&system=not.is.true&select=id,sender_id,body,created_at&order=id.desc&limit=16`);
+    const rows = await get(`chat_messages?thread_id=eq.${id}&deleted_at=is.null&system=not.is.true&select=id,sender_id,body,created_at&order=id.desc&limit=10`);
     const last = rows[0];
     if (!last || last.sender_id !== session.user.id || !String(last.body || '').trim()) return { message: null };   // already answered
     const past = rows.slice(1).reverse();
-    const history = past.map(m => ({ role: m.sender_id === session.user.id ? 'user' : 'assistant', content: String(m.body || '').slice(0, 1500) }));
+    const history = past.map(m => ({ role: m.sender_id === session.user.id ? 'user' : 'assistant', content: String(m.body || '').slice(0, 700) }));
     const firstToday = !past.some(m => m.sender_id === session.user.id && String(m.created_at).slice(0, 10) === omanDay());
     let out;
     try {

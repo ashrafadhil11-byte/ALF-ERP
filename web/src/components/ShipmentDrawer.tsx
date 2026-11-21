@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Icon } from './Icon';
 import { PageLink } from './PageLink';
 import { api } from '../lib/api';
+import { openPacking } from './PackingList';
 import { toast } from '../lib/toast';
 import type { IconName } from '../lib/icons';
 
@@ -234,6 +235,7 @@ export function ShipmentDrawer({ awb, version = 0, onClose, actions }: { awb: st
 
             <footer className="sx-foot">
                 {actions ? actions(b, { cancelled, fab }) : <>
+                    <button type="button" className="fab fab-open flex-shrink-0" title="Packing list" onClick={() => openPacking(b.awb)}><Icon name="box" /><span className="fab-label">Packing list</span></button>
                     <PageLink page="shipments.html" search={`?awb=${encodeURIComponent(b.awb)}`} data-peek="off" className="fab fab-open flex-shrink-0" title="Open in Shipments"><Icon name="box" /><span className="fab-label">Open in Shipments</span></PageLink>
                     <PageLink page="status-update.html" search={`?awb=${encodeURIComponent(b.awb)}`} className="fab fab-open fab-primary flex-shrink-0" title="Update status"><Icon name="refresh" /><span className="fab-label">Update status</span></PageLink>
                 </>}

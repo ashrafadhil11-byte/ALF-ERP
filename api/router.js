@@ -23,6 +23,7 @@ import integrations from './_routes/integrations.js';
 import login from './_routes/login.js';
 import mainOffice from './_routes/main-office.js';
 import pickups from './_routes/pickups.js';
+import packing from './_routes/packing.js';
 import notifications from './_routes/notifications.js';
 import postalLookup from './_routes/postal-lookup.js';
 import profile from './_routes/profile.js';
@@ -57,6 +58,7 @@ const ROUTES = {
     'main-office': mainOffice,
     notifications,
     pickups,
+    packing,
     'postal-lookup': postalLookup,
     profile,
     status,

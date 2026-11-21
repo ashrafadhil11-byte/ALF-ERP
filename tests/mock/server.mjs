@@ -37,6 +37,20 @@ http.createServer((req, res) => {
     if (u.searchParams.get('download')) return send({ url: '#' });
     return send({ keep: 14, backups: ['19-02-00', '18-02-00', '17-02-00'].map((t, i) => ({ name: `alf-erp-2026-11-${t}.json.gz`, size: 180000 - i * 4000 })) });
   }
+  if (u.pathname === '/api/packing') {        // sample packing list (kept while the server runs)
+    const P = globalThis.__packing ||= { next: 3, items: [{ id: 1, piece_no: 1, item: 'Clothes', qty: 6 }, { id: 2, piece_no: 1, item: 'Shoes', qty: 2 }] };
+    if (req.method === 'POST') { let b = ''; req.on('data', c => b += c); req.on('end', () => { const j = JSON.parse(b || '{}');
+      if (j.action === 'add') { const same = P.items.find(i => i.piece_no === j.piece_no && i.item.toLowerCase() === String(j.item).toLowerCase());
+        if (same) { same.qty += +j.qty || 1; return send({ item: same, merged: true }); }
+        const it = { id: ++P.next, piece_no: j.piece_no, item: String(j.item).charAt(0).toUpperCase() + String(j.item).slice(1), qty: +j.qty || 1, value: j.value ?? null }; P.items.push(it); return send({ item: it }); }
+      const it = P.items.find(i => i.id === +j.id);
+      if (j.action === 'delete') { P.items = P.items.filter(i => i.id !== +j.id); return send({ success: true }); }
+      if (it && 'qty' in j) it.qty = +j.qty;
+      if (it && 'value' in j) it.value = j.value === '' ? null : +j.value;
+      send({ item: it }); }); return; }
+    return send({ shipment: { awb: u.searchParams.get('awb'), shipper: 'Abdul Rahman', consignee: 'Fathima S.', dest_city: 'Kochi', dest_country: 'India', pieces: 3, branch_code: 'ALFSLL' },
+      boxes: [1, 2, 3], items: P.items, common: ['Clothes', 'Shoes', 'Bags', 'Bed sheets', 'Blankets', 'Kitchen utensils', 'Toys', 'Books', 'Cosmetics', 'Dry food', 'Spices', 'Dates', 'Electronics', 'Perfume'] });
+  }
   if (u.pathname === '/api/todos') {          // sample to-do list (kept while the server runs)
     const T = globalThis.__todos ||= [
       { id: 1, title: 'Call the agent about MAWB EAG-01', due_date: new Date(Date.now() - 864e5).toISOString().slice(0, 10), source: 'me', done_at: null, created_at: new Date().toISOString() },

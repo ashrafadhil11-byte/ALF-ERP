@@ -82,6 +82,22 @@
   date, and the open page reloads (also after Farah's Confirm, a save in another ERP tab, and when you come back to the
   tab). Chat and "seen" saves are quiet. See web/src/lib/live.ts.
 
+## Packing list · manifest export · safe numbers · lighter Farah (migration 033)
+- **Packing list per box** (optional): shipment card → "Packing list" (any page). Box tabs; type "3 shirts" + Enter
+  (also "shirts x3"), or tap a quick item (the branch's most used items first, then common personal effects) — the same
+  item again adds to its quantity; − / + / delete; optional values for customs; "Next box". Every line saves at once.
+  Print: a list per box with the shipper's declaration and signatures. Same branch rule as the shipment.
+- **Manifest export** (Consolidation → Export; transfer manifests → Export): pick the columns and their order (drag or
+  ↑ ↓; presets Standard / Delivery / Customs) — AWB, shipper / receiver names and phones, WhatsApp, address, city,
+  state, PIN, country, pieces, weights, type, contents, packing list, value, branch, booked on, status — then
+  "Download for Excel" (CSV, opens in Excel with Arabic / Malayalam names) or Print. The last choice is remembered.
+- **Number boxes:** the mouse wheel never changes them (whole app). Prices in tables (Warehouse → Stock: price to
+  branches, reorder level) are "safe edit": shown as text, tap ✎ to change, ✓ / Enter saves, ✕ / Esc cancels, a jump of
+  more than 3× asks first.
+- **Farah is lighter:** a plain question sends about a third of what it did (job tools only when you ask her to do
+  something; shorter instructions, history and results; her reasoning text is not sent back) — about twice as many
+  questions fit in the free plan's per-minute limit.
+
 ## Needs setting once
 - **CRON_SECRET** in Vercel → Settings → Environment Variables (Production): any long random text. Vercel then signs its
   scheduled calls; without it the 8 pm summary save and the nightly backup do not run (the pages still work).

@@ -15,6 +15,7 @@ import { confirm } from '../lib/dialogs';
 import { clean } from '../lib/format';
 import { countryItems } from '../lib/geo';
 import { printManifest } from '../lib/manifest';
+import { ManifestExport } from '../components/ManifestExport';
 import { pickBoxes } from '../lib/pickBoxes';
 import { session } from '../lib/session';
 import { beep, toast } from '../lib/toast';
@@ -221,6 +222,22 @@ export function Consolidation() {
             [['Carrier', c.carrier], [c.kind === 'container' ? 'Vessel' : 'Flight', c.flight_no || c.vessel], ['Voyage', c.voyage], ['B/L', c.bl_no], ['Size', c.container_size], ['Seal', c.seal_no], ['Departure', c.departure_date], ['ETA', c.eta], ['Destination', c.dest_country], ['Origin branch', c.origin_branch], ['Status', c.closed ? 'Closed' : 'Open']],
             detail.items.map((i: any) => ({ ...i, pieces: i.boxes_in ? `${i.in_pieces} of ${i.boxes_total}` : i.in_pieces, weight: i.in_weight || i.weight })));
     };
+    // ---------- export with chosen columns (components/ManifestExport.tsx) ----------
+    const [exp, setExp] = useState<{ title: string; fileName: string; meta: [string, unknown][]; rows: any[] } | null>(null);
+    const exportDetail = () => {
+        const c = detail.consolidation;
+        setExp({ title: `${KIND_NAME[c.kind] || 'MAWB'} manifest — ${c.mawb}`, fileName: `manifest-${String(c.mawb).replace(/[^A-Za-z0-9-]+/g, '_')}`,
+            meta: [['Carrier', c.carrier], [c.kind === 'container' ? 'Vessel' : 'Flight', c.flight_no || c.vessel], ['Departure', c.departure_date], ['Destination', c.dest_country], ['Origin branch', c.origin_branch]],
+            rows: detail.items.map((i: any) => ({ ...i, pieces: i.boxes_in ? i.in_pieces : i.pieces, weight: i.in_weight || i.weight })) });
+    };
+    async function exportTransfer(id: number | string) {
+        try {
+            const { manifest: m, items } = await api(`/api/transfers?id=${encodeURIComponent(id)}`);
+            setExp({ title: `Transfer manifest — ${m.manifest_no}`, fileName: `manifest-${String(m.manifest_no).replace(/[^A-Za-z0-9-]+/g, '_')}`,
+                meta: [['From', bname(m.from_branch)], ['To', bname(m.to_branch)], ['Sent', fmt(m.created_at)], ['Vehicle', m.vehicle], ['Driver', m.driver], ['Seal', m.seal_no]],
+                rows: items.map((t: any) => ({ ...t.bookings, current_status: t.status === 'received' ? 'Received' : 'In transit' })) });
+        } catch (e) { toast(false, (e as Error).message); }
+    }
     async function printTransfer(id: number | string) {
         try {
             const { manifest: m, items } = await api(`/api/transfers?id=${encodeURIComponent(id)}`);
@@ -397,10 +414,13 @@ export function Consolidation() {
             </div>
             <div className="flex flex-wrap justify-between gap-2 pt-4 border-t border-gray-100">
                 <button id="dPrint" type="button" className="btn btn-light" onClick={printDetail}><Icon name="clipboard" />Print manifest</button>
+                <button id="dExport" type="button" className="btn btn-light" onClick={exportDetail}><Icon name="download" />Export</button>
                 <button id="dClose" type="button" className="btn btn-dark" onClick={closeToggle}>{c && (c.closed ? <><Icon name="refresh" />Reopen</> : <><Icon name="check" />{`Close ${(KIND_NAME[c.kind] || 'MAWB').toLowerCase()}`}</>)}</button>
             </div>
         </Modal>
         {agents && <datalist id="cAgentList">{agents.map((n, i) => <option key={i} value={n}></option>)}</datalist>}
+        {/* last, so it opens above the consolidation window */}
+        {exp && <ManifestExport open onClose={() => setExp(null)} title={exp.title} fileName={exp.fileName} meta={exp.meta} rows={exp.rows} />}
     </>;
 
     const consList = (cons || []).filter(x => cfilter === 'all' || (cfilter === 'open' ? !x.closed : x.closed));
@@ -500,10 +520,10 @@ export function Consolidation() {
                                     const total = m.transfers.length, got = m.transfers.filter((t: any) => t.status === 'received').length;
                                     const pill = m.status === 'received' ? 'pill-green' : m.status === 'partial' ? 'pill-amber' : 'pill-dark';
                                     return (
-                                        <button key={m.id} type="button" data-print-tr={m.id} onClick={() => printTransfer(m.id)} className="w-full flex items-center justify-between gap-3 p-3 rounded-2xl hover:bg-[#F8F8FA] text-left">
+                                        <div key={m.id} className="flex items-center gap-1"><button type="button" data-print-tr={m.id} onClick={() => printTransfer(m.id)} className="flex-1 min-w-0 flex items-center justify-between gap-3 p-3 rounded-2xl hover:bg-[#F8F8FA] text-left">
                                             <span className="min-w-0"><span className="block text-xs font-extrabold font-mono truncate">{m.manifest_no}</span>
                                                 <span className="block text-[10px] text-gray-400">{`→ ${bname(m.to_branch)} · ${fmt(m.created_at)}`}</span></span>
-                                            <span className="text-right"><span className={`pill-tag ${pill}`}>{`${got}/${total} ${m.status === 'in_transit' ? 'in transit' : m.status}`}</span>{m.transfers.some((t: any) => t.missing_pieces) && <span className="block pill-tag pill-coral mt-1">boxes missing</span>}</span></button>
+                                            <span className="text-right"><span className={`pill-tag ${pill}`}>{`${got}/${total} ${m.status === 'in_transit' ? 'in transit' : m.status}`}</span>{m.transfers.some((t: any) => t.missing_pieces) && <span className="block pill-tag pill-coral mt-1">boxes missing</span>}</span></button><button type="button" className="icon-btn flex-shrink-0" aria-label={`Export ${m.manifest_no}`} title="Export with chosen columns" data-export-tr={m.id} onClick={() => exportTransfer(m.id)}><Icon name="download" cls="w-4 h-4" /></button></div>
                                     );
                                 }) : <p className="text-xs text-gray-400 text-center py-4">Nothing sent yet.</p>}
                             </div>
@@ -544,6 +564,7 @@ export function Consolidation() {
                                     <div className="flex flex-wrap gap-2 mt-4">
                                         {left.length > 0 && <button type="button" className="btn btn-dark btn-sm" data-recv-all={m.id} onClick={() => receiveAll(m)}><Icon name="checkCircle" />{`Receive all ${left.length}`}</button>}
                                         <button type="button" className="btn btn-light btn-sm" data-print-tr={m.id} onClick={() => printTransfer(m.id)}><Icon name="clipboard" />Manifest</button>
+                                        <button type="button" className="btn btn-light btn-sm" data-export-tr={m.id} onClick={() => exportTransfer(m.id)}><Icon name="download" />Export</button>
                                     </div></article>
                             );
                         }) : T.branch ? <p className="p-10 text-center text-xs text-gray-400 bg-[#F8F8FA] rounded-[2rem]">Nothing on the way to this branch.</p> : null}

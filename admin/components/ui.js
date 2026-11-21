@@ -743,3 +743,9 @@ window.UI = (() => {
     });
     window.addEventListener('pageshow', () => document.documentElement.classList.remove('page-leaving'));
 })();
+
+// The mouse wheel never changes a number box (same guard as the new app: web/src/lib/wheelGuard.ts).
+document.addEventListener('wheel', (e) => {
+    const t = e.target;
+    if (t instanceof HTMLInputElement && t.type === 'number' && document.activeElement === t) t.blur();
+}, { capture: true, passive: true });

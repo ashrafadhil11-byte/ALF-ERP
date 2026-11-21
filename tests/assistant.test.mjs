@@ -67,7 +67,27 @@ test('assistant: a Claude tool round — reads data, then answers as Farah', asy
     assert.deepEqual(out.tools, ['count_shipments']);
     const first = calls.find(c => c.url.includes('anthropic')).body;
     assert.ok(first.tools.length >= 5);
-    assert.ok(first.system.includes('You are Farah') && first.system.includes('branch ALFSNY') && first.system.includes('call the user Ali') && first.system.includes('first message to you today'));
+    assert.ok(first.system.includes('You are Farah') && first.system.includes('branch ALFSNY') && first.system.includes('call them Ali') && first.system.includes('First message today'));
+    // a plain question gets only the reading tools; Farah can ask for the job tools
+    assert.ok(!first.tools.some(t => t.name.startsWith('propose_')) && first.tools.some(t => t.name === 'more_tools'));
+});
+
+test('assistant: action requests get the job tools at once; more_tools adds them later; reasoning is not sent back', async () => {
+    const bodies = [];
+    let round = 0;
+    fake(STAFF, {
+        'integrations?kind=eq.ai': () => [{ id: 3, name: 'Groq', adapter: 'openai_compat', base_url: 'https://api.groq.com/openai/v1', config: { model: 'm' }, secret: { api_key: 'k' } }],
+        'api.groq.com': (u, o, b) => { bodies.push(b); round++;
+            if (round === 1) return { choices: [{ message: { role: 'assistant', reasoning: 'long thoughts', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'more_tools', arguments: '{}' } }] } }] };
+            return { choices: [{ message: { role: 'assistant', content: 'OK' } }] }; }
+    });
+    await ask('could you handle the Sohar thing', [], SESSION, 'Bearer t');
+    assert.ok(!bodies[0].tools.some(t => t.function.name === 'propose_status_update'));
+    assert.ok(bodies[1].tools.some(t => t.function.name === 'propose_status_update'));
+    assert.equal(bodies[1].messages.find(m => m.tool_calls).reasoning, undefined);
+    bodies.length = 0; round = 1;
+    await ask('mark 311000045 out for delivery', [], SESSION, 'Bearer t');
+    assert.ok(bodies[0].tools.some(t => t.function.name === 'propose_status_update'));
 });
 
 test('assistant: OpenAI-compatible uses the saved base URL; provider errors keep their message', async () => {

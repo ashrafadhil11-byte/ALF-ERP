@@ -14,6 +14,7 @@ import { CityField, CountryField } from '../components/fields/PlaceFields';
 import type { ComboboxHandle } from '../components/fields/Combobox';
 import { ScanInput } from '../components/fields/Scan';
 import { ShipmentDrawer, type DrawerActions } from '../components/ShipmentDrawer';
+import { openPacking } from '../components/PackingList';
 import { api } from '../lib/api';
 import { useLive } from '../lib/live';
 import { confirm } from '../lib/dialogs';
@@ -363,6 +364,7 @@ export function Shipments() {
     const cardActions: DrawerActions = (b, { cancelled, fab }) => <>
                 <div className="flex items-center gap-1.5">
                     {fab('edit', 'Edit', () => editShipment(b.awb))}
+                    {fab('box', 'Packing list', () => openPacking(b.awb))}
                     {b.shipper_phone && fab('message', 'WhatsApp', () => whatsapp(b.awb), 'fab-wa')}
                     {b.fwd_docket && fab('sync', 'Carrier sync', () => syncCarriers(b.awb))}
                     {!cancelled && fab('ban', 'Cancel', () => cancelShipment(b.awb), 'fab-danger')}

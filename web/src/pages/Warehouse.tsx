@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppFrame } from '../components/frame/AppFrame';
 import { Modal, useDismiss } from '../components/Modal';
 import { Icon } from '../components/Icon';
+import { SafeNumber } from '../components/fields/SafeNumber';
 import { api, ApiError } from '../lib/api';
 import { toast } from '../lib/toast';
 import './warehouse.css';
@@ -179,9 +180,12 @@ export function Warehouse() {
     };
 
     // ---------- stock ----------
-    const savePrice = async (item: any, row: HTMLElement) => {
-        try { await wh('/api/warehouse', { method: 'POST', body: { action: 'price', product_id: item.id, sell_price: (row.querySelector('[data-price]') as HTMLInputElement).value, reorder_level: (row.querySelector('[data-reorder]') as HTMLInputElement).value } }); toast(true, `${item.name} saved.`); }
-        catch (err) { toast(false, (err as Error).message); }
+    // price and reorder level are changed on purpose only (SafeNumber: tap, change, ✓); the other value is sent as it is
+    const savePrice = async (item: any, patch: { sell_price?: string; reorder_level?: string }) => {
+        try {
+            await wh('/api/warehouse', { method: 'POST', body: { action: 'price', product_id: item.id, sell_price: patch.sell_price ?? item.sell_price, reorder_level: patch.reorder_level ?? (item.reorder_level ?? '') } });
+            toast(true, `${item.name} saved.`); show();
+        } catch (err) { toast(false, (err as Error).message); throw err; }
     };
     const count = async (item: any) => {
         const v = prompt(`Counted ${item.name} on the shelf (system says ${item.qty} ${item.unit}):`, String(item.qty));
@@ -275,9 +279,9 @@ export function Warehouse() {
                             <td className="p-3 pl-4" data-label="Item"><b>{i.name}</b><span className="block text-[10px] text-gray-400 font-mono">{i.sku}</span></td>
                             <td className="p-3 text-right font-extrabold" data-label="In stock">{i.qty + ' '}<span className="text-[10px] text-gray-400 font-medium">{i.unit}</span>{low ? <span className="block text-[10px] text-[#D55C48]">reorder</span> : null}</td>
                             <td className="p-3 text-right money" data-label="Avg cost">{money(i.avg_cost)}</td>
-                            <td className="p-3" data-label="Price to branches"><input type="number" min="0" step="0.001" className="field !py-1.5 !w-28 text-right" data-price defaultValue={(+i.sell_price).toFixed(dp())} aria-label={`Price to branches for ${i.name}`} /></td>
-                            <td className="p-3" data-label="Reorder at"><input type="number" min="0" step="any" className="field !py-1.5 !w-20 text-right" data-reorder defaultValue={i.reorder_level || ''} aria-label={`Reorder level for ${i.name}`} /></td>
-                            <td className="p-3 pr-4 text-right whitespace-nowrap" data-label=""><button type="button" className="btn btn-light btn-sm" data-save onClick={(e) => savePrice(i, e.currentTarget.closest('tr')!)}>Save</button>{' '}<button type="button" className="btn btn-light btn-sm" data-count onClick={() => count(i)}>Count</button></td></tr>
+                            <td className="p-3" data-label="Price to branches"><SafeNumber value={i.sell_price} step="0.001" label={`Price to branches for ${i.name}`} format={(v) => v.toFixed(dp())} onSave={(v) => savePrice(i, { sell_price: v })} /></td>
+                            <td className="p-3" data-label="Reorder at"><SafeNumber value={i.reorder_level || null} width="!w-20" label={`Reorder level for ${i.name}`} empty="Set" onSave={(v) => savePrice(i, { reorder_level: v })} /></td>
+                            <td className="p-3 pr-4 text-right whitespace-nowrap" data-label=""><button type="button" className="btn btn-light btn-sm" data-count onClick={() => count(i)}>Count</button></td></tr>
                     );
                 })}
             </Table>
